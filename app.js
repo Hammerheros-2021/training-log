@@ -358,7 +358,7 @@ function targets(){return {fastH:(meta.settings&&meta.settings.fastH)||14}}
 // ---------- totals ----------
 const kcalOf=i=>isNum(i.kcal)?+i.kcal:Math.round(4*(+i.carbs||0)+4*(+i.protein||0)+9*(+i.fat||0));
 const breaksFast=i=>kcalOf(i)>=20;
-function foodTotals(d){const t={n:0,microN:0};NK.forEach(k=>t[k]=0);(d&&d.food||[]).forEach(i=>{NK.forEach(k=>{t[k]+=k==='kcal'?kcalOf(i):(+i[k]||0)});t.n++;if(i.micros!==false)t.microN++});return t}
+function foodTotals(d){const t={n:0,microN:0};NK.forEach(k=>t[k]=0);(d&&d.food||[]).forEach(i=>{NK.forEach(k=>{t[k]+=k==='kcal'?kcalOf(i):(+i[k]||0)});t.n++;if(i.micros!==false)t.microN++});suppItems(d).forEach(i=>NK.forEach(k=>{if(k!=='kcal')t[k]+=(+i[k]||0);else t.kcal+=(+i.kcal||0)}));return t}
 function mealWindow(d){if(!d)return null;let ts=(d.food||[]).filter(breaksFast).map(i=>tmin(i.at)).filter(x=>x!=null);const f=tmin(d.firstMeal),l=tmin(d.lastMeal);if(f!=null)ts.push(f);if(l!=null)ts.push(l);if(!ts.length)return null;return {first:f!=null?f:Math.min(...ts),last:l!=null?l:Math.max(...ts)}}
 function fastHours(map,k){const d=map[k],p=map[iso(addD(parse(k),-1))];const w=mealWindow(d),pw=mealWindow(p);if(!w||!pw)return null;return Math.round(((w.first+1440)-pw.last)/6)/10}
 function lastCaffeineOf(d){if(!d)return null;if(d.lastCaffeine)return tmin(d.lastCaffeine);const ts=(d.food||[]).filter(i=>(+i.caffeine||0)>0).map(i=>tmin(i.at)).filter(x=>x!=null);return ts.length?Math.max(...ts):null}
@@ -401,20 +401,20 @@ function foodTodayHTML(dIso){
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Time to plan ahead'}</b><br><small>Update your food available, then let the app build the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
   <article class="card"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label}</h2><div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
     <div class="form" style="padding-bottom:4px"><div class="field"><span class="label">Day type</span>${seg('dt','dayType',['rest','training','match'],dt,['Rest','Training','Match'],'small')}</div></div>
-    <div class="macs">${NUTS.filter(n=>n.macro).map(n=>nutBar(n,t[n.k],nutTarget(n.k,dt))).join('')}</div>
-    <details class="wu" style="margin:0 16px 10px"><summary>Vitamins &amp; minerals · ${t.n?`${microOk} of ${micros.length} on target`:'none logged'}</summary><div class="macs" style="padding:4px 0 12px">${micros.map(n=>nutBar(n,t[n.k],nutTarget(n.k,dt))).join('')}${t.n&&t.microN<t.n?`<div class="hint" style="font-size:12px;color:var(--muted)">${t.n-t.microN} item${t.n-t.microN>1?'s have':' has'} macros only, so these may read low.</div>`:''}</div></details>
+    ${macroRings(t,dt)}
+    ${microsHTML(t,dt,dIso)}
     <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants this week${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
   </article>
-  ${planMismatch(dIso)}${planVsHTML(dIso)}${pd?`<article class="card"><div class="chead"><div style="flex:1"><h2>${dIso===iso(todayDate())?'Your plan for today':'Your plan for this day'}</h2><div class="sub">${esc(pd.note||'Tap Ate this as you go. Changes go in the diary.')}</div></div></div>${planMealsHTML(dIso)}</article>`:''}
+  ${closeDayNudge(dIso)}${drinksHTML(dIso)}${planMismatch(dIso)}${planVsHTML(dIso)}${pd?`<article class="card"><div class="chead"><div style="flex:1"><h2>${dIso===iso(todayDate())?'Your plan for today':'Your plan for this day'}</h2><div class="sub">${esc(pd.note||'Tap Ate this as you go. Changes go in the diary.')}</div></div></div>${planMealsHTML(dIso)}</article>`:''}
   <article class="card"><div class="form">
       <h3>Food diary</h3>
       ${ai?`<div class="field"><label class="label" for="f-say">Say it in your own words, any time of day</label><textarea id="f-say" placeholder="e.g. Coffee and SIS tab before training. Porridge with whey after at 8. Chicken salad bowl at 1. Cappuccino at 3. Ribeye and mushrooms at 7, 2 brownies after." style="min-height:110px">${esc(diaryText)}</textarea>
         <div class="hint" style="font-size:12px;color:var(--muted)">Use the microphone on your phone keyboard to talk. Mention times and they set your fasting hours. Only log things not already ticked off from the plan.</div></div>
       <div class="actions"><button type="button" class="primary" id="fParse" ${fState.busy?'disabled':''} style="font-size:17px">${fState.busy?'Working…':(d.food||[]).some(i=>i.src==='diary')?'Update from diary':'Work out my day'}</button></div>`:'<div class="hint">Claude estimates are not available in this view. Use the quick adds below.</div>'}
-      ${canImg?`<div class="field"><label class="label" for="mealFile">Or add a photo of a meal</label><input type="file" id="mealFile" accept="image/*" class="nativefile"></div>`:''}
+      ${canImg?`<label class="cambtn">📷 Snap your plate<input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}
       ${fState.msg?`<div class="hsum" role="status">${esc(fState.msg)}</div>`:''}
       <div class="field"><span class="label">Meal for photos and quick adds</span>${seg('f','meal',MEALS,meal,null,'small')}</div>
-      ${lib.length?`<div class="field"><span class="label">From your meal guide (tap to add)</span><div class="tags">${lib.map(x=>`<button type="button" data-lib="${LIB.indexOf(x)}">${esc(x[0])}</button>`).join('')}</div></div>`:''}
+      ${lib.length?`<details class="wu"><summary>Quick add from your meal guide</summary><div class="tags" style="padding-bottom:10px">${lib.map(x=>`<button type="button" data-lib="${LIB.indexOf(x)}">${esc(x[0])}</button>`).join('')}</div></details>`:''}
       ${freq.length?`<div class="field"><span class="label">Your usual extras</span><div class="tags">${freq.map((i,ix)=>`<button type="button" data-quick="${ix}">${esc(i.name)}${i.qty?` · ${esc(i.qty)}`:''}</button>`).join('')}</div></div>`:''}
   </div>
   ${groups?`<div class="meals" style="border-top:1px solid var(--line);padding-top:6px">${groups}</div>`:''}
@@ -494,10 +494,10 @@ async function parseDiary(){
 async function parseFoodPhoto(file){
   const meal=fState.meal||(iso(sel)===iso(todayDate())?guessMeal():'Dinner');
   fState.busy=true;fState.msg='Looking at your plate… this can take up to a minute.';render();
-  try{const out=await sample.json(`This is a photo of a meal (${meal}). Identify each food and estimate its portion and nutrition.\n${foodRules()}\nIf it is not food, reply {"items":[]}.`,{images:file});
+  try{const out=await sample.json(`This is a photo of a meal (${meal}). Identify each food and estimate its portion and nutrition.\n${foodRules()}\nAlso add a "seen" field to the JSON: one plain sentence describing what you can see on the plate. If it is not food, reply {"items":[],"seen":"what it is instead"}.`,{images:file});
     const items=cleanItems(out&&out.items,meal,true,'photo').map(i=>({...i,meal}));
     if(!items.length){fState={...fState,busy:false,msg:'No food recognised. Try a closer photo from above, or describe it in the diary.'};render();return}
-    await addFood(items);fState={...fState,busy:false,msg:`Estimated ${items.length} item${items.length>1?'s':''} for ${meal}. Photo estimates can be off by 20-30%.`};toast('Meal estimated');
+    await addFood(items);fState={...fState,busy:false,msg:(out&&out.seen?'I can see: '+String(out.seen).slice(0,200)+' ':'')+`Logged ${items.length} item${items.length>1?'s':''} for ${meal} as an estimate: photos can be 20-30% out. Check them below and fix anything that's wrong.`};toast('Meal estimated');
   }catch(e){fState={...fState,busy:false,msg:foodErr(e)}}
   render();
 }
@@ -770,7 +770,7 @@ function viewDashboard(){
   const yd=DD[yk];const bal=[['farmHrs','var(--farm)',WORK],['deskHrs','var(--s)','Desk'],['carHrs','var(--r)','Car'],['familyHrs','var(--e)','Family']];
   const balTot=yd?bal.reduce((a,[f])=>a+(+yd[f]||0),0):0;
   const balance=balTot?`<div class="stack">${bal.map(([f,c,l])=>+yd[f]?`<i style="flex:${+yd[f]};background:${c}" title="${l}"></i>`:'').join('')}</div><div class="legend">${bal.map(([f,c,l])=>`<span style="--c:${c}"><i></i>${l} ${+yd[f]||0} h</span>`).join('')}</div>`:'<div class="ds">Comes from the morning check-in, under Yesterday.</div>';
-  const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'')):[];
+  const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'').split(' :: ')[0]):[];
   const due=!sampleMode&&planDue();
   const su=setupChecklistHTML();return toggle+su+(su?'':todoHTML())+hero+`<div class="dgrid">${tSleep}${tSess}${tFuel}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
@@ -888,7 +888,8 @@ async function applyAdjust(list,src){
     cur[k]={type,note,src,at:now,was:p.type,prev:cur[k]||null};applied.push({date:k,from:p.type,to:type,note})});
   if(applied.length)await persistMeta('adjust',{days:cur});return applied;
 }
-async function undoAdjust(k){const cur=Object.assign({},ADJ());const a=cur[k];if(!a)return;if(a.prev)cur[k]=a.prev;else delete cur[k];
+async function undoAdjust(k){const cur=Object.assign({},ADJ());const a=cur[k];if(!a)return;
+  if(a.group){Object.keys(cur).forEach(x=>{const b=cur[x];if(b&&b.group===a.group){if(b.prev)cur[x]=b.prev;else delete cur[x]}});await persistMeta('adjust',{days:cur});toast('Back to the original plan');render();return}if(a.prev)cur[k]=a.prev;else delete cur[k];
   if(a.src==='move'&&a.pair){const b=cur[a.pair];if(b&&b.src==='move'&&b.pair===k){if(b.prev)cur[a.pair]=b.prev;else delete cur[a.pair]}}
   await persistMeta('adjust',{days:cur});if(xState.last)xState.last.applied=(xState.last.applied||[]).filter(x=>x.date!==k&&x.date!==a.pair);toast('Back to the original plan');render()}
 async function addExtra(){
@@ -918,14 +919,15 @@ async function moveSession(a,b){
   xState.moveOpen=false;
   const nb=[iso(addD(parse(b),-1)),iso(addD(parse(b),1))].filter(x=>x!==a).map(x=>{const p=planFor(parse(x));return p&&HARDC.includes(p.type)});
   toast(HARDC.includes(pa.type)&&nb.some(Boolean)?`Moved to ${dn(b)}. Heads up: that puts two hard days back to back.`:`Moved to ${dn(b)}`,3800);
-  sel=parse(b);sDraft=null;dDraft=null;render();
+  sel=parse(b);sDraft=null;dDraft=null;render();balanceWeek(a<b?a:b);
 }
 function adjBanner(pl){if(!pl||!pl.adj)return '';const a=pl.adj;const k=iso(sel);
   return `<div class="adjb"><div><b>${a.src==='move'?'Moved':'Adjusted'}${a.was&&a.was!==pl.type?`: was ${esc(TNAME[a.was]||'')}`:''}</b>${a.note?`<br><span>${esc(a.note)}</span>`:''}</div>${k>=iso(todayDate())&&!L()[k]?`<button type="button" class="ghost" data-xundo="${k}">Undo</button>`:''}</div>`}
 function moveHTML(pl){const k=iso(sel);if(!pl||pl.type==='R'||L()[k]||k<iso(todayDate()))return '';
-  if(!xState.moveOpen)return `<div class="movebar"><button type="button" class="ghost" id="mvOpen">⇄ Move this session</button><span>Swap it with another day this week</span></div>`;
-  const mon=addD(sel,-((sel.getDay()+6)%7));const opts=[];for(let i=0;i<7;i++){const d=addD(mon,i),kk=iso(d),p=planFor(d);if(kk===k||kk<iso(todayDate())||!p||L()[kk])continue;opts.push(`<button type="button" data-mvto="${kk}" style="--c:var(${TVAR[p.type]})"><b>${fmtD(d,{weekday:'short'})} ${d.getDate()}</b><span>${esc(TNAME[p.type])}</span></button>`)}
-  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Move ${esc(TNAME[pl.type])} to…</h2><div class="sub">The two days swap. The rest of your plan stays the same.</div></div><button type="button" class="x" id="mvClose" aria-label="Close">×</button></div><div class="mvgrid">${opts.join('')||'<div class="hint">No other free days left this week.</div>'}</div></article>`}
+  const isToday=k===iso(todayDate());const skip=isToday&&!((D()[k]||{}).trainIntent==='no');
+  if(!xState.moveOpen)return `<div class="movebar"><button type="button" class="ghost" id="mvPost">⏭ Postpone a day</button><button type="button" class="ghost" id="mvOpen">⇄ Move</button>${skip?`<button type="button" class="ghost" id="mvSkip">Skip today</button>`:''}</div>`;
+  const opts=[];for(let i=-3;i<=7;i++){const d=addD(sel,i),kk=iso(d),p=planFor(d);if(kk===k||kk<iso(todayDate())||!p||L()[kk])continue;opts.push(`<button type="button" data-mvto="${kk}" style="--c:var(${TVAR[p.type]})"><b>${fmtD(d,{weekday:'short'})} ${d.getDate()}</b><span>${esc(TNAME[p.type])}</span></button>`)}
+  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Move ${esc(TNAME[pl.type])} to…</h2><div class="sub">The two days swap. Then the app checks the rest of your week and eases anything that ends up too close together.</div></div><button type="button" class="x" id="mvClose" aria-label="Close">×</button></div><div class="mvgrid">${opts.join('')||'<div class="hint">No free days in the next week.</div>'}</div></article>`}
 function extrasCardHTML(k){
   const d=D()[k]||{};const ex=d.extras||[];const future=k>iso(todayDate());if(future&&!ex.length)return '';
   const list=ex.map((x,i)=>`<div class="fitem"><div style="min-width:0"><div class="fn">${esc(x.desc||x.kind)}</div><div class="fq">${esc(x.kind)}${x.dur?` · ${x.dur} min`:''}${x.rpe?` · effort ${x.rpe}/10`:''}</div></div><span></span>${sampleMode?'':`<button type="button" class="x" data-xdel="${i}" aria-label="Remove">×</button>`}</div>`).join('');
@@ -1072,7 +1074,7 @@ function todoHTML(){
   const pend=items.filter(x=>!x[1]);const nx=pend[0];const onlyFood=pend.length===1&&/today's food/i.test(nx[0]);
   const tag=nx[3].startsWith('href')?'a':'button';
   const list=todoOpen?`<div class="todolist">${items.map(([t,ok,dsc,attr],i)=>{const tg=attr.startsWith('href')?'a':'button';return `<${tg} ${tg==='button'?'type="button"':''} class="step ${ok?'ok':''}" ${attr} data-todo><span class="sn">${ok?'✓':i+1}</span><span class="st"><b>${esc(t)}</b><small>${esc(dsc)}</small></span><span aria-hidden="true">›</span></${tg}>`}).join('')}</div>`:'';
-  return `<section class="todobar ${onlyFood&&!todoOpen?'later':''}"><${tag} ${tag==='button'?'type="button"':''} class="tnext" ${nx[3]} data-todo><span class="tdots" aria-hidden="true">${items.map(x=>`<i class="${x[1]?'on':''}"></i>`).join('')}</span><span class="tt"><small>${onlyFood?'Later today':'Next'} · ${done} of ${items.length} done</small><b>${esc(nx[0])}</b></span><span aria-hidden="true">›</span></${tag}><button type="button" class="ttog" id="todoTog" aria-label="${todoOpen?'Hide':'Show'} today's to-do list" aria-expanded="${todoOpen}">${todoOpen?'▴':'▾'}</button>${list}</section>`;
+  return `<section class="todobar "><${tag} ${tag==='button'?'type="button"':''} class="tnext" ${nx[3]} data-todo><span class="tdots" aria-hidden="true">${items.map(x=>`<i class="${x[1]?'on':''}"></i>`).join('')}</span><span class="tt"><small>${onlyFood?'Later today':'Next'} · ${done} of ${items.length} done</small><b>${esc(nx[0])}</b></span><span aria-hidden="true">›</span></${tag}><button type="button" class="ttog" id="todoTog" aria-label="${todoOpen?'Hide':'Show'} today's to-do list" aria-expanded="${todoOpen}">${todoOpen?'▴':'▾'}</button>${list}</section>`;
 }
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#todoTog')){todoOpen=!todoOpen;render()}});
 
@@ -1145,13 +1147,127 @@ function planMismatch(k){const pd=planDay(k);if(!pd)return '';const now=dayTypeF
   return `<div class="adjb"><div><b>Today changed to a ${esc(DAYT[now].label.toLowerCase())}</b><br><span>Your targets above have switched (${esc(dayTypeWhy(k))}). The meal plan was made for a ${esc(DAYT[pd.dayType].label.toLowerCase())}; follow it loosely or re-plan.</span></div><button type="button" class="ghost" data-fview="plan">Re-plan</button></div>`}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-intent]');if(b){setIntent(b.dataset.intent)}});
 
+// ================= food log v2: rings, nutrient gaps, water, alcohol, supplements =================
+const NUT_FOODS={fibre:'oats, beans and lentils, berries, wholegrain bread, vegetables, chia seeds',sodium:'a pinch of salt on food, stock, cheese; more on heavy sweat days',potassium:'potatoes, bananas, beans, spinach, avocado, yogurt, salmon',
+  magnesium:'pumpkin seeds, almonds, cashews, spinach, black beans, oats, dark chocolate (70%+)',calcium:'milk, Greek yogurt, cheese, tinned sardines or salmon with the bones, calcium-set tofu, kale',
+  iron:'red meat, mussels, lentils, chickpeas, spinach (with a vitamin C food to absorb it)',zinc:'beef, lamb, oysters, pumpkin seeds, chickpeas, cheese',selenium:'Brazil nuts (1-2 a day is plenty), tuna, sardines, eggs, chicken',
+  iodine:'milk, yogurt, white fish like cod and haddock, eggs',vitA:'carrots, sweet potato, spinach, eggs, liver, butter',vitC:'peppers, kiwi, oranges, strawberries, broccoli, tomatoes',
+  vitD:'oily fish (salmon, mackerel, sardines), eggs, fortified milk. Hard to get enough from food from October to March in Ireland',vitK:'kale, spinach, broccoli, Brussels sprouts, cabbage',
+  b12:'meat, fish, eggs, milk and yogurt',folate:'lentils, chickpeas, spinach, asparagus, broccoli, avocado',choline:'eggs (the yolk), beef, chicken, salmon, soya beans',
+  omega3:'salmon, mackerel, sardines, herring, trout, twice a week. Walnuts, flax and chia help but give a different, weaker form'};
+const SUPP_INFO=[['Creatine monohydrate','3-5 g a day, any time, with water or food; no loading needed. One of the best-studied supplements for strength and power. Meat and fish contain some, but not enough for the full effect.'],
+  ['Vitamin D','Hard to get enough from food or sunlight in an Irish winter, so many people take it from October to March. Ask a pharmacist about the right dose for you.'],
+  ['Omega-3 (fish or algae oil)','Worth it if you eat oily fish less than twice a week.'],
+  ['Magnesium','Food first: seeds, nuts, greens, beans. If you do take one, keep to the label dose.'],
+  ['Protein powder','Just food in a handy form. Useful when you can\'t reach your protein target from meals.'],
+  ['Electrolytes','On long or very sweaty days. Otherwise salt on your food covers it.']];
+const ALC=[['Pint of lager',2,215,18],['Pint of stout',2,210,17],['Pint of cider',2,220,25],['Bottle of beer',1.5,140,11],['Glass of wine',1.7,160,4],['Gin and tonic',1,130,14],['Vodka and coke',1,150,20],['Spirit, neat',1,70,0],['Alcohol-free beer',0,60,12]];
+function alcOn(){const s=(meta.settings||{}).alcohol;if(s)return s==='on';return typeof PROFILE!=='undefined'}
+function alcLimit(){let sx='';try{sx=(PROFILE&&PROFILE.answers&&PROFILE.answers.sex)||''}catch(e){}return /female|woman/i.test(sx)?11:17}
+function alcWeek(k){let n=0;const t=parse(k),mon=addD(t,-((t.getDay()+6)%7));for(let i=0;i<7;i++){const d=D()[iso(addD(mon,i))];(d&&d.food||[]).forEach(x=>n+=+x.sd||0)}return Math.round(n*10)/10}
+let fx={alc:false,supAdd:false,supBusy:false,supMsg:'',gap:null};
+const supps=()=>(meta.supps&&meta.supps.list)||[];
+function suppItems(d){if(!d||!d.date)return [];return supps().filter(s=>d.date>=(s.since||'0')&&d.date<=iso(todayDate())&&!(d.suppMissed||[]).includes(s.id)).map(s=>Object.assign({name:s.name},s.nut||{}))}
+function ringSVG(v,tg,col,size){const r=size/2-6,c=2*Math.PI*r,p=Math.max(0,Math.min(1,tg?v/tg:0));return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true"><circle cx="${size/2}" cy="${size/2}" r="${r}" style="fill:none;stroke:var(--sunk);stroke-width:7"/><circle cx="${size/2}" cy="${size/2}" r="${r}" transform="rotate(-90 ${size/2} ${size/2})" style="fill:none;stroke:${col};stroke-width:7;stroke-linecap:round" stroke-dasharray="${(c*p).toFixed(1)} ${c.toFixed(1)}"/></svg>`}
+function macroRings(t,dt){
+  const one=(k,lab,col)=>{const n=NUTS.find(x=>x.k===k),tg=nutTarget(k,dt);const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);const st=status(t[k],tg);
+    return `<div class="mring">${ringSVG(t[k],ref,st==='bad'&&t[k]>ref?'var(--bad)':col,74)}<div class="mrv"><b class="num">${Math.round(t[k])}</b><small>of ${Math.round(ref)}${n.u==='kcal'?'':' '+n.u}</small></div><span>${lab}</span></div>`};
+  return `<div class="mrings">${one('kcal','Calories','var(--accent)')}${one('protein','Protein','var(--s)')}${one('carbs','Net carbs','var(--e)')}${one('fat','Fat','var(--x)')}</div>`;
+}
+function microsHTML(t,dt,k){
+  const micros=NUTS.filter(n=>!n.macro&&n.lo);const d=D()[k]||{};const late=d.foodDone||k<iso(todayDate())||new Date().getHours()>=18;
+  const gaps=t.microN>=2?micros.map(n=>{const tg=nutTarget(n.k,dt);return {n,pct:tg.lo?t[n.k]/tg.lo:1}}).filter(x=>x.pct<.6).sort((a,b)=>a.pct-b.pct).slice(0,4):[];
+  const fib=NUTS.find(x=>x.k==='fibre');const ftg=nutTarget('fibre',dt);if(t.microN>=2&&ftg.lo&&t.fibre<ftg.lo*.6&&gaps.length<4)gaps.push({n:fib,pct:t.fibre/ftg.lo});
+  const all=NUTS.filter(n=>!n.macro);const ok=all.filter(n=>status(t[n.k],nutTarget(n.k,dt))==='ok').length;
+  return `${gaps.length?`<div class="gapbox"><div class="gh"><b>${late?'Worth topping up':'Running low so far today'}</b><small>Tap one to see which foods have it</small></div><div class="gchips">${gaps.map(g=>`<button type="button" class="gchip ${fx.gap===g.n.k?'on':''}" data-gap="${g.n.k}">${esc(g.n.l)} <i>${Math.round(g.pct*100)}%</i></button>`).join('')}</div>${fx.gap&&NUT_FOODS[fx.gap]&&gaps.some(g=>g.n.k===fx.gap)?`<div class="gfood"><b>Good sources of ${esc(NUTS.find(x=>x.k===fx.gap).l.toLowerCase())}:</b> ${esc(NUT_FOODS[fx.gap])}.</div>`:''}</div>`:''}
+  <details class="wu" style="margin:0 16px 10px"><summary>All vitamins &amp; minerals · ${t.n?`${ok} of ${all.length} on target`:'none logged'}</summary><div class="macs" style="padding:4px 0 12px">${all.map(n=>nutBar(n,t[n.k],nutTarget(n.k,dt))).join('')}${t.n&&t.microN<t.n?`<div class="hint" style="font-size:12px;color:var(--muted)">${t.n-t.microN} item${t.n-t.microN>1?'s have':' has'} calories and macros only, so these may read low.</div>`:''}</div></details>`;
+}
+function drinksHTML(k){
+  const d=D()[k]||{};const w=+d.water||0;const tgt=WATER[1]||3;const pct=Math.min(100,w/tgt*100);const today=k===iso(todayDate());const can=!sampleMode&&k<=iso(todayDate());
+  const wk=alcWeek(k),lim=alcLimit();const alcToday=(d.food||[]).filter(x=>x.src==='alcohol');
+  const water=`<div class="wrow"><span class="wico" aria-hidden="true">💧</span><div class="wbar"><div class="wh"><b>Water</b><span class="num">${Math.round(w*100)/100} of ${WATER[0]}-${WATER[1]} L</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:var(--h)"></div></div></div></div>
+    ${can?`<div class="wbtns">${[[.25,'+ Glass'],[.5,'+ 500 ml'],[.75,'+ Bottle']].map(([v,l])=>`<button type="button" class="ghost" data-water="${v}">${l}</button>`).join('')}${w>0?`<button type="button" class="ghost" data-water="-0.25" aria-label="Take off a glass">−</button>`:''}</div>`:''}`;
+  const alc=alcOn()?`<div class="arow"><button type="button" class="alink" id="alcTog"><span aria-hidden="true">🍺</span> Alcohol: <b>${wk} standard drink${wk===1?'':'s'}</b> this week${alcToday.length?` · ${alcToday.length} today`:''} <i>${fx.alc?'▴':'▾'}</i></button>
+    ${fx.alc?`<div class="apick">${can?ALC.map((a,i)=>`<button type="button" class="ghost" data-alc="${i}">${a[0]}</button>`).join(''):''}</div><div class="hint" style="font-size:12px;color:var(--muted)">Irish low-risk guide: up to ${lim} standard drinks a week, spread out, with 2-3 alcohol-free days. A pint is 2, a pub measure 1. Drinks count toward your calories.${alcToday.length?' Remove one from the food list below.':''} <button type="button" class="linkbtn" id="alcOff" style="padding:0">I don't drink: hide this</button></div>`:''}</div>`
+    :`<button type="button" class="linkbtn" id="alcOn" style="font-size:12px;padding:0 16px 10px;color:var(--muted)">+ Track alcohol</button>`;
+  return `<article class="card drinks"><div class="form" style="gap:10px">${water}</div>${alc}${suppHTML(k)}</article>`;
+}
+function suppHTML(k){
+  const d=D()[k]||{};const list=supps();const can=!sampleMode&&k<=iso(todayDate());const miss=d.suppMissed||[];
+  const rows=list.map(s=>{const took=!miss.includes(s.id)&&k>=(s.since||'0');return `<button type="button" class="schip ${took?'on':''}" data-supp="${s.id}" ${can?'':'disabled'}>${took?'✓':'✕'} ${esc(s.name)}${s.dose?` <small>${esc(s.dose)}</small>`:''}</button>`}).join('');
+  const add=fx.supAdd?`<div class="form" style="padding-top:4px;gap:10px"><div class="field"><label class="label" for="sp-name">Supplement and dose</label><input id="sp-name" type="text" placeholder="e.g. Creatine 5 g, Magnesium glycinate 2 capsules"></div>
+      <div class="actions"><button type="button" class="primary" id="spSave" ${fx.supBusy?'disabled':''}>${fx.supBusy?'Reading…':'Add'}</button>${canImg?`<label class="filebtn camlite">📷 Photo of the label<input type="file" id="spPhoto" accept="image/*" capture="environment"></label>`:''}</div>
+      ${fx.supMsg?`<div class="hsum" role="status">${esc(fx.supMsg)}</div>`:''}</div>`:'';
+  return `<div class="srow"><div class="sh"><b>Supplements</b><span>${list.length?'Ticked = taken today. Tap if you missed one.':'Food first. Add any you take so they count.'}</span></div>${rows?`<div class="schips">${rows}</div>`:''}
+    <div class="sbtns">${can?`<button type="button" class="linkbtn" id="spAdd">${fx.supAdd?'Cancel':'+ Add a supplement'}</button>`:''}<details class="sinfo"><summary>Which ones are worth it?</summary><ul class="cover">${SUPP_INFO.map(([n,t])=>`<li><b>${n}:</b> ${t}</li>`).join('')}<li>Check with a pharmacist or GP before starting any supplement, especially if you take medication.</li></ul></details></div>${add}</div>`;
+}
+function closeDayNudge(k){const d=D()[k]||{};if(sampleMode||k!==iso(todayDate())||d.foodDone||!(d.food||[]).length||new Date().getHours()<19)return '';
+  return `<div class="adjb"><div><b>Finished eating for today?</b><br><span>Close the day so your totals and reports count it as complete.</span></div><button type="button" class="ghost" id="foodDoneBtn">✓ Done</button></div>`}
+async function addSupp(nameText,photo){
+  fx.supBusy=true;fx.supMsg=photo?'Reading the label…':'';render();
+  let s={id:'s'+Date.now().toString(36),name:String(nameText||'').slice(0,50),dose:'',nut:{},since:iso(sel)<iso(todayDate())?iso(sel):iso(todayDate())};
+  try{if(sample&&(photo||nameText)){const out=await sample.json(`${photo?'This is a photo of a supplement label.':`A person takes this supplement: "${String(nameText).slice(0,200)}".`} Give its short name, the daily dose they take (one serving unless they said otherwise), and the nutrients in that dose using these keys and units: ${MICRO.filter(x=>x!=='caffeine').join(', ')} (sodium, potassium, magnesium, calcium, iron, zinc, choline, vitC in mg; selenium, iodine, vitA, vitD, vitK, b12, folate in µg; omega3 in g), plus "protein" in g and "kcal" if it has any. Leave out anything not in it. For creatine or other non-nutrients, nutrients is {}.
+Reply with ONLY JSON: {"name":"","dose":"","nut":{}}`,photo?{images:photo}:{modelTier:'quick'});
+    if(out&&out.name)s.name=String(out.name).slice(0,50);if(out&&out.dose)s.dose=String(out.dose).slice(0,40);
+    if(out&&out.nut&&typeof out.nut==='object')Object.keys(out.nut).forEach(k=>{if(NK.includes(k)&&isNum(out.nut[k])&&+out.nut[k]>0)s.nut[k]=+out.nut[k]})}}
+  catch(e){if(!s.name){fx={...fx,supBusy:false,supMsg:foodErr(e)};render();return}}
+  if(!s.name){fx={...fx,supBusy:false,supMsg:'Type the name, or try a clearer photo.'};render();return}
+  await persistMeta('supps',{list:supps().concat([s])});fx={...fx,supAdd:false,supBusy:false,supMsg:''};toast(`Added ${s.name}. It counts as taken each day unless you untick it.`,4000);render();
+}
+async function toggleSupp(id){const k=iso(sel);const d=D()[k]||{};const m=(d.suppMissed||[]).slice();const i=m.indexOf(id);if(i>=0)m.splice(i,1);else m.push(id);await persistDay(k,{suppMissed:m});render()}
+async function addWater(v){const k=iso(sel);const d=D()[k]||{};const w=Math.max(0,Math.round(((+d.water||0)+v)*100)/100);await persistDay(k,{water:w});render()}
+async function addAlc(i){const a=ALC[i];const k=iso(sel);const now=new Date();const it={name:a[0],qty:'1',meal:'Snack',at:k===iso(todayDate())?fmtT(now.getHours()*60+now.getMinutes()):'21:00',est:true,src:'alcohol',sd:a[1],micros:false,plants:[]};NK.forEach(x=>it[x]=0);it.kcal=a[2];it.carbs=a[3];
+  await addFood([it],k);toast(`${a[0]} logged (${a[1]} standard drink${a[1]===1?'':'s'})`);render()}
+// ---- coach's overview as short points that open up ----
+function ovPointsHTML(text){const pts=String(text||'').split('\n').map(x=>x.trim()).filter(x=>x.startsWith('-')).map(x=>x.replace(/^-\s*/,''));
+  if(!pts.length)return `<div class="ai">${esc(text)}</div>`;
+  return `<div class="ovpts">${pts.map(p=>{const [h,...rest]=p.split(' :: ');const det=rest.join(' :: ').trim();return det?`<details class="ovp"><summary>${esc(h)}</summary><p>${esc(det)}</p></details>`:`<div class="ovp"><span>${esc(h)}</span></div>`}).join('')}</div>`}
+// ---- training: postpone pushes the week back to the next rest day ----
+async function postponeSession(a){
+  const pa=planFor(parse(a));if(!pa||pa.type==='R')return;const chain=[a];let rest=false;
+  for(let i=1;i<=6;i++){const kk=iso(addD(parse(a),i)),p=planFor(parse(kk));if(!p||L()[kk])break;chain.push(kk);if(p.type==='R'){rest=true;break}}
+  if(chain.length<2){toast("Can't postpone: there's no free day after it");return}
+  if(!rest)return moveSession(a,chain[1]);
+  const types=chain.map(k=>planFor(parse(k)).type);const cur=Object.assign({},ADJ());const now=new Date().toISOString();const dn=k=>fmtD(parse(k),{weekday:'long'});
+  chain.forEach((k,i)=>{const nt=i===0?'R':types[i-1];if(nt===types[i])return;cur[k]={type:nt,note:i===0?`${TNAME[types[0]]} postponed to ${dn(chain[1])}, so today is a rest day`:`${TNAME[types[i-1]]}, moved back a day from ${dn(chain[i-1])}`,src:'move',group:now,at:now,was:types[i],prev:cur[k]||null}});
+  await persistMeta('adjust',{days:cur});
+  const mv=((meta.moves&&meta.moves.list)||[]).concat([{at:now,from:a,to:chain[1],code:pa.type,fromDow:pa.di,toDow:(pa.di+1)%7}]).slice(-80);await persistMeta('moves',{list:mv});
+  xState.moveOpen=false;toast(`Postponed to ${dn(chain[1])}. ${chain.length>2?`The next ${chain.length-2>1?chain.length-2+' sessions shift':'session shifts'} back a day; your rest day moves to ${dn(chain[chain.length-1])}.`:''}`,4500);
+  sel=parse(chain[1]);sDraft=null;dDraft=null;render();balanceWeek(chain[0]);
+}
+async function balanceWeek(from){
+  if(!sample||sampleMode)return;const d0=parse(from);const days7=[];for(let i=0;i<7;i++){const dd=addD(d0,i),kk=iso(dd),p=planFor(dd);if(p&&kk>=iso(todayDate())&&!L()[kk])days7.push({date:kk,weekday:fmtD(dd,{weekday:'long'}),code:p.type,session:sessionBrief(dd,p),moved:!!(p.adj)})}
+  if(days7.length<2)return;
+  try{const out=await sample.json(`${XABOUT()} has just rearranged their training week. Check the next days still make sense for recovery and suggest only the small changes needed.
+Last 7 days: ${JSON.stringify(loadHistory(iso(addD(d0,-1))))}
+Coming days (you may change only these): ${JSON.stringify(days7)}
+Session codes: ${planCodes().map(c=>`${c} = ${TNAME[c]}`).join(', ')}.
+Rules: avoid hard sessions (${HARDC.filter(c=>TNAME[c]).map(c=>TNAME[c]).join(', ')}) on back-to-back days where possible, by making one easier (a note) or swapping it with an easy or rest day nearby. Keep at least one rest day in any 7. Fixed classes or club sessions stay put. If it's fine as it is, return an empty list.
+Reply with ONLY JSON: {"adjust":[{"date":"YYYY-MM-DD","type":"code","note":"one short practical line"}],"summary":"one short line"}`,{modelTier:'quick'});
+    const applied=await applyAdjust(out&&out.adjust,'balance');if(applied.length){toast(`Week checked: ${String(out.summary||`${applied.length} day${applied.length>1?'s':''} adjusted`).slice(0,140)}`,5000);render()}}catch(e){}
+}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-gap]')){fx.gap=fx.gap===x.dataset.gap?null:x.dataset.gap;render();return}
+  if(x=c('[data-water]')){addWater(+x.dataset.water);return}
+  if(c('#alcTog')){fx.alc=!fx.alc;render();return}
+  if(x=c('[data-alc]')){addAlc(+x.dataset.alc);return}
+  if(c('#alcOff')){fx.alc=false;persistMeta('settings',Object.assign({},meta.settings||{},{alcohol:'off'})).then(()=>render());return}
+  if(c('#alcOn')){fx.alc=true;persistMeta('settings',Object.assign({},meta.settings||{},{alcohol:'on'})).then(()=>render());return}
+  if(x=c('[data-supp]')){toggleSupp(x.dataset.supp);return}
+  if(c('#spAdd')){fx.supAdd=!fx.supAdd;fx.supMsg='';render();return}
+  if(c('#spSave')){const v=($('#sp-name')&&$('#sp-name').value||'').trim();if(!v){toast('Type the supplement, or snap the label');return}addSupp(v,null);return}
+  if(c('#mvPost')){postponeSession(iso(sel));return}
+  if(c('#mvSkip')){setIntent('no');return}
+});
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='spPhoto'&&e.target.files&&e.target.files[0])addSupp('',e.target.files[0])});
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
 function dayLoad(dIso){return sRPE(L()[dIso])+extrasLoad(D()[dIso])}
 function lineChart(points,{h=150,fmtY=v=>v,invert=false,color='var(--accent)',yMin=null,yMax=null,pad=0}={}){
   if(points.length<2)return '<div class="hint">Needs at least two entries.</div>';
-  const W=600,H=h,l=40,r=12,t=14,b=22;const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
+  const W=380,H=h,l=40,r=12,t=14,b=22;const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
   let x0=Math.min(...xs),x1=Math.max(...xs);if(x0===x1){x0-=1;x1+=1}
   let y0=yMin??Math.min(...ys)-pad,y1=yMax??Math.max(...ys)+pad;if(y0===y1){y0-=1;y1+=1}
   const X=x=>l+(x-x0)/(x1-x0)*(W-l-r),Y=y=>invert?t+(y-y0)/(y1-y0)*(H-t-b):H-b-(y-y0)/(y1-y0)*(H-t-b);
@@ -1161,7 +1277,7 @@ function lineChart(points,{h=150,fmtY=v=>v,invert=false,color='var(--accent)',yM
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}${invert?'':`<path d="${area}" style="fill:${color};opacity:.12"/>`}<path d="${path}" style="fill:none;stroke:${color};stroke-width:2.5;stroke-linejoin:round"/>${points.length<40?points.map(p=>`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="2.6" style="fill:${color}"/>`).join(''):''}<circle cx="${X(last.x)}" cy="${Y(last.y)}" r="5.5" style="fill:var(--surface);stroke:${color};stroke-width:2.5"/><text class="ax" x="${Math.min(X(last.x),W-r-6)}" y="${Math.max(Y(last.y)-10,10)}" text-anchor="end" style="fill:var(--fg);font-weight:600;font-size:12px">${fmtY(last.y)}</text><text class="ax" x="${l}" y="${H-5}">${points[0].lab||''}</text><text class="ax" x="${W-r}" y="${H-5}" text-anchor="end">${last.lab||''}</text></svg>`;
 }
 function weeklyChart(wkNow){
-  const LL=L(),DD=D();const W=600,H=210,l=36,r=36,t=14,b=26,bw=(W-l-r)/16;const data=[];let mx=0,mxF=0;
+  const LL=L(),DD=D();const W=380,H=210,l=36,r=36,t=14,b=26,bw=(W-l-r)/16;const data=[];let mx=0,mxF=0;
   for(let w=1;w<=16;w++){const seg={};let tot=0,farm=0,farmN=0;const mon=addD(START,(w-1)*7);
     for(let i=0;i<7;i++){const k=iso(addD(mon,i));const lg=LL[k];const v=sRPE(lg);if(v){seg[lg.type]=(seg[lg.type]||0)+v;tot+=v}const e=extrasLoad(DD[k]);if(e){seg.O=(seg.O||0)+e;tot+=e}const dd=DD[k];if(dd&&isNum(dd.farmHrs)){farm+=+dd.farmHrs;farmN++}}
     data.push({seg,tot,farm,farmN});mx=Math.max(mx,tot);mxF=Math.max(mxF,farm)}
@@ -1244,7 +1360,7 @@ function injuryAnalysis(){
   return {table,lead};
 }
 function sleepTimingChart(now){
-  const DD=D();const W=600,H=200,l=40,r=8,t=10,b=22,N=28,bw=(W-l-r)/N;const y0=20*60,y1=33*60; // 20:00 to 09:00 next day
+  const DD=D();const W=380,H=200,l=40,r=8,t=10,b=22,N=28,bw=(W-l-r)/N;const y0=20*60,y1=33*60; // 20:00 to 09:00 next day
   const Y=m=>t+(m-y0)/(y1-y0)*(H-t-b);const norm=m=>m<12*60?m+1440:m;
   let g='';for(let h=20;h<=33;h+=2){const m=h*60;g+=`<line class="grid" x1="${l}" x2="${W-r}" y1="${Y(m)}" y2="${Y(m)}"/><text class="ax" x="${l-6}" y="${Y(m)+3}" text-anchor="end">${pad(h%24)}:00</text>`}
   let bars='',beds=[],wakes=[];
@@ -1259,11 +1375,12 @@ function sleepTimingChart(now){
     stats:beds.length?`<div class="tests"><div><b class="num">${fmtT(avg(beds.slice(-7)))}</b><small>Avg bedtime, 7 days</small></div><div><b class="num">${fmtT(avg(wakes.slice(-7)))}</b><small>Avg wake, 7 days</small></div><div><b class="num" style="color:${sb!=null&&sb<=30?'var(--ok)':'var(--warn)'}">${sb!=null?'±'+Math.round(sb):'-'}</b><small>Bedtime spread (min)</small></div></div>`:''};
 }
 function timeUseChart(now){
-  const DD=D();const W=600,H=170,l=30,r=8,t=10,b=22,N=8,bw=(W-l-r)/N;const keys=[['farmHrs','var(--farm)',WORK],['deskHrs','var(--s)','Desk'],['carHrs','var(--r)','Car'],['familyHrs','var(--e)','Family']];
-  const weeks=[];for(let i=N-1;i>=0;i--){const end=addD(now,-i*7);const sums={};let n=0;for(let j=0;j<7;j++){const d=DD[iso(addD(end,-j))];if(d&&dayFilled(d)){n++;keys.forEach(([k])=>sums[k]=(sums[k]||0)+(+d[k]||0))}}weeks.push({end,n,avg:Object.fromEntries(keys.map(([k])=>[k,n?(sums[k]||0)/n:0]))})}
-  const mx=Math.max(8,...weeks.map(w=>keys.reduce((a,[k])=>a+w.avg[k],0)));const top=Math.ceil(mx/2)*2;const Y=v=>H-b-v/top*(H-t-b);
-  let g='';for(let i=0;i<=4;i++){const v=top*i/4;g+=`<line class="grid" x1="${l}" x2="${W-r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${l-5}" y="${Y(v)+3}" text-anchor="end">${v}h</text>`}
-  let bars='';weeks.forEach((w,i)=>{const x=l+i*bw+6;let acc=0;if(w.n)keys.forEach(([k,c])=>{const v=w.avg[k];if(!v)return;bars+=`<rect x="${x}" y="${Y(acc+v)}" width="${bw-12}" height="${Y(acc)-Y(acc+v)}" style="fill:${c}"/>`;acc+=v});bars+=`<text class="ax" x="${x+(bw-12)/2}" y="${H-6}" text-anchor="middle">${short(addD(w.end,-6))}</text>`});
+  const DD=D(),LL=L();const W=380,H=200,l=30,r=6,t=10,b=22,N=8,bw=(W-l-r)/N;
+  const keys=[['sleep','var(--x)','Sleep',(d,k)=>sleepHours(d)||0],['train','var(--accent)','Training',(d,k)=>{const lg=LL[k];return ((lg&&lg.status!=='missed'&&+lg.dur)||0)/60+(d.extras||[]).reduce((a,x)=>a+(+x.dur||0),0)/60}],['farmHrs','var(--farm)',typeof WORK!=='undefined'?WORK:'Manual labour',d=>+d.farmHrs||0],['deskHrs','var(--s)','Desk',d=>+d.deskHrs||0],['carHrs','var(--r)','Car',d=>+d.carHrs||0],['familyHrs','var(--e)','Family',d=>+d.familyHrs||0]];
+  const weeks=[];for(let i=N-1;i>=0;i--){const end=addD(now,-i*7);const sums={};let n=0;for(let j=0;j<7;j++){const k=iso(addD(end,-j)),d=DD[k];if(d&&(dayFilled(d)||sleepHours(d)!=null)){n++;keys.forEach(([key,,,f])=>sums[key]=(sums[key]||0)+f(d,k))}}weeks.push({end,n,avg:Object.fromEntries(keys.map(([key])=>[key,n?(sums[key]||0)/n:0]))})}
+  const mx=Math.max(12,...weeks.map(w=>keys.reduce((a,[key])=>a+w.avg[key],0)));const top=Math.ceil(mx/6)*6;const Y=v=>H-b-v/top*(H-t-b);
+  let g='';for(let i=0;i<=top/6;i++){const v=i*6;g+=`<line class="grid" x1="${l}" x2="${W-r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${l-5}" y="${Y(v)+3}" text-anchor="end">${v}h</text>`}
+  let bars='';weeks.forEach((w,i)=>{const x=l+i*bw+4;let acc=0;if(w.n)keys.forEach(([key,c])=>{const v=w.avg[key];if(!v)return;bars+=`<rect x="${x}" y="${Y(acc+v)}" width="${bw-8}" height="${Y(acc)-Y(acc+v)}" style="fill:${c}"/>`;acc+=v});bars+=`<text class="ax" x="${x+(bw-8)/2}" y="${H-6}" text-anchor="middle">${short(addD(w.end,-6))}</text>`});
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average hours per day">${g}${bars}</svg><div class="legend">${keys.map(([,c,lab])=>`<span style="--c:${c}"><i></i>${lab}</span>`).join('')}</div>`;
 }
 function habitGrid(now){
@@ -1277,7 +1394,7 @@ function nutritionPanels(now){
   const DD=D(),T=targets();const N=28;const vals=[];
   for(let i=N-1;i>=0;i--){const k=iso(addD(now,-i)),d=DD[k];vals.push(d&&(d.food||[]).length?{...foodTotals(d),dt:dayTypeFor(k),k}:null)}
   const logged=vals.filter(Boolean);if(!logged.length)return '<div class="hint">Log your food on the Food tab and this shows calories and protein against each day\'s target, net carbs against the cap, vitamin and mineral gaps, plants per week and fasting hours.</div>';
-  const W=600,H=160,l=40,r=8,t=10,b=22,bw=(W-l-r)/N;
+  const W=380,H=160,l=40,r=8,t=10,b=22,bw=(W-l-r)/N;
   const mx=Math.max(3500,...logged.map(v=>v.kcal));const top=Math.ceil(mx/500)*500;const Y=v=>H-b-v/top*(H-t-b);
   let g='';for(let i=0;i<=4;i++){const v=top*i/4;g+=`<line class="grid" x1="${l}" x2="${W-r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${l-5}" y="${Y(v)+3}" text-anchor="end">${v}</text>`}
   let bars='';vals.forEach((v,i)=>{const x=l+i*bw;if(v){const tg=nutTarget('kcal',v.dt);bars+=`<rect x="${x+1.5}" y="${Y(v.kcal)}" width="${bw-3}" height="${H-b-Y(v.kcal)}" rx="2" style="fill:${SC[status(v.kcal,tg)]}"/><line x1="${x+1}" x2="${x+bw-1}" y1="${Y(tg.t)}" y2="${Y(tg.t)}" style="stroke:var(--fg);stroke-width:2"/>`}if(i%7===0)bars+=`<text class="ax" x="${x+bw/2}" y="${H-6}" text-anchor="middle">${short(addD(now,-(N-1-i)))}</text>`});
@@ -1314,7 +1431,7 @@ async function runAI(){
 Each day's sleep fields describe the night before that date. Strain is 0-21 combining training and ${WORK.toLowerCase()}. No wearable; all values are self-logged. Readiness 0-100; scores out of 5; RPE out of 10.
 ${buildSummary(now)}
 
-Write a short review in plain text, no headings, no bold. Use 5-7 bullet points starting with "- ", each specific and tied to the numbers: training load and readiness trends; sleep timing and consistency, screens-off time, caffeine timing; how farm work, desk and car time relate to soreness, niggles and readiness; family time and mood; nutrition adherence, protein, vitamin and mineral gaps, fasting hours and how they relate to energy; niggle patterns and likely triggers; progress in strength, threshold pace and 5 km. Then one final line starting "Next week:" with the single most useful change. Under 220 words. No medical diagnoses; if pain is 5/10 or more, say to get it checked by a physio.`;
+Write a short review in plain text, no headings, no bold. Use 6-10 bullet points. Each bullet is ONE line in this exact form: "- " then a short headline of 4-9 words, then " :: ", then 2-4 sentences of detail tied to the numbers and ending with one practical thing to do. Cover, where the data allows: training load and readiness trends; sleep timing and consistency, screens-off time, caffeine timing; how farm work, desk and car time relate to soreness, niggles and readiness; family time and mood; nutrition adherence, protein, vitamin and mineral gaps, fasting hours and how they relate to energy; niggle patterns and likely triggers; progress in strength, threshold pace and 5 km. Then one final line starting "Next week:" with the single most useful change. Under 220 words. No medical diagnoses; if pain is 5/10 or more, say to get it checked by a physio.`;
   aiState={busy:true,text:'',err:''};render();
   try{const {text}=await sample(prompt,{onText:({text})=>{aiState.text=text;const el=$('#aiOut');if(el)el.textContent=text},cache:false});
     aiState={busy:false,text,err:''};
@@ -1352,13 +1469,13 @@ function viewReports(){
   const rhr=series('rhr'),strn=[];for(let i=41;i>=0;i--){const d=addD(now,-i),s=strain(iso(d));if(s!=null)strn.push({x:d/DAY,y:s,lab:short(d)})}
   const savedAI=!sampleMode&&meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');
   const aiPanel=`<section class="panel"><h3>Coach's overview</h3><div class="hint">Claude reads your last 4 weeks of check-ins, food and sessions and picks out what matters.${savedAI&&!aiState.text?` Last run ${fmtD(new Date(savedAI.at))}.`:''}</div>
-    ${aiText||aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
+    ${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
     ${sample?`<button type="button" class="primary" id="aiBtn" ${aiState.busy?'disabled':''} style="flex:none">${aiState.busy?'Working…':aiText?'Refresh overview':'Get overview'}</button>`:'<div class="hint">Not available in this view.</div>'}</section>`;
   const W=(title,hint,body)=>`<section class="panel"><h3>${title}</h3>${hint?`<div class="hint">${hint}</div>`:''}${body}</section>`;
   return toggle+tiles+aiPanel+planStickHTML()+
    `<div class="sect">Load</div>`+
    W(`Training load vs ${WORK.toLowerCase()}`,`Bars: minutes × effort per week, by session type (club and extra sessions in teal). Dashed line: hours of ${WORK.toLowerCase()}.`,weeklyChart(wkNow)+`<div class="legend">${['S','E','H','T','X','O'].map(k=>`<span style="--c:var(${TVAR[k]})"><i></i>${TNAME[k]}</span>`).join('')}<span style="--c:var(--farm)"><i></i>${WORK} hours</span></div>`)+
-   W('How you spend your days','Average hours per day, by week.',timeUseChart(now))+
+   W('How you spend your days','Average hours per day, by week, including sleep and training.',timeUseChart(now))+
    W('Plan completion','',cbars+(swaps?`<div class="hint">${swaps} Friday threshold run${swaps>1?'s':''} swapped for a class.</div>`:''))+
    `<div class="sect">Sleep &amp; recovery</div>`+
    W('Readiness','Daily score from sleep, how you feel, niggles and, when logged, your morning pulse against your own 2-week baseline.',lineChart(series(d=>readiness(d)),{yMin:0,yMax:100,fmtY:v=>Math.round(v),color:'var(--accent)'}))+
