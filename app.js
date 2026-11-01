@@ -396,7 +396,7 @@ function foodTodayHTML(dIso){
   const lib=LIB.filter(x=>x[1]==='any'||x[1]==='snack'||x[1]==='drinks'||x[1]==='treat'||(dt==='rest'&&x[1]==='rest')||(dt!=='rest'&&(x[1]==='training'||x[1]==='post'))||(dt==='match'&&x[1]==='match'));
   const freq=frequentFoods();const ai=!!sample;const due=planDue();
   const kEmpty=!kitchen().length&&!sampleMode;
-  return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: stock your kitchen</b><span>Tap what you have in, or say it. Your meal plans are built from it, so this comes first.</span><em>Add my kitchen ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Time to plan ahead'}</b><br><small>Update your kitchen, then let the app build the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
+  return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Time to plan ahead'}</b><br><small>Update your food available, then let the app build the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
   <article class="card"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label}</h2><div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
     <div class="form" style="padding-bottom:4px"><div class="field"><span class="label">Day type</span>${seg('dt','dayType',['rest','training','match'],dt,['Rest','Training','Match'],'small')}</div></div>
     <div class="macs">${NUTS.filter(n=>n.macro).map(n=>nutBar(n,t[n.k],nutTarget(n.k,dt))).join('')}</div>
@@ -427,8 +427,8 @@ function planHTML(){
   const set=meta.settings||{};
   const head=`<article class="card"><div class="chead"><div style="flex:1"><h2>Plan ahead</h2><div class="sub">${p?`Made ${fmtD(new Date(p.createdAt),{weekday:'short',day:'numeric',month:'short'})} · covers ${short(parse(p.days[0].date))}-${short(parse(p.days[p.days.length-1].date))}`:'No plan yet'}</div></div>${due?'<span class="kpill" style="--vc:var(--warn)">Due</span>':''}</div>
     <div class="form">
-      ${!k.length?`<button type="button" class="bigcta" data-fview="kitchen"><b>Add your kitchen first</b><span>The plan uses what you have in. Without it, it guesses and puts more on the shopping list.</span><em>Add my kitchen ›</em></button>`:''}
-      <div class="hint" style="font-size:13px;color:var(--muted)">Builds the next 3 days from your kitchen (${k.length} item${k.length===1?'':'s'}), your meal guide and each day's targets, timed around ${esc(set.trainTime||trainTimeFor(iso(todayDate())))} ${FASTED()?'fasted ':''}training.${k.length?'':' Add your kitchen first for a better plan.'}</div>
+      ${!k.length?`<button type="button" class="bigcta" data-fview="kitchen"><b>Add your food first</b><span>The plan uses what you can actually get: food at home, or where you'll be eating. Without it, it guesses.</span><em>Add my food ›</em></button>`:''}
+      <div class="hint" style="font-size:13px;color:var(--muted)">Builds the next 3 days from your food available (${k.length} item${k.length===1?'':'s'}), your meal guide and each day's targets, timed around ${esc(set.trainTime||trainTimeFor(iso(todayDate())))} ${FASTED()?'fasted ':''}training.${k.length?'':' Add your food available first for a better plan.'}</div>
       ${eatSetHTML()}
       <div class="row2"><div class="field"><label class="label" for="s-tt">Usual training time</label><input id="s-tt" type="time" value="${esc(set.trainTime||'06:30')}" data-setting="trainTime"></div><div class="field"><label class="label" for="s-fh">Overnight fast target (h)</label><input id="s-fh" type="number" step="0.5" value="${set.fastH||14}" data-setting="fastH"></div></div>
       ${sample?`<button type="button" class="primary" id="pBuild" ${pState.busy?'disabled':''}>${pState.busy?'Planning… up to 2 minutes':p?'Re-plan the next 3 days':'Plan the next 3 days'}</button>`:'<div class="hint">Planning needs Claude, which is not available in this view.</div>'}
@@ -441,7 +441,7 @@ function planHTML(){
       <div class="ptot">${chip('kcal',tot.kcal,'kcal')}${chip('Protein',tot.protein,'protein')}${chip('Net carbs',tot.carbs,'carbs')}${chip('Fat',tot.fat,'fat')}${chip('Fibre',tot.fibre,'fibre')}</div>
       ${pd.note?`<div class="note" style="margin:0 16px 8px">${esc(pd.note)}</div>`:''}${planMealsHTML(pd.date)}</article>`}).join('');
   const shop=(p.shopping||[]);
-  return head+daysH+(shop.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>Shopping list</h2><div class="sub">Not in your kitchen yet</div></div></div><div class="shop">${shop.map((s,i)=>`<label class="toggle"><input type="checkbox" data-shop="${i}" ${s.got?'checked':''}> <span style="flex:1"><b>${esc(s.name)}</b>${s.qty?` · ${esc(s.qty)}`:''}${s.why?`<br><small style="color:var(--muted)">${esc(s.why)}</small>`:''}</span></label>`).join('')}</div></article>`:'');
+  return head+daysH+(shop.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>Shopping list</h2><div class="sub">Not on your food list yet</div></div></div><div class="shop">${shop.map((s,i)=>`<label class="toggle"><input type="checkbox" data-shop="${i}" ${s.got?'checked':''}> <span style="flex:1"><b>${esc(s.name)}</b>${s.qty?` · ${esc(s.qty)}`:''}${s.why?`<br><small style="color:var(--muted)">${esc(s.why)}</small>`:''}</span></label>`).join('')}</div></article>`:'');
 }
 function kitchenHTML(){
   const items=kitchen();const where=KWHERE;
@@ -476,7 +476,7 @@ async function persistDay(k,fields){
 }
 async function persistMeta(id,doc){meta[id]=doc;if(metaCol){try{await metaCol.doc(id).set(doc);return true}catch(e){toast('Could not save. Try again.');return false}}return true}
 async function addFood(items,k){k=k||iso(sel);const cur=(days[k]&&days[k].food)||[];await persistDay(k,{food:cur.concat(items)})}
-function foodErr(e){const m={not_granted:'This needs your permission to use Claude.',rate_limited:'Too many requests just now. Try again in a few minutes.',image_rejected:'That photo could not be read. Try another.',invalid_json:'Could not work that out. Try again.'};return m[e&&e.code]||'That did not work. Try again.'}
+function foodErr(e){const m={not_granted:'This needs your permission to use Claude.',rate_limited:'Too many requests just now. Try again in a few minutes.',image_rejected:'That photo could not be read. Try another.',invalid_json:'Could not work that out. Try again.'};return m[e&&e.code]||(e&&e.message?'That did not work: '+String(e.message).slice(0,160):'That did not work. Try again.')}
 async function parseDiary(){
   const ta=$('#f-say');const text=(ta&&ta.value||'').trim();fState.text=text;if(!text){toast('Add what you ate first');return}
   fState.busy=true;fState.msg='Working out your day… this can take up to a minute.';render();
@@ -514,9 +514,9 @@ async function buildPlan(reqArg){
   const dlist=[0,1,2].map(i=>{const d=addD(start,i),k=iso(d),pl=planFor(d),dt=dayTypeFor(k);const T=DAYT[dt];
     return {date:k,weekday:fmtD(d,{weekday:'long'}),dayType:dt,session:pl&&pl.type!=='R'&&dt!=='rest'?`${TNAME[pl.type]} at ${trainTimeFor(k)}${FASTED()?', fasted':''}`:(dt==='match'?'Match day':'Rest'),targets:{kcal:T.kcal,protein_g:T.protein,net_carbs_max_g:T.carbs,fat_g:T.fat,fibre_g:'30-40'}}});
   const recent=[];for(let i=1;i<=7;i++){const d=D()[iso(addD(t,-i))];(d&&d.food||[]).forEach(x=>{if(kcalOf(x)>150)recent.push(x.name)})}
-  pState.busy=true;pState.msg='Planning your next 3 days around your kitchen and targets. This can take up to 2 minutes.';render();
-  const prompt=`You are planning meals for ${ABOUT}. Nutrition approach: ${APPROACH}. Plan these days:
-${JSON.stringify(dlist)}
+  pState.busy=true;pState.msg='Planning your next 3 days around your food and targets. This can take up to 2 minutes.';render();
+  const mk=dl=>`You are planning meals for ${ABOUT}. Nutrition approach: ${APPROACH}. Plan this day (the other days are planned separately, so vary the meals):
+${JSON.stringify(dl)}
 Their rules:
 ${RULES}
 Their meal guide (use these first, adapt portions to hit targets, swap ingredients for what is in stock): ${LIB.map(x=>`${x[0]} [${x[1]}] ${x[2]} kcal ${x[3]}p ${x[4]}f ${x[5]}c ${x[6]}fibre: ${x[7]}`).join(' | ')}
@@ -529,7 +529,8 @@ For each day list the meals in time order. ${FASTED()?`On training days start wi
 For each meal give ${NUT_JSON}.
 ${eatRules()}
 Reply with ONLY JSON: {"days":[{"date":"YYYY-MM-DD","dayType":"training","session":"short","note":"one short practical line, e.g. defrost the salmon tonight","meals":[{"slot":"Post-training breakfast","time":"08:00","when":"after training","where":"Home","name":"meal name","items":[{"name":"oats","qty":"70 g"}],"prep":10,"servings":1,"method":["step"],"kcal":0,"protein":0,"carbs":0,"fat":0,"fibre":0,"sodium":0,"potassium":0,"magnesium":0,"calcium":0,"iron":0,"zinc":0,"selenium":0,"iodine":0,"vitA":0,"vitC":0,"vitD":0,"vitK":0,"b12":0,"folate":0,"choline":0,"omega3":0,"caffeine":0,"plants":["oats"],"options":[{"name":"","where":"Shop","get":"what to pick up or order","kcal":0,"protein":0,"carbs":0,"fat":0}]}]}],"shopping":[{"name":"","qty":"","why":"which meal"}]}`;
-  try{const out=await sample.json(prompt,{maxTokens:16000});
+  try{const outs=await Promise.all(dlist.map(d=>sample.json(mk([d]),{maxTokens:12000}).catch(e=>({__err:e}))));const ok=outs.filter(o=>o&&!o.__err);if(!ok.length)throw outs[0].__err;
+    const seen=new Set();const out={days:ok.flatMap(o=>Array.isArray(o.days)?o.days:[]).sort((x,y)=>String(x.date).localeCompare(String(y.date))),shopping:ok.flatMap(o=>Array.isArray(o.shopping)?o.shopping:[]).filter(x=>{const k=String(x&&x.name||'').toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true})};
     const ds=(Array.isArray(out&&out.days)?out.days:[]).filter(d=>d&&d.date&&Array.isArray(d.meals)).map(d=>({date:String(d.date).slice(0,10),dayType:DAYT[d.dayType]?d.dayType:dayTypeFor(String(d.date).slice(0,10)),session:String(d.session||'').slice(0,60),note:String(d.note||'').slice(0,160),
       meals:d.meals.filter(m=>m&&m.name).map(m=>{const o={slot:String(m.slot||'').slice(0,40),time:tmin(m.time)!=null?fmtT(tmin(m.time)):'',name:String(m.name).slice(0,70),items:(Array.isArray(m.items)?m.items:[]).slice(0,12).map(x=>({name:String(x.name||'').slice(0,40),qty:String(x.qty||'').slice(0,20)})),plants:Array.isArray(m.plants)?m.plants.map(p=>String(p).toLowerCase().slice(0,30)).slice(0,15):[],method:Array.isArray(m.method)?m.method.map(String).slice(0,8):[],prep:+m.prep||null,servings:+m.servings||1};NK.forEach(k=>o[k]=Math.max(0,+m[k]||0));Object.assign(o,mealExtras(m));return o})}));
     if(!ds.length){pState={...pState,busy:false,msg:'The plan came back empty. Try again.'};render();return}
@@ -655,7 +656,7 @@ function viewTraining(){
   if(pl&&pl.pre)pre=`<div class="banner">Your plan starts ${fmtD(FIRST)}, so this session is for reference only.</div>`;
   const due=key===iso(todayDate())&&planDue();const pd=planDay(key);
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
-  const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update the kitchen and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
+  const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food available and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
   return dayHeader()+pre+adjBanner(pl)+(pl?sessionHTML(sel,pl):none)+moveHTML(pl)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
 }
@@ -740,7 +741,7 @@ function viewDashboard(){
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Readiness, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section>
-   ${due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--accent);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update the kitchen and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:''}
+   ${due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--accent);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food available and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:''}
    ${ov.length?`<a class="panel" href="#reports" style="text-decoration:none;color:inherit"><div class="ph"><h3>Coach's notes</h3><span class="ds">${fmtD(new Date(meta.overview.at))}</span></div>${ov.map(x=>`<p class="ovl">${esc(x)}</p>`).join('')}</a>`:''}`;
 }
 // ================= dictate anything =================
@@ -950,7 +951,7 @@ function patternHTML(){const p=patternFound();if(!p)return '';const s=xState.sug
 // ---- dictation hints per tab ----
 function vTab(){const t=tab();
   if(t==='training')return {head:'Your training',ph:"e.g. Did the strength session, 55 minutes, felt like a 7, top set 110. Hamstring a bit tight after. Also went for an easy 20-minute jog this evening.",title:'What to cover for training',cover:'<li><b>The planned session:</b> done, partly done or missed</li><li><b>How it went:</b> minutes, effort 1-10, weights or paces</li><li><b>Anything extra:</b> a run, the gym, a game, a class</li><li><b>Niggles:</b> where it hurts and how much, 0-10</li>',line:'Talk about this day\'s training. It logs the session and anything extra you did.'};
-  if(t==='food')return {head:'Food',ph:"e.g. Two coffees this morning. Chicken wrap and a yogurt from the shop at 1. Steak, chips and salad out for dinner around 8. About 2 litres of water.",title:'What to cover for food',cover:'<li><b>What you ate and drank,</b> roughly when</li><li><b>Where:</b> home, the shop, a restaurant, and rough portions</li><li><b>Water</b> for the day</li><li><b>Shopping:</b> what you bought or ran out of (updates the kitchen)</li><li><b>The next few days:</b> where you\'ll be and how many times you\'ll eat (shapes your meal plan)</li>',line:'Talk about food and drink. It logs it for this day and updates your kitchen.'};
+  if(t==='food')return {head:'Food',ph:"e.g. Two coffees this morning. Chicken wrap and a yogurt from the shop at 1. Steak, chips and salad out for dinner around 8. About 2 litres of water.",title:'What to cover for food',cover:'<li><b>What you ate and drank,</b> roughly when</li><li><b>Where:</b> home, the shop, a restaurant, and rough portions</li><li><b>Water</b> for the day</li><li><b>Shopping:</b> what you bought or ran out of (updates your food available)</li><li><b>The next few days:</b> where you\'ll be and how many times you\'ll eat (shapes your meal plan)</li>',line:'Talk about food and drink. It logs it for this day and updates your food available.'};
   if(t==='mobility')return {head:'Mobility',ph:"e.g. Did the 15-minute hips routine this morning. Left hip still tight, about 3 out of 10. Calves sore from yesterday's run.",title:'What to cover',cover:'<li><b>What you did</b> and for how long</li><li><b>Where feels tight or sore,</b> and how much, 0-10</li>',line:'Talk about stretching and anything tight or sore.'};
   return {head:t==='checkin'||t==='dashboard'?'Morning check-in':'Say it',ph:"e.g. Bed at half eleven, up at six. Slept well. Energy 4, mood good, a bit stressed. Left hamstring tight, about 3 out of 10. Yesterday: heavy day of manual labour, about 7 hours. An hour in the car, an hour with the kids in the evening. Saw the sunrise.",title:'What to cover',cover:'<li><b>Last night:</b> bed time, wake time, when screens went off, sleep quality 1-5</li><li><b>This morning:</b> energy, mood, stress and soreness, each 1-5; any niggles with pain 0-10</li><li><b>Yesterday:</b> hours of manual labour and how heavy, desk, driving, family time; steps; habits</li><li><b>Training:</b> done, partial or missed; minutes; effort 1-10</li><li><b>Food:</b> what you ate and roughly when</li>',line:'Say how you slept, how you feel and what yesterday looked like. It fills in the check-in.'};
 }
@@ -1471,7 +1472,7 @@ function authHTML(mode,msg){
   return `<div class="gcard"><div class="gbrand">Training log</div><h1>Your training, recovery and food, planned around you</h1>
     <p class="gsub">A coach, a food planner and a training diary in one app. Here's what it does:</p>${featuresHTML()}
     <div class="gstep"><span class="num">1</span>Create your account</div>${form}
-    <div class="gnext"><span class="num">2</span>Tell it about you, in your own words if you like</div><div class="gnext"><span class="num">3</span>Get your plan, then add what's in your kitchen</div>
+    <div class="gnext"><span class="num">2</span>Tell it about you, in your own words if you like</div><div class="gnext"><span class="num">3</span>Get your plan, then add the food you can get</div>
     <button type="button" class="linkbtn" data-auth="in">Already have an account? Sign in</button></div>`;
 }
 let authMode='up';
@@ -1526,7 +1527,7 @@ function obHTML(){
       <div class="label">Daily nutrition targets</div><div class="scroll"><table class="tbl"><thead><tr><th></th><th class="r">kcal</th><th class="r">Protein</th><th class="r">Net carbs</th><th class="r">Fat</th></tr></thead><tbody>${['training','rest','match'].map(k=>{const n=pr.nutrition[k];return `<tr><td>${k[0].toUpperCase()+k.slice(1)} day</td><td class="r num">${n.kcal}</td><td class="r num">${n.protein} g</td><td class="r num">${n.carbs} g</td><td class="r num">${n.fat} g</td></tr>`}).join('')}</tbody></table></div>
       ${pr.rules?`<details class="wu"><summary>Food planning rules</summary><div style="white-space:pre-wrap;font-size:13.5px;padding-bottom:10px">${esc(pr.rules)}</div></details>`:''}
       <div class="hint" style="font-size:13px;color:var(--muted)">Starts ${fmtD(parse(pr.plan.firstDay))}. You can rebuild it any time from your profile.</div>
-      <button type="button" class="primary" id="obStart">${kitchen().length?'Start':'Next: your kitchen ›'}</button><button type="button" class="ghost" id="obBuild">Build it again</button>`
+      <button type="button" class="primary" id="obStart">${kitchen().length?'Start':'Next: your food ›'}</button><button type="button" class="ghost" id="obBuild">Build it again</button>`
     :`<h2>Build your plan</h2>${ob.msg&&!ob.busy?`<div class="note" style="margin:0">${esc(ob.msg)}</div>`:''}<p class="gsub" style="margin:0">Check your answers. Tap any section to change it. Then Claude builds your 16-week training plan, your food targets for training and rest days, and the rules your meal planning follows. It takes about a minute.</p>${obReview()}
       <button type="button" class="primary" id="obBuild" ${ob.busy?'disabled':''}>${ob.busy?'Building your plan… up to 2 minutes':'Build my plan'}</button>${ob.err?`<div class="alert amber">${esc(ob.err)}</div>`:''}
       ${IS_OWNER?`<div class="note" style="margin-top:6px"><b>Owner shortcut.</b> Skip the build and load the original Road to February plan and nutrition guide.<div class="field" style="margin-top:8px"><label class="label" for="ob-about">Describe yourself in a line (used by the coach and food estimates)</label><textarea id="ob-about" data-ob="about" placeholder="e.g. 82 kg sheep and cattle farmer, senior Gaelic footballer, father of two, no alcohol">${esc(ob.a.about||'')}</textarea></div><button type="button" class="ghost" id="obOwner" style="margin-top:8px;color:var(--fg)">Load my original plan</button></div>`:''}`}
@@ -1801,7 +1802,7 @@ const DEMO_EXAMPLE=null;
 const FEATURES=[
  ['Talk, don\'t type','Tap Dictate and say how you slept, how you feel, what you ate and how training went. It fills everything in for you.','var(--accent)'],
  ['A plan built around you','Tell it your sport, goals and week. Claude builds a 16-week training plan and daily food targets to match.','var(--s)'],
- ['Meals from your own kitchen','Tap or say what you have in. It plans the next 3 days of meals to hit your targets and writes the shopping list.','var(--e)'],
+ ['Meals from food you can get','Tap or say what you have in. It plans the next 3 days of meals to hit your targets and writes the shopping list.','var(--e)'],
  ['Your status at a glance','Each morning a readiness score from sleep, energy and niggles tells you whether to push on or back off.','var(--h)'],
  ['It spots the patterns','Reports link sleep, work, food and training load to how you feel, and flag what came before a niggle.','var(--x)']];
 const featuresHTML=()=>`<div class="feats">${FEATURES.map((f,i)=>`<div class="feat" style="--fc:${f[2]}"><span class="fnum num">${i+1}</span><div><b>${f[0]}</b><p>${f[1]}</p></div></div>`).join('')}</div>`;
@@ -1933,13 +1934,13 @@ async function toggleStaple(n){
 }
 let kSetup={sel:[],text:'',busy:false,msg:''};
 function kitchenSetupHTML(){
-  return `<div class="gcard wide"><div class="obprog">${OB_STEPS.concat(['Kitchen']).map((x,i)=>`<span class="${i<6?'done':'cur'}">${x}</span>`).join('')}</div>
+  return `<div class="gcard wide"><div class="obprog">${OB_STEPS.concat(['Food']).map((x,i)=>`<span class="${i<6?'done':'cur'}">${x}</span>`).join('')}</div>
     <div class="gbrand">Last step</div><h1>What food can you get?</h1>
     <p class="gsub">Your meal plans are built from food you actually have. Tap what's in now, and add anything else by voice or typing. Update it after each shop.</p>
     ${staplesHTML(new Set(kSetup.sel.map(x=>x.toLowerCase())))}
     <div class="field"><label class="label" for="ks-say">Anything else?</label><textarea id="ks-say" placeholder="e.g. 2 packs of chicken, frozen peas, feta, rice, a dozen eggs. Or if you don't cook much: lunch from the Centra beside work, dinner at home.">${esc(kSetup.text)}</textarea></div>
     <div class="actions">${speakBtn('ks-say')}</div>
-    <button type="button" class="primary" id="ksDone" ${kSetup.busy?'disabled':''}>${kSetup.busy?'Saving your kitchen…':`Save and plan my first 3 days${kSetup.sel.length?` (${kSetup.sel.length} items)`:''}`}</button>
+    <button type="button" class="primary" id="ksDone" ${kSetup.busy?'disabled':''}>${kSetup.busy?'Saving…':`Save and plan my first 3 days${kSetup.sel.length?` (${kSetup.sel.length} items)`:''}`}</button>
     ${kSetup.msg?`<div class="hsum" role="status">${esc(kSetup.msg)}</div>`:''}
     <button type="button" class="linkbtn" id="ksSkip">Skip for now, I'll do it later</button></div>`;
 }
@@ -1959,8 +1960,8 @@ function setupChecklistHTML(){
   if(sampleMode||!PROFILE)return '';const fl=meta.flags||{};if(fl.hideSetup)return '';
   const DV=Object.values(days);
   const items=[
-    ['Stock your kitchen',kitchen().length>0,'Tap what you have in. Your meal plans are built from it.','data-fview="kitchen"'],
-    ['Plan your next 3 days of meals',!!meta.plan,'Built from your kitchen and your daily targets.','data-fview="plan"'],
+    ['Add your food available',kitchen().length>0,'Tap what you have in, or say where you eat. Meal plans are built from it.','data-fview="kitchen"'],
+    ['Plan your next 3 days of meals',!!meta.plan,'Built from your food available and your daily targets.','data-fview="plan"'],
     ['Do your first check-in',DV.some(d=>d.bed||isNum(d.energy)),'Sleep, how you feel and any niggles. Gives you a readiness score.','href="#checkin"'],
     ['Log something by voice',!!fl.voice,'Tap the orange Dictate button and just talk.','data-open-voice'],
     ['Log what you ate',DV.some(d=>(d.food||[]).length),'Tick off a planned meal, say it, or snap a photo.','href="#food" data-dtab']];
