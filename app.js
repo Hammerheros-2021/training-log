@@ -408,17 +408,7 @@ function foodTodayHTML(dIso){
     <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants this week${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
   </article>
   ${drinksHTML(dIso)}${planMismatch(dIso)}${planVsHTML(dIso)}${pd?`<article class="card"><div class="chead"><div style="flex:1"><h2>${dIso===iso(todayDate())?'Your plan for today':'Your plan for this day'}</h2><div class="sub">${esc(pd.note||'Tap Ate this as you go. Changes go in the diary.')}</div></div></div>${planMealsHTML(dIso)}</article>`:''}
-  ${eatenHTML(d)}<article class="card"><div class="form">
-      <h3>Add food</h3>
-      ${ai?`<div class="field"><label class="label" for="f-say">Say it in your own words, any time of day</label><textarea id="f-say" placeholder="e.g. Coffee and SIS tab before training. Porridge with whey after at 8. Chicken salad bowl at 1. Cappuccino at 3. Ribeye and mushrooms at 7, 2 brownies after." style="min-height:110px">${esc(diaryText)}</textarea>
-        <div class="hint" style="font-size:12px;color:var(--muted)">Use the microphone on your phone keyboard to talk. Mention times and they set your fasting hours. Only log things not already ticked off from the plan.</div></div>
-      <div class="actions"><button type="button" class="primary" id="fParse" ${fState.busy?'disabled':''} style="font-size:17px">${fState.busy?'Working…':(d.food||[]).some(i=>i.src==='diary')?'Update from diary':'Work out my day'}</button></div>`:'<div class="hint">Smart estimates are not available in this view. Use the quick adds below.</div>'}
-      
-      ${fState.msg?`<div class="hsum" role="status">${esc(fState.msg)}</div>`:''}
-      
-      
-  </div>
-  <div class="form" style="border-top:1px solid var(--line)"><h3>Fasting</h3>
+  ${eatenHTML(d)}<article class="card"><div class="form"><h3>Fasting</h3>
       <div class="row2"><div class="field"><label class="label" for="ffm">First food</label><input id="ffm" type="time" value="${esc(d.firstMeal||(win?fmtT(win.first):''))}" data-food="firstMeal"></div>
       <div class="field"><label class="label" for="flm">Last food</label><input id="flm" type="time" value="${esc(d.lastMeal||(win?fmtT(win.last):''))}" data-food="lastMeal"></div></div>
       <div class="hint" style="font-size:12.5px;color:var(--muted)">${fh!=null?`Overnight fast into today: <b style="color:var(--fg)">${fh} h</b> (target ${targets().fastH} h).`:'Fasting hours appear once yesterday and today both have food times.'} Black coffee, tea and the SIS tablet don't break the fast.</div></div></article>`;
@@ -778,7 +768,6 @@ function viewDashboard(){
 const MIC='<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z" fill="currentColor"/></svg>';
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let vState={open:false,busy:false,listening:false,blocked:false};let rec=null;
-function updateFab(){const f=$('#fab');if(f)f.hidden=!sample||vState.open||sampleMode}
 function openVoice(){
   if(!sample){toast('Dictation is not available in this view');return}
   vState.open=true;updateFab();const v=$('#voice');const k=sel;
@@ -1328,30 +1317,77 @@ function signSheetHTML(){const k=iso(sel),d=D()[k]||{};const food=d.food||[];con
 function showSign(){signOpen=true;let el=$('#signHost');if(!el){el=document.createElement('div');el.id='signHost';document.body.appendChild(el)}el.innerHTML=signSheetHTML()}
 function hideSign(){signOpen=false;const el=$('#signHost');if(el)el.innerHTML=''}
 // ---- Recover: guided programmes ----
-const BR=(n,pat,lab)=>{const out=[];for(let i=0;i<n;i++)pat.forEach(([k,s,t])=>out.push({k,s,t,round:i+1,of:n}));return out};
-const MOVES=(list,secs)=>list.map(([t,c])=>({k:'move',s:secs,t,c}));
+const BRS=(sec,pat)=>{const per=pat.reduce((a,p)=>a+p[1],0);const n=Math.max(2,Math.round(sec/per));const out=[];for(let i=0;i<n;i++)pat.forEach(([k,s,t])=>out.push({k,s,t,round:i+1,of:n}));return out};
+const EVEN=(list,total)=>{const s=Math.max(20,Math.round(total/list.length));return list.map(([t,c])=>({k:'move',s,t,c}))};
 const PROGS=[
- {id:'box',ic:'🫁',name:'Box breathing',min:4,mind:'Calms stress, sharpens focus',body:'Slows your heart rate',cat:'Breathe',steps:()=>BR(15,[['in',4,'Breathe in'],['hold',4,'Hold'],['out',4,'Breathe out'],['hold',4,'Hold']])},
- {id:'sigh',ic:'😮‍💨',name:'Calming sighs',min:2,mind:'The quickest way to settle nerves',body:'Resets your breathing',cat:'Breathe',steps:()=>BR(12,[['in',2,'Breathe in through your nose'],['in',1,'Top up: one more short sniff'],['out',6,'Long, slow breath out through your mouth']])},
- {id:'478',ic:'🌙',name:'4-7-8 wind-down',min:3,mind:'Quietens a busy head before bed',body:'Helps you fall asleep',cat:'Breathe',steps:()=>BR(8,[['in',4,'Breathe in through your nose'],['hold',7,'Hold'],['out',8,'Breathe out slowly through your mouth']])},
- {id:'scan',ic:'🧠',name:'Body scan',min:6,mind:'Switches off the to-do list',body:'Lets tight muscles let go',cat:'Mind',steps:()=>[['Settle','Sit or lie down. Close your eyes. Let your breathing slow down.'],['Feet and calves','Notice your feet and calves. Let them go heavy.'],['Knees and thighs','Relax the front and back of your thighs.'],['Hips and lower back','Let your hips sink. Soften your lower back.'],['Belly and chest','Feel your breath rise and fall. No need to change it.'],['Shoulders and arms','Drop your shoulders away from your ears. Let your hands go loose.'],['Jaw and face','Unclench your jaw. Soften your eyes and forehead.'],['Whole body','Feel your whole body at once, heavy and still. Then slowly open your eyes.']].map(([t,c])=>({k:'move',s:45,t,c}))},
- {id:'loosen',ic:'🤸',name:'Loosen-out',min:10,mind:'A gentle reset after a long day',body:'Eases stiffness from work and training',cat:'Move',steps:()=>MOVES([['Neck rolls','Slow circles, both ways.'],['Shoulder rolls','Big circles back, then forward.'],['Cat-cow','On hands and knees, round then arch your back.'],['Thread the needle','Reach one arm under, twist, swap halfway.'],['Hip circles','Hands on hips, big slow circles both ways.'],['Leg swings','Hold a wall. Front-to-back, then side-to-side. Swap legs halfway.'],['Couch stretch','Back knee down, foot up a wall or sofa. Swap halfway.'],['90/90 switches','Sit, knees bent to one side, switch slowly.'],['Deep squat hold','Heels down, chest up, elbows pushing knees out.'],['Calf stretch','Hands on a wall, back heel down. Swap halfway.'],['Child\'s pose','Knees wide, arms long, breathe into your back.'],['Lie and breathe','On your back, slow breaths, everything heavy.']],50)},
- {id:'stretch',ic:'🧘',name:'Stretch',min:8,mind:'Slows you down after a busy day',body:'Restores range in hips, legs and back',cat:'Move',steps:()=>MOVES([['Hamstrings','Lying down, one leg up with a towel. Swap halfway.'],['Quads','Standing or lying on your side, heel to bum. Swap halfway.'],['Hip flexors','Half-kneeling lunge, squeeze your glute. Swap halfway.'],['Glutes','Lying down, ankle over the other knee, pull in. Swap halfway.'],['Groin','Sit, soles of feet together, knees down.'],['Lower back','Lying down, knees to one side, then the other.'],['Chest','Forearm on a door frame, turn away gently. Swap halfway.'],['Calves','Wall stretch, straight then bent knee. Swap halfway.']],60)},
- {id:'yoga',ic:'🕉️',name:'Yoga flow',min:12,mind:'Moving meditation: breath and body together',body:'Mobility, balance and core',cat:'Move',steps:()=>MOVES([['Mountain','Stand tall, breathe slowly.'],['Forward fold','Soft knees, let your head hang.'],['Low lunge (right)','Back knee down, hips forward.'],['Downward dog','Hips high, heels towards the floor.'],['Low lunge (left)','Back knee down, hips forward.'],['Cobra','Lying on your belly, gently lift your chest.'],['Child\'s pose','Knees wide, arms long.'],['Warrior II (right)','Wide stance, arms out, look over the front hand.'],['Warrior II (left)','Same on the other side.'],['Tree (right)','Foot on calf or thigh, hands together.'],['Tree (left)','Same on the other side.'],['Bridge','Lying down, lift your hips, squeeze your glutes.'],['Supine twist','Knees to one side, then the other.'],['Rest','Lie still, eyes closed, slow breaths.']],50)},
- {id:'contrast',ic:'🔥',name:'Contrast therapy',min:35,mind:'A big mood and energy lift',body:'Can ease soreness after hard days',cat:'Hot & cold',safety:'Not after alcohol. Skip if you have a heart condition or high blood pressure unless your GP says it\'s fine. Get out if you feel dizzy.',
-  steps:()=>{const s=[];for(let r=1;r<=3;r++){s.push({k:'hot',s:600,t:`Heat · round ${r} of 3`,c:'Sauna or hot tub. Slow breaths, sit back, relax.'},{k:'cold',s:120,t:`Cold · round ${r} of 3`,c:'Cold shower, plunge or sea. Long slow breaths out. Up to 2 minutes.'});if(r<3)s.push({k:'move',s:60,t:'Rest',c:'Sit, warm up naturally, sip water.'})}return s}},
- {id:'ice',ic:'🧊',name:'Ice bath',min:5,mind:'Builds calm under pressure',body:'Eases muscle soreness',cat:'Hot & cold',safety:'Never alone. Not after alcohol. Skip if you have a heart condition unless your GP says it\'s fine. Get out if you start shivering hard or feel unwell.',
-  steps:()=>[{k:'move',s:60,t:'Get ready',c:'Slow breaths before you go in. Long breath out.'},{k:'cold',s:180,t:'In the cold',c:'Breathe out slowly. Stay still. The first 30 seconds are the hardest.'},{k:'move',s:60,t:'Warm up',c:'Dry off, layer up, move around. Let your body rewarm on its own.'}]},
- {id:'sauna',ic:'♨️',name:'Sauna',min:20,mind:'Deep relaxation, better sleep',body:'Loosens muscles, good for your heart',cat:'Hot & cold',safety:'Drink water before and after. Not after alcohol. Get out if you feel dizzy.',
-  steps:()=>[{k:'hot',s:900,t:'Sauna',c:'Sit or lie back. Slow breaths. Leave early if you need to.'},{k:'move',s:300,t:'Cool down',c:'Cool shower, sit, drink water.'}]},
- {id:'walk',ic:'🚶',name:'Recovery walk',min:20,mind:'Clears your head; daylight helps your mood and sleep',body:'Flushes tired legs',cat:'Move',steps:()=>[{k:'move',s:300,t:'Easy start',c:'Gentle pace. Breathe through your nose.'},{k:'move',s:600,t:'Look up',c:'Eyes on the horizon. Notice five things you can hear.'},{k:'move',s:300,t:'Slow finish',c:'Ease the pace right down. Long breaths out.'}]},
- {id:'nap',ic:'😴',name:'Power nap',min:20,mind:'Sharper and more patient for the rest of the day',body:'Tops up recovery after a short night',cat:'Mind',steps:()=>[{k:'move',s:1200,t:'Rest',c:'Lie down, eyes closed. Even if you don\'t sleep, rest still helps. You\'ll hear nothing: check back when the timer ends.'}]}];
+ {id:'box',ic:'🫁',name:'Box breathing',cat:'Breathe',mind:'Calms stress, sharpens focus',body:'Slows your heart rate',
+  lens:[['3 min',3],['5 min',5],['10 min',10]],def:1,
+  prep:['Sit upright or lie down somewhere quiet.','Headphones make it easier to relax.','Breathe through your nose if you can.'],
+  intro:'Welcome to box breathing. You\'ll breathe in for a count of four, hold for four, breathe out for four, and hold again for four, like tracing the sides of a box. I\'ll count you through the first few rounds, then soft tones will keep the rhythm, so you can close your eyes. If you feel light-headed at any point, just breathe normally. Let\'s begin.',
+  steps:v=>BRS(v*60,[['in',4,'Breathe in'],['hold',4,'Hold'],['out',4,'Breathe out'],['hold',4,'Hold']])},
+ {id:'sigh',ic:'😮‍💨',name:'Calming sighs',cat:'Breathe',mind:'The quickest way to settle nerves',body:'Resets your breathing',
+  lens:[['2 min',2],['5 min',5],['10 min',10]],def:1,
+  prep:['Sit comfortably. Shoulders relaxed.','Good before bed, before a match, or after a stressful moment.'],
+  intro:'Welcome to calming sighs. Each breath has three parts. Breathe in through your nose, then take one more short sniff on top to fill your lungs. Then let it all go in a long, slow breath out through your mouth. The long breath out is what calms you. I\'ll guide the first few, then tones will keep the pace. Let\'s begin.',
+  steps:v=>BRS(v*60,[['in',2,'Breathe in'],['in',1,'One more sniff'],['out',6,'Long breath out']])},
+ {id:'478',ic:'🌙',name:'4-7-8 wind-down',cat:'Breathe',mind:'Quietens a busy head before bed',body:'Helps you fall asleep',
+  lens:[['2 min',2],['4 min',4],['6 min',6]],def:1,
+  prep:['Best done in bed with the lights off.','Rest the tip of your tongue just behind your top teeth.'],
+  intro:'Welcome to the four, seven, eight wind-down. Breathe in quietly through your nose for four, hold for seven, then breathe out slowly through your mouth for eight. The long breath out tells your body it\'s time to rest. If the hold feels too long, just shorten it. Let\'s begin.',
+  steps:v=>BRS(v*60,[['in',4,'Breathe in'],['hold',7,'Hold'],['out',8,'Breathe out slowly']])},
+ {id:'scan',ic:'🧠',name:'Body scan',cat:'Mind',mind:'Switches off the to-do list',body:'Lets tight muscles let go',
+  lens:[['5 min',5],['8 min',8],['12 min',12]],def:1,
+  prep:['Lie on your back or sit back in a chair.','Somewhere you won\'t be disturbed.','A blanket helps: you\'ll cool down as you relax.'],
+  intro:'Welcome to the body scan. We\'ll move slowly through your body, from your feet to your head, noticing each part and letting it soften. There\'s nothing to get right. If your mind wanders, that\'s normal, just come back to my voice. Close your eyes when you\'re ready.',
+  steps:v=>EVEN([['Feet and calves','Bring your attention to your feet and calves. Notice how they feel. Let them go heavy.'],['Knees and thighs','Move up to your knees and thighs. Let the big muscles soften and sink.'],['Hips and lower back','Notice your hips and lower back. Let them sink into the floor or chair.'],['Belly and chest','Feel your breath rising and falling in your belly and chest. No need to change it.'],['Hands and arms','Let your hands go loose. Feel your arms grow heavy.'],['Shoulders and neck','Let your shoulders drop away from your ears. Soften your neck.'],['Jaw and face','Unclench your jaw. Soften your eyes, your cheeks and your forehead.'],['Whole body','Now feel your whole body at once, heavy, warm and still. Stay here a while. When you\'re ready, open your eyes slowly.']],v*60)},
+ {id:'nap',ic:'😴',name:'Power nap',cat:'Mind',mind:'Sharper and more patient for the rest of the day',body:'Tops up recovery after a short night',
+  lens:[['10 min',10],['20 min',20],['30 min',30]],def:1,
+  prep:['Lie down somewhere dark and quiet.','Before 3pm, so it doesn\'t affect tonight\'s sleep.','Twenty minutes is the sweet spot: longer can leave you groggy.'],
+  intro:'Time for a power nap. Lie down, close your eyes and let your breathing slow. Even if you don\'t fall asleep, resting quietly still helps. I\'ll stay quiet now and wake you gently at the end.',
+  steps:v=>[{k:'move',s:v*60,t:'Rest',c:'Eyes closed. Let everything go.',quiet:true}]},
+ {id:'loosen',ic:'🤸',name:'Loosen-out',cat:'Move',mind:'A gentle reset after a long day',body:'Eases stiffness from work and training',
+  lens:[['8 min',8],['12 min',12],['16 min',16]],def:1,
+  prep:['A mat or a bit of floor space, and a wall or sofa nearby.','Loose clothes.','Move gently: this is about feeling better, not stretching hard.'],
+  intro:'Welcome to the loosen-out. We\'ll work from your neck down to your hips and legs, with easy movements to shake out stiffness from work and training. I\'ll tell you each move and when to switch sides. Move slowly and keep breathing. Let\'s start standing up.',
+  steps:v=>EVEN([['Neck rolls','Slow circles with your head, one way, then the other.'],['Shoulder rolls','Big slow circles back, then forward.'],['Cat-cow','On hands and knees, round your back up, then let it sink.'],['Thread the needle','On hands and knees, reach one arm under your body and twist. Switch halfway.'],['Hip circles','Hands on hips, big slow circles both ways.'],['Leg swings','Hold a wall. Swing one leg front to back. Switch legs halfway.'],['Couch stretch','Back knee down, foot up against a wall or sofa. Switch halfway.'],['Ninety ninety switches','Sit with both knees bent to one side, then slowly switch to the other.'],['Deep squat hold','Heels down, chest up, elbows gently pushing your knees out.'],['Calf stretch','Hands on a wall, back heel down. Switch halfway.'],['Child\'s pose','Knees wide, arms long, breathe into your back.'],['Lie and breathe','On your back, slow breaths, let everything go heavy.']],v*60)},
+ {id:'stretch',ic:'🧘',name:'Stretch',cat:'Move',mind:'Slows you down after a busy day',body:'Restores range in hips, legs and back',
+  lens:[['6 min',6],['8 min',8],['12 min',12]],def:1,
+  prep:['A mat or soft floor and a towel.','Warm is better: after a walk or shower is ideal.','Ease in: mild tension, never pain.'],
+  intro:'Welcome to your stretch. We\'ll hold eight stretches for your legs, hips, back and chest. Ease into each one until you feel mild tension, then breathe slowly and let it relax a little more each breath out. I\'ll tell you when to switch sides.',
+  steps:v=>EVEN([['Hamstrings','Lying down, one leg up with a towel around your foot. Switch halfway.'],['Quads','Lying on your side or standing, heel towards your bum. Switch halfway.'],['Hip flexors','Half-kneeling lunge, squeeze the glute of the back leg. Switch halfway.'],['Glutes','Lying down, ankle over the other knee, pull gently towards you. Switch halfway.'],['Groin','Sitting, soles of your feet together, let your knees drop.'],['Lower back','Lying down, knees to one side, then the other.'],['Chest','Forearm on a door frame, turn gently away. Switch halfway.'],['Calves','Against a wall, straight knee then bent knee. Switch halfway.']],v*60)},
+ {id:'yoga',ic:'🕉️',name:'Yoga flow',cat:'Move',mind:'Moving meditation: breath and body together',body:'Mobility, balance and core',
+  lens:[['10 min',10],['15 min',15],['20 min',20]],def:1,
+  prep:['A mat and a bit of space.','Bare feet if you can.','Breathe through your nose and move slowly.'],
+  intro:'Welcome to your yoga flow. We\'ll move through fourteen simple poses, linking each one to slow, steady breathing. Hold each pose gently and don\'t force anything. Balance poses may wobble, that\'s fine. Let\'s begin standing tall.',
+  steps:v=>EVEN([['Mountain','Stand tall, feet hip-width, breathe slowly.'],['Forward fold','Soft knees, let your head and arms hang.'],['Low lunge, right','Right foot forward, back knee down, hips forward.'],['Downward dog','Hips high, heels reaching towards the floor.'],['Low lunge, left','Left foot forward, back knee down, hips forward.'],['Cobra','Lying on your belly, gently lift your chest.'],['Child\'s pose','Knees wide, arms long, forehead down.'],['Warrior two, right','Wide stance, arms out, look over your right hand.'],['Warrior two, left','Same on the other side.'],['Tree, right','Right foot on your left calf or thigh, hands together.'],['Tree, left','Same on the other side.'],['Bridge','Lying down, lift your hips and squeeze your glutes.'],['Supine twist','Knees to one side, then the other.'],['Rest','Lie still, eyes closed, slow breaths.']],v*60)},
+ {id:'walk',ic:'🚶',name:'Recovery walk',cat:'Move',mind:'Clears your head; daylight lifts mood and helps sleep',body:'Flushes tired legs',
+  lens:[['10 min',10],['20 min',20],['30 min',30]],def:1,
+  prep:['Headphones in, phone in your pocket.','Outdoors if you can, ideally somewhere green or by water.'],
+  intro:'Welcome to your recovery walk. Keep it easy, a pace where you could chat. I\'ll check in a few times with something to notice. Breathe through your nose and enjoy being outside.',
+  steps:v=>[{k:'move',s:Math.round(v*60*.25),t:'Easy start',c:'Gentle pace. Breathe through your nose.'},{k:'move',s:Math.round(v*60*.5),t:'Look up',c:'Lift your eyes to the horizon. Notice five things you can hear.'},{k:'move',s:Math.round(v*60*.25),t:'Slow finish',c:'Ease the pace right down. Long breaths out.'}]},
+ {id:'contrast',ic:'🔥',name:'Contrast therapy',cat:'Hot & cold',mind:'A big mood and energy lift',body:'Can ease soreness after hard days',
+  lens:[['2 rounds · 25 min',[2,10]],['3 rounds · 40 min',[3,10]],['3 rounds · 50 min',[3,13]]],def:1,
+  prep:['Sauna or hot tub, plus a cold plunge, the sea or a cold shower.','Towel, water bottle and warm clothes ready.','Never alone in cold water.'],
+  safety:'Not after alcohol. Skip if you have a heart condition or high blood pressure unless your GP says it\'s fine. Get out if you feel dizzy.',
+  intro:'Welcome to contrast therapy. You\'ll swap between heat and cold. In the heat, sit back and slow your breathing. In the cold, focus on long slow breaths out, the first thirty seconds are the hardest. I\'ll tell you when to switch. Have your towel and water ready.',
+  steps:([r,h])=>{const s=[];for(let i=1;i<=r;i++){s.push({k:'hot',s:h*60,t:`Heat, round ${i} of ${r}`,c:'Sauna or hot tub. Sit back, slow breaths, relax your shoulders.'},{k:'cold',s:120,t:`Cold, round ${i} of ${r}`,c:'Cold plunge, sea or shower. Long, slow breaths out. Up to two minutes.'});if(i<r)s.push({k:'move',s:90,t:'Rest',c:'Sit, let your body warm up naturally, sip some water.'})}return s}},
+ {id:'ice',ic:'🧊',name:'Ice bath',cat:'Hot & cold',mind:'Builds calm under pressure',body:'Eases muscle soreness',
+  lens:[['2 min',2],['3 min',3],['5 min',5]],def:1,
+  prep:['Water around 10-15°C. Have a towel and warm clothes beside you.','Someone nearby, every time.','Go in on a slow breath out.'],
+  safety:'Never alone. Not after alcohol. Skip if you have a heart condition unless your GP says it\'s fine. Get out if you shiver hard or feel unwell.',
+  intro:'Welcome to your ice bath. First, a minute of slow breathing to get ready. When I say, lower yourself in on a long breath out. The gasp in the first thirty seconds is normal and it passes. Stay still and keep your breaths slow and long. I\'ll tell you when it\'s time to get out.',
+  steps:v=>[{k:'move',s:60,t:'Get ready',c:'Slow breaths. In through the nose, long breath out through the mouth.'},{k:'cold',s:v*60,t:'In the cold',c:'Breathe out slowly. Stay still. You\'re doing well.'},{k:'move',s:90,t:'Warm up',c:'Out you get. Dry off, layer up and move around to rewarm.'}]},
+ {id:'sauna',ic:'♨️',name:'Sauna',cat:'Hot & cold',mind:'Deep relaxation, better sleep',body:'Loosens muscles, good for your heart',
+  lens:[['10 min',10],['15 min',15],['20 min',20]],def:1,
+  prep:['Drink a glass of water first.','Towel to sit on.','Leave any time you need to.'],
+  safety:'Drink water before and after. Not after alcohol. Get out if you feel dizzy.',
+  intro:'Welcome to your sauna session. Sit or lie back, let your shoulders drop and breathe slowly. I\'ll check in halfway and let you know when to cool down. Leave early if you need to, there\'s no prize for staying longer.',
+  steps:v=>[{k:'hot',s:v*60,t:'Sauna',c:'Sit back. Slow breaths. Let the heat loosen you.'},{k:'move',s:300,t:'Cool down',c:'Cool shower, sit down, drink some water.'}]}];
 let PL=null,rpTimer=null,rpWake=null;
-function rpStart(id){const pr=PROGS.find(p=>p.id===id);if(!pr)return;PL={pr,steps:[{k:'move',s:8,t:'Settle in',c:'Get comfortable. You can close your eyes and follow my voice.'}].concat(pr.steps()),i:0,left:0,paused:false,end:false,started:Date.now(),elapsed:0};audBed();keepAwake(true);rpGo(0);try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(w=>rpWake=w).catch(()=>{})}catch(e){}}
 function rpGo(i){if(!PL)return;if(i>=PL.steps.length){rpFinish();return}PL.i=i;PL.stepEnd=Date.now()+PL.steps[i].s*1000;PL.paused=false;rpRender(true);audStepSay(PL.steps[i],i,PL.pr);clearInterval(rpTimer);rpTimer=setInterval(rpTick,250)}
-function rpTick(){if(!PL||PL.paused||PL.end)return;const left=Math.max(0,Math.ceil((PL.stepEnd-Date.now())/1000));const el=$('#plCount');if(el)el.textContent=left>=60?fromSec(left):left;if(left<=0)rpGo(PL.i+1)}
+function rpTick(){if(!PL||PL.paused||PL.end)return;const left=Math.max(0,Math.ceil((PL.stepEnd-Date.now())/1000));const el=$('#plCount');if(el)el.textContent=left>=60?fromSec(left):left;rpCues(left);if(left<=0)rpGo(PL.i+1)}
 function rpFinish(){clearInterval(rpTimer);PL.end=true;chime('end');say('Well done. Take a moment before you get up.');setTimeout(audBedStop,3000);keepAwake(false);PL.mins=Math.max(1,Math.round((Date.now()-PL.started)/60000));try{rpWake&&rpWake.release()}catch(e){}rpRender()}
-function rpClose(){clearInterval(rpTimer);PL=null;audBedStop();try{speechSynthesis.cancel()}catch(e){}keepAwake(false);try{rpWake&&rpWake.release()}catch(e){}const h=$('#plHost');if(h)h.innerHTML=''}
+function rpClose(){clearInterval(rpTimer);PL=null;audBedStop();sayStop();keepAwake(false);try{rpWake&&rpWake.release()}catch(e){}const h=$('#plHost');if(h)h.innerHTML=''}
 function rpRender(fresh){let h=$('#plHost');if(!h){h=document.createElement('div');h.id='plHost';document.body.appendChild(h)}if(!PL){h.innerHTML='';return}
   const pr=PL.pr;
   if(PL.end){h.innerHTML=`<div class="plwrap2"><div class="plbox"><div class="plic">${pr.ic}</div><h2>${esc(pr.name)} done</h2><p class="ds">${PL.mins} minute${PL.mins>1?'s':''}. ${esc(pr.mind)}.</p><p style="margin:14px 0 8px;font-weight:600">How do you feel now?</p>
@@ -1374,11 +1410,85 @@ function viewRecover(){const k=iso(todayDate());let n=0,mins=0,feel=[];for(let i
   return `<section class="rhero"><div><h2>Recover</h2><p>Recovery is where your body adapts and your head clears. A few calm minutes lower stress, improve sleep and leave you more patient with the people around you.</p></div>
     <div class="rstats"><span><b class="num">${n}</b>sessions this week</span><span><b class="num">${mins}</b>minutes</span><span><b class="num">${feel.length?avg(feel).toFixed(1):'–'}</b>feel after, out of 5</span></div></section>
   ${typeof viewMobility==='function'?`<a class="rprog" href="#mobility"><span class="ric" aria-hidden="true">🧘</span><span class="rt"><b>Mobility follow-along</b><small>Made for today from your training and niggles</small></span><span class="rgo" aria-hidden="true">▶</span></a>`:''}
-  ${cats.map(c=>`<div class="rcat"><h3>${c}</h3><div class="rprogs">${PROGS.filter(p=>p.cat===c).map(p=>`<button type="button" class="rprog" data-prog="${p.id}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${p.min} min · ${esc(p.mind)}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></div>`).join('')}
+  ${cats.map(c=>`<div class="rcat"><h3>${c}</h3><div class="rprogs">${PROGS.filter(p=>p.cat===c).map(p=>`<button type="button" class="rprog" data-prog="${p.id}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${esc(p.lens[p.def||0][0])} · ${esc(p.mind)}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></div>`).join('')}
   ${recoveryHTML(k).replace('<h2>Recovery</h2>','<h2>Already did something?</h2>')}
   <button type="button" class="ghost learnlink" data-learn-cat="Recovery">📘 Learn: ice baths, sauna, breathing and more ›</button>`}
 // ---- Learn ----
 const LEARN=[
+ {id:'myplan',ic:'📋',cat:'Food',t:'Your food plan, explained',get s(){const R=DAYT.rest,T=DAYT.training;const ap=(typeof APPROACH!=='undefined'&&APPROACH)?APPROACH:'higher protein and lower carb, built on whole foods';const fh=(typeof targets==='function'&&targets().fastH)||14;return [
+  ['The idea',`Your plan is ${ap}. Plenty of protein to build and protect muscle, carbs matched to how active you are, lots of plants for fibre and your gut, and mostly real, unprocessed food.`],
+  ['Your daily targets',`Rest days: about ${R.kcal} kcal, ${R.protein} g protein and up to ${R.carbs} g net carbs. Training days: about ${T.kcal} kcal, ${T.protein} g protein and up to ${T.carbs} g net carbs. The app switches between them automatically, based on what you actually do.`],
+  ['Protein first',`Build every meal around a protein: eggs, Greek yogurt, meat, fish, beans or tofu. Spread across 3-4 meals, that is roughly ${Math.round(T.protein/4)} g a meal.`],
+  ['Carbs where they count','Most of your carbs come from vegetables, fruit, dairy and beans. Starchier carbs such as potatoes, rice and oats go around your training, when your muscles use them best.'],
+  ['Fat for flavour and fullness','Olive oil, avocado, nuts, seeds, oily fish, eggs, butter and cheese. Fat keeps you full and carries vitamins A, D, E and K.'],
+  ['The overnight fast',`A gap of about ${fh} hours between your last food at night and your first the next day gives your gut a rest and helps blood sugar control. Black coffee, tea and water don't break it.`],
+  ['Plants and fibre','Aim for 30 different plants a week and 30-40 g of fibre a day. Half your plate as non-starchy vegetables does most of the work.'],
+  ['Why it works','High protein keeps you full and protects muscle. Fewer refined carbs means steadier energy and fewer cravings. Whole foods bring the vitamins, minerals and fibre that processed food strips out.']]},q:['On a hard training day, your plan…',['Adds starchy carbs around the session','Cuts protein','Skips meals'],0]},
+ {id:'carbs',ic:'🥦',cat:'Food',t:'Carbs are more than bread and pasta',s:[
+  ['What carbs are','Carbohydrates are sugars, starches and fibre. They are in far more foods than bread, pasta and rice.'],
+  ['Natural carbs are everywhere','Vegetables, fruit, beans, lentils, milk, yogurt, nuts and seeds all contain carbs, packed with fibre, water, vitamins and minerals.'],
+  ['Non-starchy vegetables','Broccoli, spinach, peppers, courgettes, cabbage, cauliflower, mushrooms, tomatoes, leeks, green beans, kale and salad leaves. Very low in net carbs and calories, high in fibre and nutrients. Fill half your plate with them.'],
+  ['Starchy carbs','Potatoes, rice, pasta, bread, oats, parsnips and beans are denser fuel. Useful around hard training; portion them to how active you are that day.'],
+  ['Fruit and dairy','Fruit brings natural sugar with fibre and vitamin C. Berries are lowest in sugar. Milk and yogurt bring lactose with protein and calcium.'],
+  ['Net carbs','Net carbs are total carbs minus fibre. Fibre is not absorbed as sugar, so vegetable-heavy meals count for much less than they look. The app tracks net carbs.'],
+  ['Refined carbs','Sweets, fizzy drinks, white bread, pastries and most cereals are carbs stripped of their fibre. They digest fast and are easy to overeat.'],
+  ['Try this week','Make half your plate non-starchy vegetables at two meals a day, and swap one refined carb for a whole one, such as white bread for oats or potatoes.']],q:['Which is a non-starchy vegetable?',['Potato','Broccoli','Parsnip'],1]},
+ {id:'glucose',ic:'🩸',cat:'Food',t:'Blood sugar: the carb connection',s:[
+  ['From carbs to glucose','Your body breaks starches and sugars down into glucose, which passes into your blood. That is your blood sugar.'],
+  ['Insulin\'s job','When blood sugar rises, your pancreas releases insulin, which moves glucose into your muscles, liver and fat cells. That is normal and healthy.'],
+  ['Spikes and crashes','A big hit of fast carbs on their own, such as sweets, juice or white bread, can send blood sugar up quickly and then down again, leaving you hungry, tired and craving more.'],
+  ['What slows it down','Fibre, protein and fat slow the rise. Whole foods beat refined ones. Eating vegetables and protein before the starchy part of a meal flattens the curve.'],
+  ['Muscles are a sponge','Working muscles soak up glucose even with little insulin. That is why active people handle carbs better, and why a 10-15 minute walk after a meal helps.'],
+  ['Sleep and stress count','A bad night or a stressful day makes your body handle the same meal worse. Sleep is part of blood sugar control.'],
+  ['Try this week','For your most carb-heavy meal each day, eat the vegetables and protein first, and take a 10-minute walk afterwards.']],q:['What slows the rise in blood sugar?',['Eating protein and fibre with your carbs','Drinking juice first','Eating carbs on their own'],0]},
+ {id:'upf',ic:'🏭',cat:'Food',t:'Ultra-processed foods',s:[
+  ['What they are','Ultra-processed foods (UPFs) are industrial products made mostly from substances taken out of food, such as oils, sugars, starches and protein isolates, plus additives like emulsifiers, flavourings, sweeteners and colours. Most of the ingredients are things you would never find in a home kitchen.'],
+  ['The official definition','Scientists use the NOVA system, which groups foods by how processed they are: 1 unprocessed or minimally processed, 2 cooking ingredients, 3 processed foods, 4 ultra-processed. Group 4 is the one to limit.'],
+  ['Common examples','Fizzy drinks, packaged biscuits, sweets and crisps, mass-produced sliced bread, most breakfast cereals, chicken nuggets and hot dogs, instant noodles, many ready meals and flavoured yogurts.'],
+  ['Not all processing is bad','Tinned beans, frozen vegetables, plain yogurt, cheese, oats and tinned fish are processed but not ultra-processed. They are great everyday foods.'],
+  ['How bad are they?','In a 2019 US National Institutes of Health study, people eating an ultra-processed diet ate about 500 kcal more a day than on a minimally processed diet with the same nutrients available, and gained weight. Large long-term studies link high UPF intake with higher rates of obesity, type 2 diabetes, heart disease and depression.'],
+  ['Why we overeat them','They are soft, quick to eat and engineered to taste great, while being low in fibre and protein. You eat faster than your fullness signals can keep up.'],
+  ['How to spot them','A long ingredients list, ingredients you do not recognise, and health claims on the front of the pack.'],
+  ['Try this week','Swap one ultra-processed food a day: crisps for nuts, cereal for oats, a cereal bar for fruit and yogurt, a ready meal for a batch-cooked dinner.']],q:['Which of these is ultra-processed?',['Tinned chickpeas','Plain porridge oats','Chicken nuggets'],2]},
+ {id:'insulin',ic:'⚖️',cat:'Food',t:'Insulin resistance and belly fat',s:[
+  ['What it is','Insulin resistance is when your cells stop responding well to insulin. Your pancreas makes more and more to keep blood sugar normal. It can go on quietly for years.'],
+  ['Where it leads','If it carries on, blood sugar starts to rise: first prediabetes, then type 2 diabetes. It is also linked with heart disease, fatty liver and high blood pressure.'],
+  ['Visceral fat','Fat stored deep around your organs, the hard belly, is far more harmful than fat under the skin and closely linked with insulin resistance. You can be a normal weight and still carry it.'],
+  ['Warning signs','A growing waist (more than half your height is a common red flag), energy slumps after meals, high triglycerides and blood pressure. Only a blood test, such as HbA1c, can confirm it.'],
+  ['What helps most','Strength training and daily movement, 7-9 hours of sleep, losing some belly fat, cutting sugary drinks and ultra-processed food, more fibre and protein, and keeping alcohol and stress in check.'],
+  ['Good news','Exercise improves insulin sensitivity fast: a single session helps for a day or two, and regular training changes it for good. Muscle is your best defence.'],
+  ['Try this week','Measure your waist at belly-button level. If it is more than half your height, or diabetes runs in your family, ask your GP about an HbA1c test.']],q:['Which fat is most closely linked with insulin resistance?',['Visceral fat around your organs','Fat on your arms','Fat on your thighs'],0]},
+ {id:'stretchlearn',ic:'🧘',cat:'Recovery',t:'Stretching and yoga',s:[
+  ['What stretching does','Regular stretching improves your range of motion over a few weeks. It mostly works by your nervous system getting used to the stretch.'],
+  ['Before and after','Before training, use moving stretches like leg swings and lunges. Save long holds for after training or the evening.'],
+  ['How to hold','30-60 seconds, mild tension and never pain. Breathe slowly and let it ease a little more on each breath out. No bouncing.'],
+  ['Yoga adds more','Yoga combines stretching with balance, strength and breathing. Studies show it can reduce stress and help with lower back pain.'],
+  ['The mental side','Slow holds and breathing switch your body into rest mode, which is why a stretch before bed helps many people sleep.'],
+  ['Try this week','Do the Stretch or Yoga flow session in Recover on two evenings this week.']],q:['When are long stretch holds best?',['Right before sprinting','After training or in the evening','Never'],1]},
+ {id:'mindlearn',ic:'🧠',cat:'Recovery',t:'Meditation and body scans',s:[
+  ['What it is','Meditation is training your attention: noticing your breath, body or thoughts without getting swept away. A body scan moves your attention slowly through your body.'],
+  ['The evidence','Regular practice modestly lowers stress and anxiety and can improve sleep. Ten minutes a day is enough to notice.'],
+  ['A wandering mind is normal','Noticing you have drifted and coming back is the exercise itself, not a failure.'],
+  ['For athletes','Many teams use it for focus, staying calm under pressure and switching off after games.'],
+  ['Try this week','Do the Body scan in Recover at bedtime on three nights and note your sleep quality in the check-in.']],q:['Your mind wanders during a body scan. That means…',['You are doing it wrong','You are doing the exercise: notice and come back','You should stop'],1]},
+ {id:'naplearn',ic:'😴',cat:'Recovery',t:'Napping',s:[
+  ['Short is sweet','A 10-20 minute nap boosts alertness and mood without leaving you groggy.'],
+  ['Avoid the middle','30-60 minutes can drop you into deep sleep and leave you foggy when you wake. If you need longer, a full 90-minute cycle is better.'],
+  ['Timing','Nap before about 3pm so it doesn\'t steal from your night\'s sleep.'],
+  ['The coffee nap','Drink a coffee and nap straight away for 20 minutes. The caffeine kicks in just as you wake.'],
+  ['Try this week','After a short night, take a 20-minute Power nap from Recover instead of reaching for sugar.']],q:['The best length for a quick nap is…',['10-20 minutes','45 minutes','2 hours'],0]},
+ {id:'rolling',ic:'🌀',cat:'Recovery',t:'Foam rolling and massage',s:[
+  ['What it does','Foam rolling and massage reduce how sore you feel and give a short-term boost to how freely you move.'],
+  ['Not breaking up knots','It doesn\'t physically break up knots or fascia. It works through your nervous system, telling tight muscles they can relax.'],
+  ['How to roll','30-60 seconds per area, slow, with moderate pressure. Stay off bones, joints and the lower back.'],
+  ['Massage','A good massage relaxes you and lifts your mood as much as it helps your muscles. Worth it after a big block of training.'],
+  ['Try this week','Roll your calves, quads and glutes for 5 minutes after your hardest session, then log it in Recover.']],q:['Foam rolling mainly works by…',['Breaking up knots','Calming your nervous system','Removing lactic acid'],1]},
+ {id:'sea',ic:'🌊',cat:'Recovery',t:'Sea swimming',s:[
+  ['Why people love it','Cold sea swims bring a strong lift in mood and alertness, and the people you swim with are half the benefit.'],
+  ['Cold shock','The first minute in cold water makes you gasp and breathe fast. Enter slowly, breathe out long, and never jump straight in.'],
+  ['How long','In Irish winter water, a few minutes is plenty to start with. Get out before you start shivering hard.'],
+  ['Stay safe','Swim with others at known spots. Check tides and weather, wear a bright hat, and know your way out. Rewarm with dry layers and a warm drink.'],
+  ['Try this week','Find a local sea swimming group and go along with them for your first swims.']],q:['The safest way to start a cold sea swim is…',['Dive straight in','Walk in slowly and breathe out long','Hold your breath'],1]},
  {id:'protein',ic:'🥩',cat:'Food',t:'Protein: how much, how often',s:[
   ['Why it matters','Protein is the raw material for muscle, tendons, skin, hormones and immune cells. Training causes small amounts of muscle damage, and protein is what you rebuild with. It also keeps you fuller for longer than carbs or fat.'],
   ['How much','Most active adults do well on about 1.6 g per kg of body weight a day. Going up to 2.2 g/kg can help when you are losing body fat or training very hard. For an 80 kg person that is roughly 130-175 g a day.'],
@@ -1387,13 +1497,6 @@ const LEARN=[
   ['As you get older','From your 40s, muscle responds less to small doses. Aim for the top of the range, get 30-40 g per meal, and keep up strength training to hold on to muscle.'],
   ['Easy wins','Greek yogurt, about 15-20 g a bowl. 3 eggs, 18 g. A tin of tuna, 25 g. A chicken breast, 35 g. A glass of milk, 8 g. 200 g cooked lentils, 18 g. A scoop of whey, 20-25 g.'],
   ['Try this week','Check your breakfast. If it has under 25 g of protein, add yogurt, eggs, milk or a scoop of protein. Breakfast is where most people fall short.']],q:['Which works best for most people?',['One big protein dinner','Protein spread across 3-4 meals','Protein only after training'],1]},
- {id:'carbs',ic:'🍚',cat:'Food',t:'Carbs and fuelling',s:[
-  ['Your fastest fuel','Carbs are stored as glycogen in your muscles and liver. Hard, fast efforts such as sprints, intervals and heavy sessions run mostly on it.'],
-  ['Match carbs to the work','Eat more carbs on hard training or heavy work days and fewer on rest days. The app moves your targets automatically based on what you are doing that day.'],
-  ['Timing','A normal meal 2-3 hours before a hard session, or a banana or toast an hour before, tops you up. Carbs plus protein afterwards refills you and starts repair.'],
-  ['Pick quality most of the time','Oats, potatoes, rice, wholegrain bread, fruit and beans give fibre, vitamins and steady energy. Sweets and white bread are fine around training, less so as the base of your diet.'],
-  ['Low carb: when it helps, when it hurts','Lower-carb eating can work well for steady days and for losing body fat. It can blunt performance in sprints and high-intensity work, so put more carbs around those sessions.'],
-  ['Try this week','On your two hardest days, add a fist-sized portion of carbs to the meal before and the meal after. Notice how the session feels.']],q:['When do carbs matter most?',['On rest days','Around hard, fast training','Last thing at night'],1]},
  {id:'gut',ic:'🦠',cat:'Food',t:'Your gut microbiome',s:[
   ['A garden inside you','Trillions of microbes live in your gut. Together they weigh about as much as a bag of sugar and carry far more genes than you do.'],
   ['What they do','They turn fibre into short-chain fatty acids that feed your gut lining and help calm inflammation. They train your immune system, and your gut and brain send signals to each other all day long.'],
@@ -1510,7 +1613,7 @@ function progSub(){return `<div class="subtabs" style="grid-template-columns:1fr
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(c('#signOpen')){showSign();return}if(c('#signNo')||(e.target.id==='signWrap')){hideSign();return}
   if(c('#signYes')){const k=iso(sel);hideSign();persistDay(k,{foodDone:true});toast('Day signed off ✓');render();stepDone();return}
-  if(x=c('[data-prog]')){rpStart(x.dataset.prog);return}
+  if(x=c('[data-prog]')){const pr=PROGS.find(p=>p.id===x.dataset.prog);if(pr){RI={pr,li:pr.def||0};showRI()}return}
   if(c('#plX')){if(PL&&!PL.end&&Date.now()-PL.started>60000){rpFinish()}else rpClose();return}
   if(c('#plPause')){if(!PL)return;if(PL.paused){PL.stepEnd=Date.now()+PL.pausedLeft;PL.paused=false}else{PL.pausedLeft=PL.stepEnd-Date.now();PL.paused=true}rpRender();const o=$('.plorb');if(o)o.style.animationPlayState=PL.paused?'paused':'running';return}
   if(c('#plSkip')){rpGo(PL.i+1);return}if(c('#plBack')){rpGo(Math.max(0,PL.i-1));return}
@@ -1542,7 +1645,6 @@ function chime(kind){const c=audCtx();if(!c)return;const now=c.currentTime;const
 let VOICE=null;function pickVoice(){if(VOICE||!window.speechSynthesis)return VOICE;const vs=speechSynthesis.getVoices();const pref=['Moira','Serena','Kate','Fiona','Martha','Google UK English Female','Samantha','Karen','Tessa'];
   VOICE=vs.find(v=>pref.some(p=>v.name.includes(p)))||vs.find(v=>/en-(IE|GB)/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null;return VOICE}
 try{window.speechSynthesis&&speechSynthesis.addEventListener&&speechSynthesis.addEventListener('voiceschanged',()=>{VOICE=null;pickVoice()})}catch(e){}
-function say(t){if(!AUD.voice||!t||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.8;u.pitch=.92;u.volume=1;const v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
 const TINY_MP4='data:video/mp4;base64,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IGNocm9tYV9tZT0xIHRyZWxsaXM9MCA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0wIHRocmVhZHM9MSBsb29rYWhlYWRfdGhyZWFkcz0xIHNsaWNlZF90aHJlYWRzPTAgbnI9MCBkZWNpbWF0ZT0xIGludGVybGFjZWQ9MCBibHVyYXlfY29tcGF0PTAgY29uc3RyYWluZWRfaW50cmE9MCBiZnJhbWVzPTMgYl9weXJhbWlkPTIgYl9hZGFwdD0xIGJfYmlhcz0wIGRpcmVjdD0xIHdlaWdodGI9MSBvcGVuX2dvcD0wIHdlaWdodHA9MSBrZXlpbnQ9MjUwIGtleWludF9taW49MSBzY2VuZWN1dD00MCBpbnRyYV9yZWZyZXNoPTAgcmNfbG9va2FoZWFkPTEwIHJjPWNyZiBtYnRyZWU9MSBjcmY9MjMuMCBxY29tcD0wLjYwIHFwbWluPTAgcXBtYXg9NjkgcXBzdGVwPTQgaXBfcmF0aW89MS40MCBhcT0xOjEuMDAAgAAAABJliIQAFv/sf8JVf9ECkR5tf/EBGCAHARggBwEYIAcBGCAHARggBwEYIAcBGCAHARggBwAAAAhBmiEYgr/+8AEYIAcBGCAHARggBwEYIAcBGCAHARggBwEYIAcBGCAH';
 let rpWake2=null;
 async function keepAwake(on){
@@ -1550,9 +1652,6 @@ async function keepAwake(on){
   try{if(on){if(!AUD.vid){const v=document.createElement('video');v.setAttribute('playsinline','');v.setAttribute('muted','');v.muted=true;v.loop=true;v.src=TINY_MP4;v.style.cssText='position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;bottom:0;left:0';document.body.appendChild(v);AUD.vid=v}AUD.vid.play().catch(()=>{})}else if(AUD.vid){AUD.vid.pause();AUD.vid.remove();AUD.vid=null}}catch(e){}
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&typeof PL!=='undefined'&&PL&&!PL.end)keepAwake(true)});
-function audStepSay(st,i,pr){const breath=['in','hold','out'].includes(st.k);
-  if(breath){chime(st.k==='in'?'in':st.k==='out'?'out':'hold');if((st.round||1)<=2||(st.k!=='hold'&&(st.round%5===0)))say(st.t)}
-  else{chime('step');say(i===0&&pr.intro?pr.intro+' '+st.t+'. '+(st.c||''):st.t+'. '+(st.c||''))}}
 function audControls(){return `<div class="audbar"><div class="segmini">${[['ocean','🌊 Ocean'],['rain','🌧 Rain'],['off','🔇 Quiet']].map(([v,l])=>`<button type="button" data-asnd="${v}" aria-pressed="${AUD.snd===v}">${l}</button>`).join('')}</div><button type="button" class="vtog" data-avoice aria-pressed="${AUD.voice}">${AUD.voice?'🗣 Voice on':'🗣 Voice off'}</button></div>`}
 // ---- photo review before logging ----
 let PR=null;
@@ -1581,7 +1680,7 @@ function foodActionsHTML(dIso){if(sampleMode||dIso>iso(todayDate()))return '';
   return `<article class="card factions"><div class="frow">${canImg?`<label class="fbtn"><span aria-hidden="true">📷</span><b>Snap plate</b><input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}<button type="button" class="fbtn" id="fSay"><span aria-hidden="true">🎤</span><b>Say it</b></button><button type="button" class="fbtn" id="fType"><span aria-hidden="true">⌨️</span><b>Type it</b></button></div>
     <div class="mealpick">${seg('f','meal',MEALS,meal,null,'small')}</div><div class="qline"><span class="label">Quick add · ${esc(meal)}</span>${fr.length?`<div class="tags">${fr.slice(0,5).map(chip).join('')}</div>`:`<div class="hint" style="font-size:12px;color:var(--muted)">Things you eat often will appear here.</div>`}
     ${fr.length>5||lib.length?`<details class="qmore"><summary>More</summary>${fr.length>5?`<div class="tags">${fr.slice(5).map((x,i)=>chip(x,i+5)).join('')}</div>`:''}${lib.length?`<div class="label" style="margin-top:8px">From your meal guide</div><div class="tags">${lib.map(x=>`<button type="button" data-lib="${LIB.indexOf(x)}">${esc(x[0])}</button>`).join('')}</div>`:''}</details>`:''}</div>
-    ${fState.msg&&!/^Logged/.test(fState.msg)?'':''}</article>`}
+    ${fState.busy||fState.msg?`<div class="hsum" role="status">${esc(fState.busy?'Working…':fState.msg)}</div>`:''}</article>`}
 // ---- compact meals ----
 const msOpen=new Set();
 document.addEventListener('toggle',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.ms){if(t.open)msOpen.add(t.dataset.ms);else msOpen.delete(t.dataset.ms)}},true);
@@ -1593,9 +1692,56 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(x=c('[data-proff]')){const i=+x.dataset.proff;PR.items[i].off=!PR.items[i].off;showPR();return}
   if(c('#prNo')){PR=null;showPR();return}if(c('#prYes')){prLog();return}
   if(c('#fSay')){if(typeof openVoice==='function')openVoice();return}
-  if(c('#fType')){const t=$('#f-say');if(t){t.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>t.focus(),300)}return}
+  if(c('#fType')){if(typeof openVoice==='function'){openVoice();setTimeout(()=>{const t=$('#v-text');if(t)t.focus()},120)}return}
 });
 document.addEventListener('input',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.prname!=null&&PR){PR.items[+t.dataset.prname].name=t.value}});
+
+// ================= v6: real voice, session intros with length choice =================
+let TTS_ON=false;const ttsBuf=new Map(),ttsPend=new Map();let ttsSrc=null;
+function ttsGet(text){if(ttsBuf.has(text))return Promise.resolve(ttsBuf.get(text));if(ttsPend.has(text))return ttsPend.get(text);
+  const p=(async()=>{const c=audCtx();if(!c)return null;let ab=null;
+    try{let cache=null,key=null;try{cache=window.caches?await caches.open('tts-v1'):null;key=new Request(location.origin+'/tts-cache/'+encodeURIComponent(text));const hit=cache&&await cache.match(key);if(hit)ab=await hit.arrayBuffer()}catch(e){}
+      if(!ab){const {data:{session}}=await sb.auth.getSession();if(!session)return null;const r=await fetch('/api/tts',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({text})});if(!r.ok)return null;ab=await r.arrayBuffer();try{cache&&cache.put(key,new Response(ab.slice(0),{headers:{'content-type':'audio/mpeg'}}))}catch(e){}}
+      const b=await c.decodeAudioData(ab.slice(0));ttsBuf.set(text,b);return b}catch(e){return null}})();
+  ttsPend.set(text,p);return p}
+async function say(t){if(!AUD.voice||!t)return;const tok={};say.tok=tok;
+  if(TTS_ON){const b=await ttsGet(t);if(say.tok!==tok)return;if(b){try{ttsSrc&&ttsSrc.stop()}catch(e){}const c=audCtx();const s=c.createBufferSource();s.buffer=b;const g=c.createGain();g.gain.value=1.1;s.connect(g);g.connect(c.destination);s.start();ttsSrc=s;return}}
+  if(!window.speechSynthesis)return;try{if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.82;u.pitch=.95;u.volume=1;const v=pickVoice();if(v)u.voice=v;setTimeout(()=>{try{speechSynthesis.speak(u)}catch(e){}},80)}catch(e){}}
+function sayStop(){say.tok=null;try{ttsSrc&&ttsSrc.stop()}catch(e){}try{window.speechSynthesis&&speechSynthesis.cancel()}catch(e){}}
+function primeAudio(){try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}audCtx();try{if(window.speechSynthesis&&!TTS_ON){const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}}catch(e){}}
+let RI=null;
+function riHTML(){if(!RI)return '';const pr=RI.pr;const v=pr.lens[RI.li][1];const steps=pr.steps(v);const breath=steps.some(s=>s.k==='in');
+  const coming=breath?[`${steps[0].of} rounds of: ${steps.filter(s=>s.round===1).map(s=>`${s.t} (${s.s}s)`).join(', ')}`,'Soft tones keep the rhythm after the first few rounds']:[...new Set(steps.map(s=>s.t))];
+  return `<div class="cfwrap" id="riWrap"><div class="cfsheet risheet" role="dialog" aria-label="${esc(pr.name)}"><div class="rih"><span class="ric" aria-hidden="true">${pr.ic}</span><div style="flex:1"><h2>${esc(pr.name)}</h2><small class="ds">${esc(pr.cat)}</small></div><button type="button" class="x" id="riX" aria-label="Close">×</button></div>
+    <div class="ritags"><span>🧠 ${esc(pr.mind)}</span><span>💪 ${esc(pr.body)}</span></div>
+    <div><div class="label">How long?</div><div class="segmini" style="display:inline-flex;margin-top:6px">${pr.lens.map(([l],i)=>`<button type="button" data-rilen="${i}" aria-pressed="${RI.li===i}">${esc(l)}</button>`).join('')}</div></div>
+    <div><div class="label">What's coming</div><ol class="rilist">${coming.slice(0,10).map(t=>`<li>${esc(t)}</li>`).join('')}${coming.length>10?'<li>…and a few more</li>':''}</ol></div>
+    <div><div class="label">Before you start</div><ul class="cover" style="margin-top:6px">${pr.prep.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div>
+    ${pr.safety?`<div class="plsafe">${esc(pr.safety)}</div>`:''}
+    <div><div class="label">Sound</div>${audControls()}</div>
+    <button type="button" class="donebtn" id="riGo" style="flex:none;width:100%;padding:15px">▶ Start</button>
+    <small class="ds" style="text-align:center">${TTS_ON?'A calm voice will guide you. Turn your volume up.':'Your phone\'s voice will guide you. Turn your volume up and check the silent switch.'} The screen stays on.</small></div></div>`}
+function showRI(){let h=$('#riHost');if(!h){h=document.createElement('div');h.id='riHost';document.body.appendChild(h)}h.innerHTML=riHTML()}
+function rpStart(id,v){const pr=PROGS.find(p=>p.id===id);if(!pr)return;if(v==null)v=pr.lens[pr.def||0][1];
+  const settle=Math.min(50,Math.max(18,Math.round(pr.intro.split(/\s+/).length/2.1)+5));
+  const steps=[{k:'move',s:settle,t:'Settle in',c:'Listen, get comfortable, and close your eyes when you\'re ready.',intro:true}].concat(pr.steps(v));
+  PL={pr,steps,i:0,paused:false,end:false,started:Date.now(),cues:{}};
+  audCtx();audBed();keepAwake(true);
+  if(TTS_ON&&AUD.voice){[pr.intro,'Breathe in','Hold','Breathe out','Long breath out','One more sniff','Breathe out slowly','Halfway. Keep breathing slowly.','Ten seconds.','Well done. Take a moment before you get up.'].concat(steps.filter(s=>!['in','hold','out'].includes(s.k)&&!s.intro&&!s.quiet).map(s=>s.t+'. '+(s.c||''))).forEach(t=>ttsGet(t))}
+  rpGo(0)}
+function audStepSay(st,i,pr){if(st.intro){chime('step');say(pr.intro);return}const breath=['in','hold','out'].includes(st.k);
+  if(breath){chime(st.k==='in'?'in':st.k==='out'?'out':'hold');if((st.round||1)<=3)say(st.t);return}
+  chime('step');if(!st.quiet)say(st.t+'. '+(st.c||''))}
+function rpCues(left){if(!PL)return;const st=PL.steps[PL.i];if(!st||st.quiet||st.intro)return;const k=PL.i;
+  if(st.s>=90&&left===Math.round(st.s/2)&&!PL.cues[k+'h']){PL.cues[k+'h']=1;say('Halfway. Keep breathing slowly.')}
+  if((st.k==='hot'||st.k==='cold')&&left===10&&!PL.cues[k+'t']){PL.cues[k+'t']=1;say('Ten seconds.')}}
+function updateFab(){const f=$('#fab');let t='';try{t=tab()}catch(e){}if(f)f.hidden=!sample||vState.open||sampleMode||t==='recover'||t==='reports'}
+window.addEventListener('hashchange',()=>{try{updateFab()}catch(e){}});
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-rilen]')){RI.li=+x.dataset.rilen;showRI();return}
+  if(c('#riX')||e.target.id==='riWrap'){RI=null;showRI();return}
+  if(c('#riGo')){const {pr,li}=RI;RI=null;showRI();primeAudio();rpStart(pr.id,pr.lens[li][1]);return}
+},true);
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -2632,7 +2778,7 @@ document.addEventListener('click',async e=>{
   if(id==='fbLoad'){loadFeedback();return}
 });
 (async()=>{
-  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;SERVER_PLAN=!!cfg.plan;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
+  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!cfg.voice;SERVER_PLAN=!!cfg.plan;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
   sb.auth.onAuthStateChange((ev,s)=>{SESSION=s;if(ev==='PASSWORD_RECOVERY'){showGate(`<div class="gcard"><h1>Set a new password</h1><form id="pwForm" class="form" style="padding:0"><div class="field"><label class="label" for="np">New password</label><input id="np" type="password" minlength="8" required></div><button class="primary" type="submit">Save password</button></form></div>`)}});
   document.addEventListener('submit',async e=>{if(e.target.id==='pwForm'){e.preventDefault();const {error}=await sb.auth.updateUser({password:$('#np').value});if(error)toast(error.message,4000);else{toast('Password saved');location.hash='';location.reload()}}},true);
