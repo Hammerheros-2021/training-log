@@ -436,6 +436,30 @@ input[type=time]{width:100%;background:var(--sunk);border:1px solid var(--line);
 .plantop b{display:block;font-family:var(--display);font-size:18px;text-transform:uppercase}.plantop small{font-size:12px;color:var(--muted)}.plantop .ghost{flex:none;color:var(--fg)}
 .donebar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:color-mix(in srgb,var(--ok) 14%,transparent);border:1px solid var(--ok);border-radius:12px;padding:10px 14px;font-weight:600}
 .form.logged{padding:12px 16px}.lgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lgrow .ds{flex:1;min-width:0}
+
+/* bottom tab bar */
+.top{position:static;padding:0}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);gap:0;background:color-mix(in srgb,var(--surface) 94%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid var(--line);border-radius:0;padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.tabs a{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0 3px;border-radius:10px;color:var(--muted);font-family:var(--body);font-size:11px;font-weight:600;text-transform:none;letter-spacing:0;background:none;overflow:visible}
+.tabs a svg{width:24px;height:24px}
+.tabs a[aria-current="page"]{background:none;color:var(--accent)}
+body{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+.fab{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+.toast{bottom:calc(144px + env(safe-area-inset-bottom,0px))}
+.dictbar{top:calc(env(safe-area-inset-top,0px) + 8px)}
+.view{padding-top:14px}
+/* one-line to-do */
+.todobar{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;overflow:hidden}
+.todobar.later{order:89;border-left-color:var(--muted)}
+.tnext{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 12px;color:var(--fg);text-decoration:none;background:none;border:0;text-align:left;font:inherit}
+.tdots{display:flex;gap:4px;flex:none}.tdots i{width:9px;height:9px;border-radius:50%;background:var(--sunk);border:1px solid var(--line)}.tdots i.on{background:var(--ok);border-color:var(--ok)}
+.tt{flex:1;min-width:0}.tt small{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}.tt b{font-size:14.5px}
+.ttog{flex:none;border:0;border-left:1px solid var(--line);background:none;color:var(--muted);width:46px;font-size:16px}
+.todolist{flex-basis:100%;display:flex;flex-direction:column;gap:6px;padding:0 10px 10px}
+.todolist .step{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;text-align:left;background:var(--sunk);border:1px solid transparent;border-radius:10px;padding:9px 12px;color:var(--fg);text-decoration:none;width:100%;font:inherit}
+.todolist .sn{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--bg);font-family:var(--display);font-weight:700;color:var(--muted)}
+.todolist .st b{display:block;font-size:14px}.todolist .st small{font-size:12px;color:var(--muted)}
+.todolist .step.ok{opacity:.6}.todolist .step.ok .sn{background:var(--ok);color:var(--on-accent)}.todolist .step.ok b{text-decoration:line-through}
 </style>
 </head>
 <body>
@@ -444,12 +468,11 @@ input[type=time]{width:100%;background:var(--sunk);border:1px solid var(--line);
 <div class="wrap">
   <header class="top">
     <nav class="tabs" aria-label="Sections">
-      <a href="#dashboard" data-tab="dashboard">Dashboard</a>
-      <a href="#checkin" data-tab="checkin">Check-in</a>
-      <a href="#training" data-tab="training">Train</a>
-      <a href="#mobility" data-tab="mobility">Mobility</a>
-      <a href="#food" data-tab="food">Food</a>
-      <a href="#reports" data-tab="reports">Reports</a>
+      <a href="#dashboard" data-tab="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+      <a href="#checkin" data-tab="checkin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M5.6 7.6l2.1 2.1M18.4 7.6l-2.1 2.1M3 17h18M7 17a5 5 0 0 1 10 0M8 21h8"/></svg><span>Check-in</span></a>
+      <a href="#training" data-tab="training"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7v10M3 9v6M18 7v10M21 9v6M6 12h12"/></svg><span>Training</span></a>
+      <a href="#food" data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 0-3 2-3 6s1 4 3 4v8"/></svg><span>Food</span></a>
+      <a href="#reports" data-tab="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-8M3 20h18"/></svg><span>Progress</span></a>
     </nav>
   </header>
   <div id="dbBanner" class="banner" hidden></div>

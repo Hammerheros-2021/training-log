@@ -694,7 +694,8 @@ function viewTraining(){
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
   return dayHeader()+pre+adjBanner(pl)+intentNudge(key)+(pl?sessionHTML(sel,pl):none)+moveHTML(pl)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
 }
-function viewTrainingTab(){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Full 16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${tView===v}">${l}</button>`).join('')}</div>`+(tView==='plan'?viewPlan():viewTraining())}
+function trainSub(cur){return `<div class="subtabs">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}<button type="button" data-tomob aria-pressed="${cur==='mob'}">Mobility</button></div>`}
+function viewTrainingTab(){return trainSub(tView)+(tView==='plan'?viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+checkinHTML(iso(sel))}
 function viewFood(){return dayHeader()+foodHTML(iso(sel))+(fView==='today'?foodDoneHTML(iso(sel)):'')}
 function viewPlan(){
@@ -738,7 +739,7 @@ function viewDashboard(){
   const tSleep=`<a class="dt" href="#checkin" data-dtab><span class="dl">Sleep</span>${sh!=null?`<b class="big num">${sh}<small>h</small></b><span class="ds">${esc(d.bed||'')}${d.wake?`–${esc(d.wake)}`:''}</span><span class="dots">${[1,2,3,4,5].map(i=>`<i class="${d.sleepQ>=i?'on':''}"></i>`).join('')}</span><span class="ds">Need ${need} h${debt>0.2?` · <b style="color:${debt>=3?'var(--bad)':'var(--warn)'}">${debt} h debt</b>`:''}</span>`:'<b class="big">–</b><span class="ds">Not logged</span>'}</a>`;
   let tSess;
   if(pl&&pl.type!=='R'&&!pl.pre){const lg=LL[k];const name=pl.type==='T'&&!THRMIN[pl.wk-1]?'5 km test':TNAME[pl.type];const st=lg?lg.status:null;
-    tSess=`<a class="dt" href="#training" data-dtab style="--c:var(${TVAR[lg&&lg.type==='H'&&pl.type==='T'?'H':pl.type]})"><span class="dl">Today's session</span><b class="mid">${esc(name)}</b><span class="ds">${esc(trainTimeFor(k))}${FASTED()?' · fasted':''}</span><span class="chipx ${st||'todo'}">${st==='done'?'Done':st==='partial'?'Partial':st==='missed'?'Missed':'To do'}</span></a>`}
+    tSess=`<a class="dt" href="#training" data-dtab style="--c:var(${TVAR[lg&&lg.type==='H'&&pl.type==='T'?'H':pl.type]})"><span class="dl">Today's session</span><b class="mid">${esc(name)}</b><span class="ds">${esc(trainTimeFor(k))}${FASTED()?' · fasted':''}</span><span class="chipx ${st||'todo'}">${st==='done'?'Done':st==='partial'?'Partial':st==='missed'?'Missed':d&&d.trainIntent==='no'?'Skipping':'To do'}</span></a>`}
   else{const next=(()=>{for(let i=1;i<=20;i++){const dd=addD(now,i),p=planFor(dd);if(p&&p.type!=='R'&&!p.pre)return {dd,p}}return null})();
     tSess=`<a class="dt" href="#training" data-dtab><span class="dl">Today's session</span><b class="mid">${pl&&!pl.pre?'Rest day':'No session'}</b>${next?`<span class="ds">Next: ${TNAME[next.p.type]}<br>${fmtD(next.dd)}</span>`:''}</a>`}
   const dt=dayTypeFor(k),ft=foodTotals(d),kt=nutTarget('kcal',dt),pt=nutTarget('protein',dt),ct=nutTarget('carbs',dt);
@@ -1064,12 +1065,17 @@ function dayTodo(){
   items.push(['Log today\'s food',!!d.foodDone,pm.length?`${ticked} of ${pm.length} planned meals ticked off. Tap "That's everything" at the end of the day.`:'Log what you eat, then tap "That\'s everything" at the end of the day.','data-fview="today"']);
   return items;
 }
+let todoOpen=false;
 function todoHTML(){
-  const items=dayTodo();if(!items)return '';const done=items.filter(x=>x[1]).length,all=done===items.length;const next=items.findIndex(x=>!x[1]);
+  const items=dayTodo();if(!items)return '';const done=items.filter(x=>x[1]).length,all=done===items.length;
   if(all)return `<section class="todo alldone"><span class="sn">✓</span><div><b>Today is complete</b><small>${items.length} of ${items.length} done. Nice work.</small></div></section>`;
-  return `<section class="todo"><div class="ph"><h3>Today's to-do</h3><span class="ds">${done} of ${items.length} done</span></div><div class="prog"><i style="width:${done/items.length*100}%"></i></div>
-    ${items.map(([t,ok,dsc,attr],i)=>{const tag=attr.startsWith('href')?'a':'button';return `<${tag} ${tag==='button'?'type="button"':''} class="step ${ok?'ok':''} ${i===next?'next':''}" ${attr} data-todo><span class="sn">${ok?'✓':i+1}</span><span class="st"><b>${esc(t)}</b><small>${esc(dsc)}</small></span><span aria-hidden="true">›</span></${tag}>`}).join('')}</section>`;
+  const pend=items.filter(x=>!x[1]);const nx=pend[0];const onlyFood=pend.length===1&&/today's food/i.test(nx[0]);
+  const tag=nx[3].startsWith('href')?'a':'button';
+  const list=todoOpen?`<div class="todolist">${items.map(([t,ok,dsc,attr],i)=>{const tg=attr.startsWith('href')?'a':'button';return `<${tg} ${tg==='button'?'type="button"':''} class="step ${ok?'ok':''}" ${attr} data-todo><span class="sn">${ok?'✓':i+1}</span><span class="st"><b>${esc(t)}</b><small>${esc(dsc)}</small></span><span aria-hidden="true">›</span></${tg}>`}).join('')}</div>`:'';
+  return `<section class="todobar ${onlyFood&&!todoOpen?'later':''}"><${tag} ${tag==='button'?'type="button"':''} class="tnext" ${nx[3]} data-todo><span class="tdots" aria-hidden="true">${items.map(x=>`<i class="${x[1]?'on':''}"></i>`).join('')}</span><span class="tt"><small>${onlyFood?'Later today':'Next'} · ${done} of ${items.length} done</small><b>${esc(nx[0])}</b></span><span aria-hidden="true">›</span></${tag}><button type="button" class="ttog" id="todoTog" aria-label="${todoOpen?'Hide':'Show'} today's to-do list" aria-expanded="${todoOpen}">${todoOpen?'▴':'▾'}</button>${list}</section>`;
 }
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#todoTog')){todoOpen=!todoOpen;render()}});
+
 // ---- plan vs what was eaten ----
 const planMealsOf=pd=>(pd&&pd.meals||[]).map((m,ix)=>({m,ix})).filter(x=>!/fasted/i.test(x.m.slot||''));
 function planTotals(pd){const t={kcal:0,protein:0,meals:0};planMealsOf(pd).forEach(({m})=>{t.kcal+=kcalOf(m);t.protein+=+m.protein||0;if(!/drink/i.test(m.slot||''))t.meals++});return t}
@@ -1438,13 +1444,14 @@ function buildSample(){
 }
 // ================= render + events =================
 const TABS=['checkin','dashboard','training','mobility','food','reports'];
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-tomob]')){location.hash='mobility';return}if(e.target.closest&&e.target.closest('[data-tview]')&&tab()==='mobility'){tView=e.target.closest('[data-tview]').dataset.tview;location.hash='training'}});
 let tView='today';
 function tab(){const h=location.hash.slice(1);if(h==='profile')return 'profile';if(h==='plan'){tView='plan';return 'training'}return TABS.includes(h)?h:'dashboard'}
 function render(){
-  const t=tab();document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===t?'page':'false'));
+  const t=tab();document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===t||(t==='mobility'&&a.dataset.tab==='training')?'page':'false'));
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
-  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?viewMobility():t==='food'?viewFood():t==='dashboard'?viewDashboard():viewReports();
+  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?trainSub('mob')+viewMobility():t==='food'?viewFood():t==='dashboard'?viewDashboard():viewReports();
   updateFab();
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
