@@ -342,7 +342,7 @@ let fState={busy:false,msg:'',meal:null,text:null,manual:false};
 let fView='today', pState={busy:false,msg:'',req:''}, kState={busy:false,msg:'',text:''};
 
 // ---------- targets ----------
-function dayTypeFor(k){const d=D()[k];if(d&&DAYT[d.dayType])return d.dayType;return dayTypeAuto(k)}
+function dayTypeFor(k){return dayTypeAuto(k)}
 function trainTimeFor(k){const d=D()[k];return (d&&d.trainTime)||(meta.settings&&meta.settings.trainTime)||(PROFILE&&PROFILE.plan&&PROFILE.plan.trainTime)||'06:30'}
 function nutTarget(k,dt){const T=DAYT[dt];const n=NUTS.find(x=>x.k===k);
   if(k==='kcal')return {lo:Math.round(T.kcal*.95),hi:Math.round(T.kcal*1.05),t:T.kcal,txt:`${T.kcal}`};
@@ -365,7 +365,7 @@ function lastCaffeineOf(d){if(!d)return null;if(d.lastCaffeine)return tmin(d.las
 function plantsOn(d){const s=new Set();(d&&d.food||[]).forEach(i=>(i.plants||[]).forEach(p=>s.add(String(p).toLowerCase().trim())));return s}
 function plantsWeek(k){const dt=parse(k),mon=addD(dt,-((dt.getDay()+6)%7));const s=new Set();for(let i=0;i<7;i++){const kk=iso(addD(mon,i));if(kk>k)break;plantsOn(D()[kk]).forEach(p=>s.add(p))}return s}
 function guessMeal(){const h=new Date().getHours();return h<11?'Breakfast':h<15?'Lunch':h<17?'Snack':'Dinner'}
-function frequentFoods(){const m={};Object.values(D()).forEach(d=>(d.food||[]).forEach(i=>{if(i.src==='plan')return;const k=(i.name+'|'+(i.qty||'')).toLowerCase();if(!m[k])m[k]={...i,count:0};m[k].count++}));return Object.values(m).sort((a,b)=>b.count-a.count).slice(0,8)}
+function frequentFoods(){return learnedFoods()}
 const fmtN=(v,u)=>u==='µg'||(u==='g'&&v<10)?(Math.round(v*10)/10):Math.round(v);
 function nutBar(n,val,tg){const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);const pct=Math.min(100,val/ref*100);const st=status(val,tg);
   return `<div class="mac"><div class="mh"><span>${n.l}</span><span class="num"><b>${fmtN(val,n.u)}</b>${n.u==='kcal'?'':' '+n.u} · ${tg.txt}</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:${SC[st]}"></div></div></div>`}
@@ -381,12 +381,10 @@ function planMealsHTML(k,compact){
   const pd=planDay(k);if(!pd)return '';const canLog=k<=iso(todayDate());
   return `<div class="pmeals">${(pd.meals||[]).map((m,ix)=>{const logged=planLogged(k,ix);const fasted=/fasted/i.test(m.slot||'');const drink=/drink/i.test(m.slot||'');
     const canRecipe=typeof recipeSheet==='function'&&!fasted&&!drink&&!(m.where&&m.where!=='Home'&&!(m.method||[]).length);const when=m.time||m.when||'';
-    const its=(m.items||[]).length,ops=(m.options||[]).length;
-    return `<div class="pm ${logged?'done':''} ${fasted||drink?'minor':''}"><div class="pmt"><span class="pslot">${esc(m.slot||'')}</span>${when?`<span class="pwhen">${esc(when)}</span>`:''}${m.where&&m.where!=='Home'?`<span class="pwhere">${esc(m.where)}</span>`:''}</div>
-      <div class="pmn">${esc(m.name)}</div>
-      ${fasted?'':`<div class="pmm"><span>${kcalOf(m)} kcal</span><span>${Math.round(+m.protein||0)} g protein</span><span>${Math.round(+m.carbs||0)} g carbs</span></div>`}
-      ${!compact&&(its||ops)?`<details class="pmd"><summary>${its?'What\'s in it':''}${its&&ops?' · ':''}${ops?`${ops} backup option${ops>1?'s':''}`:''}</summary>${its?`<div class="pi">${esc(m.items.map(x=>x.qty?`${x.qty} ${x.name}`:x.name).join(', '))}</div>`:''}${optsHTML(k,ix,m)}</details>`:''}
-      ${fasted?'':`<div class="pma">${canRecipe?`<button type="button" class="ghost" data-recipe="${k}:${ix}">Recipe</button>`:''}${canLog?(logged?'<span class="pl">✓ Eaten</span>':`<button type="button" class="ghost pate" data-ate="${k}:${ix}">Ate this</button>`):''}</div>`}</div>`}).join('')}</div>`;
+    const its=(m.items||[]).length,ops=(m.options||[]).length;const key='p'+k+':'+ix;
+    const ate=fasted?'':canLog?(logged?'<span class="pl" aria-label="Eaten">✓</span>':`<button type="button" class="pate" data-ate="${k}:${ix}">Ate</button>`):'';
+    return `<details class="pm ${logged?'done':''} ${fasted||drink?'minor':''}" data-ms="${key}" ${msOpen.has(key)?'open':''}><summary><span class="pmsum"><span class="pslot">${esc(m.slot||'')}${when?` · ${esc(when)}`:''}${m.where&&m.where!=='Home'?` · ${esc(m.where)}`:''}</span><span class="pmn">${esc(m.name)}</span></span>${fasted?'':`<span class="pkc num">${kcalOf(m)}<small>kcal</small></span>`}${ate}</summary>
+      <div class="pmbody">${fasted?'':`<div class="pmm"><span>${Math.round(+m.protein||0)} g protein</span><span>${Math.round(+m.carbs||0)} g carbs</span><span>${Math.round(+m.fat||0)} g fat</span></div>`}${its?`<div class="pi">${esc(m.items.map(x=>x.qty?`${x.qty} ${x.name}`:x.name).join(', '))}</div>`:''}${ops?optsHTML(k,ix,m):''}${canRecipe?`<div class="pma"><button type="button" class="ghost" data-recipe="${k}:${ix}">Recipe</button></div>`:''}</div></details>`}).join('')}</div>`;
 }
 
 // ---------- views ----------
@@ -403,8 +401,8 @@ function foodTodayHTML(dIso){
   const freq=frequentFoods();const ai=!!sample;const due=planDue();
   const kEmpty=!kitchen().length&&!sampleMode;
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Time to plan ahead'}</b><br><small>Update your food available, then let the app build the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
-  <article class="card"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label}</h2><div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
-    <div class="form" style="padding-bottom:4px"><div class="field"><span class="label">Day type</span>${seg('dt','dayType',['rest','training','match'],dt,['Rest','Training','Match'],'small')}</div></div>
+  ${foodActionsHTML(dIso)}<article class="card"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label} <span class="dtwhy">· ${esc(dayTypeWhy(dIso))}</span></h2><div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
+    
     ${macroRings(t,dt)}${waterHTML(dIso)}
     ${microsHTML(t,dt,dIso)}
     <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants this week${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
@@ -415,10 +413,10 @@ function foodTodayHTML(dIso){
       ${ai?`<div class="field"><label class="label" for="f-say">Say it in your own words, any time of day</label><textarea id="f-say" placeholder="e.g. Coffee and SIS tab before training. Porridge with whey after at 8. Chicken salad bowl at 1. Cappuccino at 3. Ribeye and mushrooms at 7, 2 brownies after." style="min-height:110px">${esc(diaryText)}</textarea>
         <div class="hint" style="font-size:12px;color:var(--muted)">Use the microphone on your phone keyboard to talk. Mention times and they set your fasting hours. Only log things not already ticked off from the plan.</div></div>
       <div class="actions"><button type="button" class="primary" id="fParse" ${fState.busy?'disabled':''} style="font-size:17px">${fState.busy?'Working…':(d.food||[]).some(i=>i.src==='diary')?'Update from diary':'Work out my day'}</button></div>`:'<div class="hint">Smart estimates are not available in this view. Use the quick adds below.</div>'}
-      ${canImg?`<label class="cambtn">📷 Snap your plate<input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}
+      
       ${fState.msg?`<div class="hsum" role="status">${esc(fState.msg)}</div>`:''}
-      <div class="field"><span class="label">Meal for photos and quick adds</span>${seg('f','meal',MEALS,meal,null,'small')}</div>
-      ${lib.length||freq.length?`<details class="wu qadd"><summary>Quick add</summary>${freq.length?`<div class="label">Your usual</div><div class="tags">${freq.map((i,ix)=>`<button type="button" data-quick="${ix}">${esc(i.name)}${i.qty?` · ${esc(i.qty)}`:''}</button>`).join('')}</div>`:''}${lib.length?`<div class="label">From your meal guide</div><div class="tags">${lib.map(x=>`<button type="button" data-lib="${LIB.indexOf(x)}">${esc(x[0])}</button>`).join('')}</div>`:''}</details>`:''}
+      
+      
   </div>
   <div class="form" style="border-top:1px solid var(--line)"><h3>Fasting</h3>
       <div class="row2"><div class="field"><label class="label" for="ffm">First food</label><input id="ffm" type="time" value="${esc(d.firstMeal||(win?fmtT(win.first):''))}" data-food="firstMeal"></div>
@@ -495,7 +493,7 @@ async function parseFoodPhoto(file){
   try{const out=await sample.json(`This is a photo of a meal (${meal}). Identify each food and estimate its portion and nutrition.\n${foodRules()}\nAlso add a "seen" field to the JSON: one plain sentence describing what you can see on the plate. If it is not food, reply {"items":[],"seen":"what it is instead"}.`,{images:file});
     const items=cleanItems(out&&out.items,meal,true,'photo').map(i=>({...i,meal}));
     if(!items.length){fState={...fState,busy:false,msg:'No food recognised. Try a closer photo from above, or describe it in the diary.'};render();return}
-    await addFood(items);fState={...fState,busy:false,msg:(out&&out.seen?'I can see: '+String(out.seen).slice(0,200)+' ':'')+`Logged ${items.length} item${items.length>1?'s':''} for ${meal} as an estimate: photos can be 20-30% out. Check them below and fix anything that's wrong.`};toast('Meal estimated');
+    PR={seen:out&&out.seen?String(out.seen).slice(0,200):'',meal,items:items.map(x=>({...x,pct:100,orig:x.name}))};fState={...fState,busy:false,msg:''};render();showPR();
   }catch(e){fState={...fState,busy:false,msg:foodErr(e)}}
   render();
 }
@@ -691,7 +689,7 @@ function viewTraining(){
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
   return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
 }
-function trainSub(cur){return `<div class="subtabs">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}<button type="button" data-tomob aria-pressed="${cur==='mob'}">Mobility</button></div>`}
+function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 function viewTrainingTab(){return (tView==='today'?dayHeader()+sessChip(iso(sel)):'')+trainSub(tView)+(tView==='plan'?viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+ciChip(iso(sel))+checkinHTML(iso(sel))}
 function viewFood(){return dayHeader()+(fView==='today'?signChip(iso(sel)):'')+foodHTML(iso(sel))}
@@ -740,7 +738,7 @@ function viewDashboard(){
   else{const next=(()=>{for(let i=1;i<=20;i++){const dd=addD(now,i),p=planFor(dd);if(p&&p.type!=='R'&&!p.pre)return {dd,p}}return null})();
     tSess=`<a class="dt" href="#training" data-dtab><span class="dl">Today's session</span><b class="mid">${pl&&!pl.pre?'Rest day':'No session'}</b>${next?`<span class="ds">Next: ${TNAME[next.p.type]}<br>${fmtD(next.dd)}</span>`:''}</a>`}
   const dt=dayTypeFor(k),ft=foodTotals(d),kt=nutTarget('kcal',dt),pt=nutTarget('protein',dt),ct=nutTarget('carbs',dt);
-  const tFuel=`<a class="dt" href="#food" data-dtab><span class="dl">Fuel · ${DAYT[dt].label}</span><div class="fuel">${ring(ft.kcal,kt.t,72,8,SC[status(ft.kcal,kt)==='ok'?'ok':ft.kcal<kt.lo?'na':'bad'],ft.kcal?Math.round(ft.kcal):'0','kcal')}<div style="flex:1;min-width:0">${miniBar('Protein',ft.protein,pt.t,SC[status(ft.protein,pt)],`${Math.round(ft.protein)}/${pt.t}`)}${miniBar('Carbs',ft.carbs,ct.t,ft.carbs>ct.hi?'var(--bad)':'var(--e)',`${Math.round(ft.carbs)}/${ct.hi}`)}</div></div></a>`;
+  const tFuel=`<a class="dt" href="#food" data-dtab><span class="dl">Fuel · ${DAYT[dt].label}</span><div class="fnum"><b class="num">${Math.round(ft.kcal)}</b><small>of ${kt.t} kcal</small></div>${miniBar('Protein',ft.protein,pt.t,SC[status(ft.protein,pt)],`${Math.round(ft.protein)} / ${pt.t} g`)}${miniBar('Carbs',ft.carbs,ct.t,ft.carbs>ct.hi?'var(--bad)':'var(--e)',`${Math.round(ft.carbs)} / ${ct.hi} g`)}</a>`;
   // fasting
   let fastTxt='–',fastSub='Log food times',fastCol='var(--fg)';const T=targets();
   const fh=fastHours(DD,k);
@@ -1114,13 +1112,13 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
 // ================= today's training intent → food targets follow what you actually do =================
 function dayTypeAuto(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));const planned=!!(p&&p.type!=='R'&&!p.pre);
   const ex=(d.extras||[]).filter(x=>x&&(x.dur||x.rpe||x.desc));
-  if(ex.some(x=>x.kind==='Match'))return 'match';
+  
   if(l&&(l.status==='done'||l.status==='partial'))return 'training';
   if(ex.length)return 'training';
   if(d.trainIntent==='no'||(l&&l.status==='missed'))return 'rest';
   if(d.trainIntent==='yes'||d.trainIntent==='extra')return 'training';
   return planned?'training':'rest'}
-function dayTypeWhy(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));if(d.dayType)return 'set by you';
+function dayTypeWhy(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));
   if((d.extras||[]).length)return 'you logged extra training';if(l&&l.status)return l.status==='missed'?'session marked missed':'session logged';
   if(d.trainIntent==='no')return 'not training today';if(d.trainIntent==='extra')return 'training today';return p&&p.type!=='R'&&!p.pre?'from your plan':'no session planned'}
 function intentHTML(k,f){
@@ -1264,13 +1262,13 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
 const MICO={Breakfast:'🍳',Lunch:'🥗',Dinner:'🍽️',Snack:'🍎'};
 function itemRow(i){return `<div class="fitem"><div style="min-width:0"><div class="fn">${esc(i.name)}${i.src==='plan'?' <span class="est">plan</span>':i.src==='alcohol'?' <span class="est">drink</span>':i.est?' <span class="est">est.</span>':''}</div><div class="fq">${esc(i.qty||'')}${i.at?' · '+esc(i.at):''}</div></div><div class="fm num">${kcalOf(i)} kcal<br><span>${(+i.protein||0).toFixed(0)}p · ${(+i.carbs||0).toFixed(0)}c · ${(+i.fat||0).toFixed(0)}f</span></div>${sampleMode?'<span></span>':`<button type="button" class="x" data-del-food="${i.ix}" aria-label="Remove ${esc(i.name)}">×</button>`}</div>`}
 function eatenHTML(d){
-  const food=(d.food||[]).map((i,ix)=>({...i,ix}));if(!food.length)return '';const tot=food.reduce((a,i)=>a+kcalOf(i),0);
+  const food=(d.food||[]).map((i,ix)=>({...i,ix}));if(!food.length)return '';const tot=Math.round(food.reduce((a,i)=>a+kcalOf(i),0));
   const secs=MEALS.map(m=>{const its=food.filter(i=>i.meal===m);if(!its.length)return '';
     const gs=[];its.forEach(i=>{const key=i.dish?String(i.dish).toLowerCase()+'|'+(i.at||''):null;const g=key&&gs.find(x=>x.key===key);if(g)g.items.push(i);else gs.push({key,dish:i.dish,items:[i]})});
-    const rows=gs.map(g=>{if(g.items.length<2||!g.dish)return itemRow(g.items[0]);const kc=g.items.reduce((a,i)=>a+kcalOf(i),0),p=g.items.reduce((a,i)=>a+(+i.protein||0),0);const est=g.items.some(i=>i.est);
+    const rows=gs.map(g=>{if(g.items.length<2||!g.dish)return itemRow(g.items[0]);const kc=Math.round(g.items.reduce((a,i)=>a+kcalOf(i),0)),p=g.items.reduce((a,i)=>a+(+i.protein||0),0);const est=g.items.some(i=>i.est);
       return `<details class="dish"><summary><div style="min-width:0"><div class="fn">${esc(g.dish)}${est?' <span class="est">est.</span>':''}</div><div class="fq">${g.items.length} items${g.items[0].at?' · '+esc(g.items[0].at):''} · tap to see</div></div><div class="fm num">${kc} kcal<br><span>${Math.round(p)}p</span></div>${sampleMode?'':`<button type="button" class="x" data-del-dish="${g.items.map(i=>i.ix).join(',')}" aria-label="Remove ${esc(g.dish)}">×</button>`}</summary><div class="dishin">${g.items.map(itemRow).join('')}</div></details>`}).join('');
-    const kc=its.reduce((a,i)=>a+kcalOf(i),0),p=its.reduce((a,i)=>a+(+i.protein||0),0);
-    return `<section class="msec"><div class="msh"><span class="mico" aria-hidden="true">${MICO[m]}</span><b>${m}</b><span class="num">${kc} kcal · ${Math.round(p)} g protein</span></div>${rows}</section>`}).join('');
+    const kc=Math.round(its.reduce((a,i)=>a+kcalOf(i),0)),p=its.reduce((a,i)=>a+(+i.protein||0),0);
+    return `<details class="msec" data-ms="e${m}" ${msOpen.has('e'+m)?'open':''}><summary class="msh"><span class="mico" aria-hidden="true">${MICO[m]}</span><b>${m}</b><span class="num">${kc} kcal · ${Math.round(p)} g protein</span></summary>${rows}</details>`}).join('');
   return `<article class="card"><div class="chead"><div style="flex:1"><h2>Eaten</h2><div class="sub">${food.length} item${food.length>1?'s':''} · ${tot} kcal</div></div></div><div class="msecs">${secs}</div></article>`;
 }
 // ---- recovery ----
@@ -1349,19 +1347,19 @@ const PROGS=[
  {id:'walk',ic:'🚶',name:'Recovery walk',min:20,mind:'Clears your head; daylight helps your mood and sleep',body:'Flushes tired legs',cat:'Move',steps:()=>[{k:'move',s:300,t:'Easy start',c:'Gentle pace. Breathe through your nose.'},{k:'move',s:600,t:'Look up',c:'Eyes on the horizon. Notice five things you can hear.'},{k:'move',s:300,t:'Slow finish',c:'Ease the pace right down. Long breaths out.'}]},
  {id:'nap',ic:'😴',name:'Power nap',min:20,mind:'Sharper and more patient for the rest of the day',body:'Tops up recovery after a short night',cat:'Mind',steps:()=>[{k:'move',s:1200,t:'Rest',c:'Lie down, eyes closed. Even if you don\'t sleep, rest still helps. You\'ll hear nothing: check back when the timer ends.'}]}];
 let PL=null,rpTimer=null,rpWake=null;
-function rpStart(id){const pr=PROGS.find(p=>p.id===id);if(!pr)return;PL={pr,steps:pr.steps(),i:0,left:0,paused:false,end:false,started:Date.now(),elapsed:0};rpGo(0);try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(w=>rpWake=w).catch(()=>{})}catch(e){}}
-function rpGo(i){if(!PL)return;if(i>=PL.steps.length){rpFinish();return}PL.i=i;PL.stepEnd=Date.now()+PL.steps[i].s*1000;PL.paused=false;rpRender(true);clearInterval(rpTimer);rpTimer=setInterval(rpTick,250)}
+function rpStart(id){const pr=PROGS.find(p=>p.id===id);if(!pr)return;PL={pr,steps:[{k:'move',s:8,t:'Settle in',c:'Get comfortable. You can close your eyes and follow my voice.'}].concat(pr.steps()),i:0,left:0,paused:false,end:false,started:Date.now(),elapsed:0};audBed();keepAwake(true);rpGo(0);try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(w=>rpWake=w).catch(()=>{})}catch(e){}}
+function rpGo(i){if(!PL)return;if(i>=PL.steps.length){rpFinish();return}PL.i=i;PL.stepEnd=Date.now()+PL.steps[i].s*1000;PL.paused=false;rpRender(true);audStepSay(PL.steps[i],i,PL.pr);clearInterval(rpTimer);rpTimer=setInterval(rpTick,250)}
 function rpTick(){if(!PL||PL.paused||PL.end)return;const left=Math.max(0,Math.ceil((PL.stepEnd-Date.now())/1000));const el=$('#plCount');if(el)el.textContent=left>=60?fromSec(left):left;if(left<=0)rpGo(PL.i+1)}
-function rpFinish(){clearInterval(rpTimer);PL.end=true;PL.mins=Math.max(1,Math.round((Date.now()-PL.started)/60000));try{rpWake&&rpWake.release()}catch(e){}rpRender()}
-function rpClose(){clearInterval(rpTimer);PL=null;try{rpWake&&rpWake.release()}catch(e){}const h=$('#plHost');if(h)h.innerHTML=''}
+function rpFinish(){clearInterval(rpTimer);PL.end=true;chime('end');say('Well done. Take a moment before you get up.');setTimeout(audBedStop,3000);keepAwake(false);PL.mins=Math.max(1,Math.round((Date.now()-PL.started)/60000));try{rpWake&&rpWake.release()}catch(e){}rpRender()}
+function rpClose(){clearInterval(rpTimer);PL=null;audBedStop();try{speechSynthesis.cancel()}catch(e){}keepAwake(false);try{rpWake&&rpWake.release()}catch(e){}const h=$('#plHost');if(h)h.innerHTML=''}
 function rpRender(fresh){let h=$('#plHost');if(!h){h=document.createElement('div');h.id='plHost';document.body.appendChild(h)}if(!PL){h.innerHTML='';return}
   const pr=PL.pr;
   if(PL.end){h.innerHTML=`<div class="plwrap2"><div class="plbox"><div class="plic">${pr.ic}</div><h2>${esc(pr.name)} done</h2><p class="ds">${PL.mins} minute${PL.mins>1?'s':''}. ${esc(pr.mind)}.</p><p style="margin:14px 0 8px;font-weight:600">How do you feel now?</p>
     <div class="plfeel">${[['😣',1],['😐',2],['🙂',3],['😌',4],['😁',5]].map(([e,v])=>`<button type="button" data-plfeel="${v}" aria-label="${v} out of 5">${e}</button>`).join('')}</div><button type="button" class="linkbtn" data-plfeel="0">Skip</button></div></div>`;return}
   const st=PL.steps[PL.i];const nx=PL.steps[PL.i+1];const breath=['in','hold','out'].includes(st.k);const pv=PL.steps[PL.i-1];const bcls=st.k==='hold'?(pv&&pv.k==='in'?'hbig':'hsmall'):st.k;
-  h.innerHTML=`<div class="plwrap2 ${st.k}"><div class="plhead"><span>${pr.ic} ${esc(pr.name)}</span><button type="button" class="x" id="plX" aria-label="Stop">×</button></div>
+  h.innerHTML=`<div class="plwrap2 ${st.k}"><div class="plhead"><span>${pr.ic} ${esc(pr.name)}</span><button type="button" class="x" id="plX" aria-label="Stop">×</button></div>${audControls()}
     <div class="plmain"><div class="plorb ${breath?bcls:'still'}" style="--d:${st.s}s"><span id="plCount">${st.s>=60?fromSec(st.s):st.s}</span></div>
-      <h2>${esc(st.t)}</h2>${st.c?`<p>${esc(st.c)}</p>`:''}${st.round?`<small class="ds">Round ${st.round} of ${st.of}</small>`:`<small class="ds">Step ${PL.i+1} of ${PL.steps.length}</small>`}
+      <h2>${esc(st.t)}</h2>${st.c?`<p>${esc(st.c)}</p>`:''}${st.round?`<small class="ds">Round ${st.round} of ${st.of}</small>`:(PL.i===0?'':PL.steps.length<30?`<small class="ds">Step ${PL.i} of ${PL.steps.length-1}</small>`:'')}
       ${pr.safety&&PL.i===0?`<div class="plsafe">${esc(pr.safety)}</div>`:''}</div>
     <div class="plnext">${nx?`Next: ${esc(nx.t)}`:'Last step'}</div>
     <div class="plctl"><button type="button" class="ghost" id="plBack" ${PL.i?'':'disabled'}>‹ Back</button><button type="button" class="primary" id="plPause">${PL.paused?'Resume':'Pause'}</button><button type="button" class="ghost" id="plSkip">Skip ›</button></div></div>`;
@@ -1375,22 +1373,127 @@ function viewRecover(){const k=iso(todayDate());let n=0,mins=0,feel=[];for(let i
   const cats=['Breathe','Mind','Move','Hot & cold'];
   return `<section class="rhero"><div><h2>Recover</h2><p>Recovery is where your body adapts and your head clears. A few calm minutes lower stress, improve sleep and leave you more patient with the people around you.</p></div>
     <div class="rstats"><span><b class="num">${n}</b>sessions this week</span><span><b class="num">${mins}</b>minutes</span><span><b class="num">${feel.length?avg(feel).toFixed(1):'–'}</b>feel after, out of 5</span></div></section>
+  ${typeof viewMobility==='function'?`<a class="rprog" href="#mobility"><span class="ric" aria-hidden="true">🧘</span><span class="rt"><b>Mobility follow-along</b><small>Made for today from your training and niggles</small></span><span class="rgo" aria-hidden="true">▶</span></a>`:''}
   ${cats.map(c=>`<div class="rcat"><h3>${c}</h3><div class="rprogs">${PROGS.filter(p=>p.cat===c).map(p=>`<button type="button" class="rprog" data-prog="${p.id}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${p.min} min · ${esc(p.mind)}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></div>`).join('')}
   ${recoveryHTML(k).replace('<h2>Recovery</h2>','<h2>Already did something?</h2>')}
   <button type="button" class="ghost learnlink" data-learn-cat="Recovery">📘 Learn: ice baths, sauna, breathing and more ›</button>`}
 // ---- Learn ----
 const LEARN=[
- {id:'protein',ic:'🥩',cat:'Food',t:'Protein: how much, how often',s:[['Why it matters','Protein repairs and builds muscle, and it keeps you full for longer. When you train, you need more of it than most people.'],['How much','For active people building or keeping muscle, around 1.6 g per kg of body weight a day is a good target. That\'s about 130 g for an 80 kg person.'],['Spread it out','Your body uses protein best in 3 or 4 meals of 25-40 g each, rather than one big dinner.'],['Easy sources','Eggs, Greek yogurt, chicken, fish, mince, lentils, beans, tofu and milk. A protein shake is just convenient food.']],q:['Which works best for most people?',['One big protein dinner','Protein spread across 3-4 meals','Protein only after training'],1]},
- {id:'gut',ic:'🦠',cat:'Food',t:'Your gut microbiome',s:[['A garden inside you','Trillions of microbes live in your gut. They help digest food, train your immune system and may even affect your mood.'],['Feed them fibre','Gut microbes live on fibre from plants. Most people eat far less than the 25-30 g+ a day that\'s recommended.'],['30 plants a week','Variety matters as much as amount. A large study found people eating 30+ different plants a week had more varied gut bacteria. Vegetables, fruit, nuts, seeds, beans, wholegrains, herbs, spices and coffee all count.'],['Fermented foods','Live yogurt, kefir, sauerkraut and kimchi add helpful bacteria. In one Stanford study, eating more fermented foods increased gut variety.']],q:['Which of these counts toward 30 plants a week?',['A spoon of mixed seeds','A glass of milk','A chicken breast'],0]},
- {id:'water',ic:'💧',cat:'Food',t:'Hydration',s:[['How much','Most adults need around 2-3 litres of drinks a day, more when it\'s hot or you\'re training or doing physical work.'],['Check the colour','Pale straw-coloured urine is the easiest sign you\'re drinking enough. Dark yellow means drink more.'],['Performance','Losing even 2% of your body weight in sweat can make exercise feel harder and dull your focus.'],['Salt counts too','On long or very sweaty days you lose salt as well as water. Salty food or an electrolyte tablet helps.']],q:['What\'s the easiest everyday check?',['How thirsty you feel at night','The colour of your urine','Your weight'],1]},
- {id:'sleep',ic:'🛏️',cat:'Lifestyle',t:'Sleep: the best recovery tool',s:[['How much','Adults need 7-9 hours. Hard training or physical work pushes you to the top of that range.'],['Keep it regular','Going to bed and getting up at similar times each day matters nearly as much as total hours.'],['Light and screens','Daylight in the morning sets your body clock. Bright screens late at night push it back.'],['Caffeine','Caffeine takes around 5-6 hours to halve in your body, so a 3pm coffee is still working at bedtime.']],q:['A coffee at 3pm is…',['Gone by 6pm','Still partly in your system at bedtime','Good for sleep'],1]},
- {id:'alcohol',ic:'🍺',cat:'Lifestyle',t:'Alcohol and recovery',s:[['Sleep','Alcohol may help you nod off, but it breaks up deep and dream sleep, so you wake less rested.'],['Recovery','It dehydrates you and can slow muscle repair, especially in a big session soon after training.'],['The Irish guide','Low-risk drinking is up to 11 standard drinks a week for women and 17 for men, spread out, with 2-3 alcohol-free days. A pint is 2 standard drinks.'],['Simple swaps','Alternate with water, try alcohol-free beers, and keep drinks away from the night before a big session.']],q:['How many standard drinks are in a pint of beer?',['1','2','3'],1]},
- {id:'ice',ic:'🧊',cat:'Recovery',t:'Ice baths and cold water',s:[['What it does','2-10 minutes in cold water (around 10-15°C) can reduce how sore you feel after hard training.'],['The mental side','Many people feel alert and upbeat afterwards. Staying calm in the cold is practice for staying calm under pressure.'],['Timing matters','Cold straight after a strength session may blunt muscle gains. If building muscle is your goal, leave a few hours between them.'],['Stay safe','Never alone, never after alcohol. The first 30 seconds bring a gasp: breathe out slowly. Check with your GP if you have a heart condition.']],q:['If you want to build muscle, when is cold water best avoided?',['Straight after a strength session','On a rest day','In the morning'],0]},
- {id:'sauna',ic:'♨️',cat:'Recovery',t:'Sauna',s:[['The basics','10-20 minutes at around 80-100°C, once or a few times a week. Drink water before and after.'],['Heart health','Long-term Finnish studies link regular sauna use with better heart health. These show a link rather than proof, but the signs are good.'],['Mind and sleep','Heat helps your body switch into rest mode. Many people sleep better on sauna evenings.'],['Stay safe','Not after alcohol. Leave if you feel dizzy. Check with your GP if you have heart or blood pressure problems.']],q:['A sensible sauna session is about…',['5 minutes at 40°C','10-20 minutes at 80-100°C','An hour'],1]},
- {id:'contrast',ic:'🔥',cat:'Recovery',t:'Contrast therapy',s:[['What it is','Swapping between heat (sauna or hot tub) and cold (plunge, sea or shower), usually for 3 rounds.'],['Why people love it','It\'s a big mental reset: most people feel energised, calm and in good form afterwards.'],['For your body','It may ease soreness, though research shows only modest effects. How you feel is a fair guide.'],['Finish on','End on cold for a lift during the day, or on heat to wind down before bed.']],q:['To wind down before bed, finish on…',['Cold','Heat','It makes no difference'],1]},
- {id:'breath',ic:'🫁',cat:'Recovery',t:'Breathwork',s:[['Your remote control','Breathing is the one part of your stress response you can control directly. Slow breathing tells your body it\'s safe.'],['Long breaths out','Breathing out for longer than you breathe in slows your heart rate. That\'s the idea behind 4-7-8 and calming sighs.'],['Calming sighs','In a Stanford study, 5 minutes a day of sighs (two breaths in, one long breath out) improved mood more than mindfulness alone.'],['Stay safe','Never do forceful or fast breathing in water, while driving, or standing somewhere you could fall.']],q:['Which slows your heart rate?',['Short, quick breaths','A breath out longer than the breath in','Holding your breath as long as possible'],1]},
- {id:'pilates',ic:'🤸',cat:'Movement',t:'Pilates and your core',s:[['What it is','Slow, controlled exercises for your deep core, hips and posture muscles.'],['Why it helps','A strong, controlled core protects your back and helps you run, turn and lift better.'],['Twice a week','Two short sessions a week is enough to notice a difference within a month or two.'],['Try these','Dead bugs, side planks, glute bridges and bird dogs: slow, controlled, breathing throughout.']],q:['Pilates mainly trains…',['Your deep core and control','Maximum strength','Sprint speed'],0]},
- {id:'creatine',ic:'💊',cat:'Food',t:'Creatine',s:[['What it is','A natural compound in muscle that powers short, hard efforts. Meat and fish contain some.'],['The evidence','It\'s one of the most studied supplements, with good evidence for strength and power. It\'s considered safe for healthy adults.'],['How to take it','3-5 g of creatine monohydrate a day, any time. No loading needed, it builds up over 3-4 weeks.'],['Good to know','You may gain a kilo or so of water in your muscles. That\'s normal. Check with your GP if you have kidney problems.']],q:['A typical daily dose is…',['3-5 g','30-50 g','Only on training days'],0]}];
+ {id:'protein',ic:'🥩',cat:'Food',t:'Protein: how much, how often',s:[
+  ['Why it matters','Protein is the raw material for muscle, tendons, skin, hormones and immune cells. Training causes small amounts of muscle damage, and protein is what you rebuild with. It also keeps you fuller for longer than carbs or fat.'],
+  ['How much','Most active adults do well on about 1.6 g per kg of body weight a day. Going up to 2.2 g/kg can help when you are losing body fat or training very hard. For an 80 kg person that is roughly 130-175 g a day.'],
+  ['Spread it out','Muscle repair responds best to 25-40 g at a time. Four meals of 30-40 g work better than a small breakfast and a huge dinner, even if the daily total is the same.'],
+  ['Not all protein is equal','Meat, fish, eggs, dairy and soy have all the essential amino acids, including leucine, the switch for muscle repair. Plant eaters can match it by mixing beans, lentils, grains, nuts and soy across the day.'],
+  ['As you get older','From your 40s, muscle responds less to small doses. Aim for the top of the range, get 30-40 g per meal, and keep up strength training to hold on to muscle.'],
+  ['Easy wins','Greek yogurt, about 15-20 g a bowl. 3 eggs, 18 g. A tin of tuna, 25 g. A chicken breast, 35 g. A glass of milk, 8 g. 200 g cooked lentils, 18 g. A scoop of whey, 20-25 g.'],
+  ['Try this week','Check your breakfast. If it has under 25 g of protein, add yogurt, eggs, milk or a scoop of protein. Breakfast is where most people fall short.']],q:['Which works best for most people?',['One big protein dinner','Protein spread across 3-4 meals','Protein only after training'],1]},
+ {id:'carbs',ic:'🍚',cat:'Food',t:'Carbs and fuelling',s:[
+  ['Your fastest fuel','Carbs are stored as glycogen in your muscles and liver. Hard, fast efforts such as sprints, intervals and heavy sessions run mostly on it.'],
+  ['Match carbs to the work','Eat more carbs on hard training or heavy work days and fewer on rest days. The app moves your targets automatically based on what you are doing that day.'],
+  ['Timing','A normal meal 2-3 hours before a hard session, or a banana or toast an hour before, tops you up. Carbs plus protein afterwards refills you and starts repair.'],
+  ['Pick quality most of the time','Oats, potatoes, rice, wholegrain bread, fruit and beans give fibre, vitamins and steady energy. Sweets and white bread are fine around training, less so as the base of your diet.'],
+  ['Low carb: when it helps, when it hurts','Lower-carb eating can work well for steady days and for losing body fat. It can blunt performance in sprints and high-intensity work, so put more carbs around those sessions.'],
+  ['Try this week','On your two hardest days, add a fist-sized portion of carbs to the meal before and the meal after. Notice how the session feels.']],q:['When do carbs matter most?',['On rest days','Around hard, fast training','Last thing at night'],1]},
+ {id:'gut',ic:'🦠',cat:'Food',t:'Your gut microbiome',s:[
+  ['A garden inside you','Trillions of microbes live in your gut. Together they weigh about as much as a bag of sugar and carry far more genes than you do.'],
+  ['What they do','They turn fibre into short-chain fatty acids that feed your gut lining and help calm inflammation. They train your immune system, and your gut and brain send signals to each other all day long.'],
+  ['Feed them fibre','Gut microbes live mostly on fibre from plants. Most people in Ireland eat well under the 25-30 g a day recommended.'],
+  ['30 plants a week','Variety matters as much as amount. In the American Gut Project, people eating 30 or more different plants a week had more varied gut bacteria than those eating 10 or fewer. Vegetables, fruit, nuts, seeds, beans, wholegrains, herbs, spices and coffee all count.'],
+  ['Fermented foods','Live yogurt, kefir, sauerkraut, kimchi and kombucha bring helpful bacteria. In a 2021 Stanford study, people eating more fermented foods for 10 weeks had more varied gut bacteria and lower markers of inflammation.'],
+  ['What knocks it back','Very low fibre, lots of ultra-processed food, heavy drinking, poor sleep and constant stress all reduce variety. Antibiotics are sometimes essential, but they hit the good bacteria too, so eat plenty of plants afterwards.'],
+  ['Try this week','Keep a jar of mixed seeds and a bag of mixed frozen veg in. Add a different fruit each day and a spoon of live yogurt or kefir. Watch your plant count climb on the Food log.']],q:['Which of these counts toward 30 plants a week?',['A spoon of mixed seeds','A glass of milk','A chicken breast'],0]},
+ {id:'water',ic:'💧',cat:'Food',t:'Hydration',s:[
+  ['How much','Most adults need around 2-3 litres of drinks a day, more when it is hot or you are training or doing physical work. Food provides another litre or so.'],
+  ['Check the colour','Pale straw-coloured urine is the easiest sign you are drinking enough. Dark yellow means drink more. Completely clear all day can mean you are overdoing it.'],
+  ['Performance and focus','Losing 2% of your body weight in sweat, about 1.6 kg for an 80 kg person, can make exercise feel harder and dull your concentration.'],
+  ['Know your sweat rate','Weigh yourself before and after an hour of training. Each kilo lost is about a litre of sweat. Drink about 1.5 times that afterwards.'],
+  ['Salt counts too','On long or very sweaty days you lose salt as well as water. A salty meal or an electrolyte tablet helps you hold on to what you drink.'],
+  ['Do not overdo it','Drinking huge amounts of plain water during very long events, without salt, can dangerously dilute your blood. Drink to thirst and a little more.'],
+  ['Try this week','A glass on waking, one with every meal, and a bottle you can see on your desk or in the jeep. Use the water buttons on the Food log as you go.']],q:['What is the easiest everyday check?',['How thirsty you feel at night','The colour of your urine','Your weight'],1]},
+ {id:'vitd',ic:'☀️',cat:'Food',t:'Vitamin D in Ireland',s:[
+  ['Why it matters','Vitamin D helps you absorb calcium for strong bones, and supports your muscles and immune system.'],
+  ['Ireland is far north','From about October to March the sun is too low for your skin to make vitamin D, even on a bright day.'],
+  ['Hard to get from food','Oily fish such as salmon, mackerel and sardines, eggs and fortified milk or cereals help, but it is hard to get enough from food alone in winter.'],
+  ['Who should think about it','Health advice in Ireland is that many people may benefit from a vitamin D supplement over the winter months. A pharmacist can advise on the right dose for you.'],
+  ['Try this week','Have oily fish twice this week. If you are considering a supplement, ask your pharmacist next time you are in.']],q:['When is your skin unable to make vitamin D in Ireland?',['May to August','About October to March','Never'],1]},
+ {id:'creatine',ic:'💊',cat:'Food',t:'Creatine',s:[
+  ['What it is','A natural compound stored in muscle that powers short, hard efforts such as sprints, jumps and heavy lifts. Meat and fish contain some.'],
+  ['The evidence','It is one of the most studied supplements, with strong evidence for more strength, power and repeated sprint ability. It is considered safe for healthy adults.'],
+  ['How to take it','3-5 g of creatine monohydrate a day, any time, with water or food. No loading needed: it builds up in your muscles over 3-4 weeks.'],
+  ['Good to know','You may gain a kilo or so of water inside your muscles. That is normal and is not fat.'],
+  ['Brain benefits?','Early research suggests it may help memory and tiredness, especially when short on sleep. Promising, but not settled.'],
+  ['Check first','Talk to your GP if you have kidney problems. If you play competitive sport, choose a batch-tested product (for example with the Informed Sport mark).'],
+  ['Try this week','If you decide to take it, pick a time you will not forget, such as with breakfast, and log it as a supplement so it shows on your Food log.']],q:['A typical daily dose is…',['3-5 g','30-50 g','Only on training days'],0]},
+ {id:'sleep',ic:'🛏️',cat:'Lifestyle',t:'Sleep: the best recovery tool',s:[
+  ['How much','Adults need 7-9 hours. Hard training, physical work or a stressful spell push you towards the top of that range.'],
+  ['What happens while you sleep','Deep sleep is when your body releases most growth hormone and repairs muscle. Dream (REM) sleep files away learning and steadies your mood.'],
+  ['Keep it regular','Going to bed and getting up at similar times each day, weekends too, matters nearly as much as total hours.'],
+  ['Light sets your clock','Daylight in the first hour after waking sets your body clock and helps you feel sleepy at the right time that night. Bright screens late at night push it back.'],
+  ['Caffeine','Caffeine takes around 5-6 hours to halve in your body, so a 3pm coffee is still working at 10pm. Try to have your last one before 2pm.'],
+  ['Set the scene','A cool, dark, quiet room (about 16-19°C), no big meal in the last 2-3 hours, and the phone out of reach.'],
+  ['Try this week','Pick a wake-up time and keep it for 7 days, with daylight within 30 minutes of getting up. Watch your sleep quality in the check-in.']],q:['A coffee at 3pm is…',['Gone by 6pm','Still partly in your system at bedtime','Good for sleep'],1]},
+ {id:'stress',ic:'🧠',cat:'Lifestyle',t:'Stress and recovery',s:[
+  ['One bucket','Work, family, money, travel, poor sleep and training all fill the same stress bucket. Your body cannot tell them apart.'],
+  ['Signs it is full','Poor sleep, a higher morning pulse, irritability, low motivation, picking up niggles and feeling flat in sessions.'],
+  ['Your readiness score','The app combines sleep, how you feel and your pulse into a rough guide. Several low days in a row are a signal to ease off.'],
+  ['What empties it','Sleep, walks outdoors, time with people you like, slow breathing, laughing, and easy movement such as a swim or loosen-out.'],
+  ['Train around it','On high-stress days, swap a hard session for an easy one or a recovery session. You will get more from the hard days when you are fresh.'],
+  ['Try this week','On your most stressful day, do 5 minutes of calming sighs in Recover and a 20-minute walk. Note your mood in the next morning\'s check-in.']],q:['On a very stressful day, the best training choice is usually…',['The hardest session of the week','An easy session or recovery','Two sessions'],1]},
+ {id:'alcohol',ic:'🍺',cat:'Lifestyle',t:'Alcohol and recovery',s:[
+  ['Sleep','Alcohol may help you nod off, but it breaks up deep and dream sleep in the second half of the night, so you wake less rested.'],
+  ['Recovery','It dehydrates you, and a big session soon after training can slow muscle repair.'],
+  ['Hidden calories','A pint is about 200 kcal. Four pints is roughly a full dinner, before the chipper on the way home.'],
+  ['Mood the next day','Alcohol lifts mood short term, then often brings a rebound of low mood and anxiety the next day.'],
+  ['The Irish guide','Low-risk drinking is up to 11 standard drinks a week for women and 17 for men, spread out, with 2-3 alcohol-free days. A pint is 2 standard drinks and a pub measure of spirits is 1.'],
+  ['Simple swaps','Alternate with water, try alcohol-free beers, keep drinks away from the night before a big session, and eat before you go out.'],
+  ['Try this week','Track your standard drinks with the alcohol line on the Food log, and plan at least two alcohol-free days.']],q:['How many standard drinks are in a pint of beer?',['1','2','3'],1]},
+ {id:'ice',ic:'🧊',cat:'Recovery',t:'Ice baths and cold water',s:[
+  ['What it does','2-10 minutes in cold water at around 10-15°C can reduce how sore you feel after hard training or a match.'],
+  ['The mental side','Many people feel alert and in good form for hours afterwards. Staying calm in the cold is practice for staying calm under pressure.'],
+  ['Timing matters','Cold straight after a strength session may blunt muscle gains. If building muscle is your goal, leave at least a few hours, or use cold on other days.'],
+  ['Cold showers count','Finishing a shower with 30-90 seconds of cold gives some of the same lift with less fuss.'],
+  ['How to do it','Breathe out slowly as you go in. The gasp in the first 30 seconds is normal and passes. Keep still, and get out before you start shivering hard.'],
+  ['Stay safe','Never alone and never after alcohol. Check with your GP first if you have a heart condition or high blood pressure. Rewarm gradually by moving, not with a hot shower straight away.'],
+  ['Try this week','End three showers with 30 seconds of cold, breathing out slowly, or try the guided Ice bath in Recover.']],q:['If you want to build muscle, when is cold water best avoided?',['Straight after a strength session','On a rest day','In the morning'],0]},
+ {id:'sauna',ic:'♨️',cat:'Recovery',t:'Sauna',s:[
+  ['The basics','10-20 minutes at around 80-100°C, once or a few times a week. Drink water before and after.'],
+  ['Heart health','Long-term Finnish studies link regular sauna use with lower rates of heart disease. These show a link rather than proof, but the signs are good.'],
+  ['For your body','Heat increases blood flow and loosens stiff muscles. Some research suggests regular heat can help endurance fitness too.'],
+  ['Mind and sleep','Heat helps your body switch into rest mode. Many people sleep better on sauna evenings.'],
+  ['How to do a session','2-3 rounds of 10-15 minutes with a cool shower and a few minutes sitting out between. Leave whenever you feel you need to.'],
+  ['Stay safe','Not after alcohol. Leave if you feel dizzy or sick. Check with your GP if you have heart or blood pressure problems.'],
+  ['Try this week','Use the guided Sauna or Contrast therapy session in Recover and note how you sleep that night.']],q:['A sensible sauna session is about…',['5 minutes at 40°C','10-20 minutes at 80-100°C','An hour'],1]},
+ {id:'contrast',ic:'🔥',cat:'Recovery',t:'Contrast therapy',s:[
+  ['What it is','Swapping between heat (sauna or hot tub) and cold (plunge, sea or cold shower), usually for 3 rounds.'],
+  ['Why people love it','It is a big mental reset. Most people come out energised, calm and in good form.'],
+  ['For your body','It may ease soreness after hard days, though research shows only modest effects. How you feel the next day is a fair guide.'],
+  ['A simple session','10-15 minutes of heat, 1-2 minutes of cold, a minute or two of rest. Repeat 3 times.'],
+  ['Finish on','End on cold for a lift during the day, or on heat to wind down before bed.'],
+  ['Stay safe','Not after alcohol, never alone in cold water, and check with your GP if you have heart or blood pressure problems.'],
+  ['Try this week','Do one guided Contrast therapy session in Recover after your hardest day.']],q:['To wind down before bed, finish on…',['Cold','Heat','It makes no difference'],1]},
+ {id:'breath',ic:'🫁',cat:'Recovery',t:'Breathwork',s:[
+  ['Your remote control','Breathing is the one part of your stress response you can control directly. Slow breathing tells your body it is safe.'],
+  ['Slow it down','Around 6 breaths a minute, about 5 seconds in and 5 out, tends to steady your heart rate and calm your mind.'],
+  ['Long breaths out','Breathing out for longer than you breathe in slows your heart. That is the idea behind 4-7-8 and calming sighs.'],
+  ['Calming sighs','In a 2023 Stanford study, 5 minutes a day of sighs (two breaths in through the nose, one long breath out) improved mood and lowered anxiety more than mindfulness meditation alone.'],
+  ['Box breathing','In 4, hold 4, out 4, hold 4. Used by soldiers and first responders to stay steady under pressure. Good before a match or a hard conversation.'],
+  ['Stay safe','Never do forceful or fast breathing in water, while driving, or standing where you could fall. Stop if you feel dizzy.'],
+  ['Try this week','5 minutes of calming sighs each day for a week, with your eyes closed and the voice guide on. Note your mood each morning.']],q:['Which slows your heart rate?',['Short, quick breaths','A breath out longer than the breath in','Holding your breath as long as possible'],1]},
+ {id:'walking',ic:'🚶',cat:'Movement',t:'Walking and daily movement',s:[
+  ['The movement you forget','Everything you do outside of exercise, such as walking, working and standing, can burn hundreds of calories a day. It adds up to more than most gym sessions.'],
+  ['Steps and health','Studies following thousands of people show health benefits rising up to about 7,000-10,000 steps a day.'],
+  ['After meals','A 10-15 minute walk after eating lowers the spike in blood sugar.'],
+  ['For your head','Walking outdoors, especially in green spaces or by water, lifts mood and eases stress. Daylight early in the day helps you sleep.'],
+  ['For recovery','An easy walk the day after a hard session gets blood moving and eases sore legs better than lying still.'],
+  ['Try this week','Add a 10-minute walk after your biggest meal each day, and log it in Recover.']],q:['A short walk after meals mainly helps…',['Blood sugar','Grip strength','Flexibility'],0]},
+ {id:'pilates',ic:'🤸',cat:'Movement',t:'Pilates and your core',s:[
+  ['What it is','Slow, controlled exercises for your deep core, hips and posture muscles, done with careful breathing.'],
+  ['Why it helps','A strong, controlled core protects your back and helps you run, turn, kick and lift better.'],
+  ['For field sports and runners','Better control around your hips and pelvis may take some strain off your hamstrings and groin, two of the most common problem areas in GAA and running.'],
+  ['How often','Two short sessions of 15-20 minutes a week is enough to notice a difference within a month or two.'],
+  ['Moves to start with','Dead bugs, side planks, glute bridges, bird dogs and clams. Slow and controlled, breathing out on the effort.'],
+  ['Quality over quantity','Five perfect reps beat twenty sloppy ones. Stop if anything hurts, as opposed to just working hard.'],
+  ['Try this week','Do the Loosen-out or Stretch session in Recover, then add 3 rounds of dead bugs and side planks.']],q:['Pilates mainly trains…',['Your deep core and control','Maximum strength','Sprint speed'],0]}];
 let lv={topic:null,i:0,ans:null};
 function viewLearn(){const done=(meta.learned&&meta.learned.ids)||{};
   if(lv.topic){const T=LEARN.find(x=>x.id===lv.topic);const n=T.s.length;const quiz=lv.i===n;
@@ -1420,6 +1523,79 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(x=c('[data-lans]')){lv.ans=+x.dataset.lans;render();return}
   if(c('#lDone')){const ids=Object.assign({},(meta.learned&&meta.learned.ids)||{},{[lv.topic]:iso(todayDate())});if(!sampleMode)persistMeta('learned',{ids});lv={topic:null,i:0,ans:null};toast('Nice one. Topic done ✓');render();return}
 });
+
+// ================= v5: audio-guided sessions, photo review, compact meals, smarter quick add =================
+// ---- calm audio: soft voice, ocean/rain bed, gentle chimes; screen kept awake ----
+const AUD={ctx:null,src:null,g:null,lfo:null,vid:null,snd:'ocean',voice:true};
+try{const s=JSON.parse(localStorage.getItem('rpAudio')||'{}');if(s.snd)AUD.snd=s.snd;if(s.voice===false)AUD.voice=false}catch(e){}
+function audSave(){try{localStorage.setItem('rpAudio',JSON.stringify({snd:AUD.snd,voice:AUD.voice}))}catch(e){}}
+function audCtx(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;if(!AUD.ctx)AUD.ctx=new C();if(AUD.ctx.state==='suspended')AUD.ctx.resume();return AUD.ctx}catch(e){return null}}
+function audBed(){audBedStop();if(AUD.snd==='off')return;const c=audCtx();if(!c)return;
+  const len=c.sampleRate*6,buf=c.createBuffer(1,len,c.sampleRate),d=buf.getChannelData(0);let last=0;for(let i=0;i<len;i++){const w=Math.random()*2-1;last=(last+0.02*w)/1.02;d[i]=last*3.2}
+  const src=c.createBufferSource();src.buffer=buf;src.loop=true;const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=AUD.snd==='rain'?2400:520;
+  const g=c.createGain();g.gain.value=0;g.gain.linearRampToValueAtTime(AUD.snd==='rain'?0.10:0.16,c.currentTime+3);src.connect(f);f.connect(g);g.connect(c.destination);
+  if(AUD.snd==='ocean'){const l=c.createOscillator(),lg=c.createGain();l.frequency.value=0.09;lg.gain.value=0.09;l.connect(lg);lg.connect(g.gain);l.start();AUD.lfo=l}
+  src.start();AUD.src=src;AUD.g=g}
+function audBedStop(){try{if(AUD.g&&AUD.ctx){AUD.g.gain.cancelScheduledValues(AUD.ctx.currentTime);AUD.g.gain.setTargetAtTime(0,AUD.ctx.currentTime,0.4)}const s=AUD.src,l=AUD.lfo;setTimeout(()=>{try{s&&s.stop();l&&l.stop()}catch(e){}},1500)}catch(e){}AUD.src=null;AUD.lfo=null;AUD.g=null}
+function chime(kind){const c=audCtx();if(!c)return;const now=c.currentTime;const tones=kind==='in'?[396,528]:kind==='out'?[528,396]:kind==='end'?[528,660,792]:[528];
+  tones.forEach((fq,i)=>{const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=fq;const t0=now+i*(kind==='in'||kind==='out'?0.35:0.25);g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(0.07,t0+0.03);g.gain.exponentialRampToValueAtTime(0.0008,t0+2.6);o.connect(g);g.connect(c.destination);o.start(t0);o.stop(t0+2.7)})}
+let VOICE=null;function pickVoice(){if(VOICE||!window.speechSynthesis)return VOICE;const vs=speechSynthesis.getVoices();const pref=['Moira','Serena','Kate','Fiona','Martha','Google UK English Female','Samantha','Karen','Tessa'];
+  VOICE=vs.find(v=>pref.some(p=>v.name.includes(p)))||vs.find(v=>/en-(IE|GB)/i.test(v.lang))||vs.find(v=>/^en/i.test(v.lang))||null;return VOICE}
+try{window.speechSynthesis&&speechSynthesis.addEventListener&&speechSynthesis.addEventListener('voiceschanged',()=>{VOICE=null;pickVoice()})}catch(e){}
+function say(t){if(!AUD.voice||!t||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.8;u.pitch=.92;u.volume=1;const v=pickVoice();if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
+const TINY_MP4='data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAXEbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAl10cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAAAAABAAAAAAHVbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAABAAAAAgABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABgG1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAUBzdGJsAAAAvHN0c2QAAAAAAAAAAQAAAKxhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABFUxhdmM2MC4zMS4xMDIgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAAMmF2Y0MBZAAK/+EAF2dkAAqs2V7ARAAAAwAEAAADAAg8SJZYAQAEaO+Py/34+AAAAAAQcGFzcAAAAAEAAAABAAAAFGJ0cnQAAAAAAAALSAAAC0gAAAAYc3R0cwAAAAAAAAABAAAAAgAAQAAAAAAUc3RzcwAAAAAAAAABAAAAAQAAABxzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAcc3RzegAAAAAAAAAAAAAAAgAAAsYAAAAMAAAAGHN0Y28AAAAAAAAAAgAABgkAAAjvAAACkXRyYWsAAABcdGtoZAAAAAMAAAAAAAAAAAAAAAIAAAAAAAAH0AAAAAAAAAAAAAAAAQEAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAACRlZHRzAAAAHGVsc3QAAAAAAAAAAQAAB9AAAAQAAAEAAAAAAgltZGlhAAAAIG1kaGQAAAAAAAAAAAAAAAAAAB9AAABCgFXEAAAAAAAtaGRscgAAAAAAAAAAc291bgAAAAAAAAAAAAAAAFNvdW5kSGFuZGxlcgAAAAG0bWluZgAAABBzbWhkAAAAAAAAAAAAAAAkZGluZgAAABxkcmVmAAAAAAAAAAEAAAAMdXJsIAAAAAEAAAF4c3RibAAAAH5zdHNkAAAAAAAAAAEAAABubXA0YQAAAAAAAAABAAAAAAAAAAAAAQAQAAAAAB9AAAAAAAA2ZXNkcwAAAAADgICAJQACAASAgIAXQBUAAAAAAB9AAAABPwWAgIAFFYhW5QAGgICAAQIAAAAUYnRydAAAAAAAAB9AAAABPwAAACBzdHRzAAAAAAAAAAIAAAAQAAAEAAAAAAEAAAKAAAAAKHN0c2MAAAAAAAAAAgAAAAEAAAABAAAAAQAAAAIAAAAIAAAAAQAAAFhzdHN6AAAAAAAAAAAAAAARAAAAFQAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAcc3RjbwAAAAAAAAADAAAF9AAACM8AAAj7AAAAGnNncGQBAAAAcm9sbAAAAAIAAAAB//8AAAAcc2JncAAAAAByb2xsAAAAAQAAABEAAAABAAAAYnVkdGEAAABabWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAtaWxzdAAAACWpdG9vAAAAHWRhdGEAAAABAAAAAExhdmY2MC4xNi4xMDAAAAAIZnJlZQAAAy9tZGF03gIATGF2YzYwLjMxLjEwMgACMEAOAAACrAYF//+o3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE2NCByMzEwOCAzMWUxOWY5IC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAyMyAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTEgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9MiBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0wIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MCA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0wIHRocmVhZHM9MSBsb29rYWhlYWRfdGhyZWFkcz0xIHNsaWNlZF90aHJlYWRzPTAgbnI9MCBkZWNpbWF0ZT0xIGludGVybGFjZWQ9MCBibHVyYXlfY29tcGF0PTAgY29uc3RyYWluZWRfaW50cmE9MCBiZnJhbWVzPTMgYl9weXJhbWlkPTIgYl9hZGFwdD0xIGJfYmlhcz0wIGRpcmVjdD0xIHdlaWdodGI9MSBvcGVuX2dvcD0wIHdlaWdodHA9MSBrZXlpbnQ9MjUwIGtleWludF9taW49MSBzY2VuZWN1dD00MCBpbnRyYV9yZWZyZXNoPTAgcmNfbG9va2FoZWFkPTEwIHJjPWNyZiBtYnRyZWU9MSBjcmY9MjMuMCBxY29tcD0wLjYwIHFwbWluPTAgcXBtYXg9NjkgcXBzdGVwPTQgaXBfcmF0aW89MS40MCBhcT0xOjEuMDAAgAAAABJliIQAFv/sf8JVf9ECkR5tf/EBGCAHARggBwEYIAcBGCAHARggBwEYIAcBGCAHARggBwAAAAhBmiEYgr/+8AEYIAcBGCAHARggBwEYIAcBGCAHARggBwEYIAcBGCAH';
+let rpWake2=null;
+async function keepAwake(on){
+  try{if(on){if(navigator.wakeLock)rpWake2=await navigator.wakeLock.request('screen')}else{rpWake2&&rpWake2.release();rpWake2=null}}catch(e){}
+  try{if(on){if(!AUD.vid){const v=document.createElement('video');v.setAttribute('playsinline','');v.setAttribute('muted','');v.muted=true;v.loop=true;v.src=TINY_MP4;v.style.cssText='position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;bottom:0;left:0';document.body.appendChild(v);AUD.vid=v}AUD.vid.play().catch(()=>{})}else if(AUD.vid){AUD.vid.pause();AUD.vid.remove();AUD.vid=null}}catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&typeof PL!=='undefined'&&PL&&!PL.end)keepAwake(true)});
+function audStepSay(st,i,pr){const breath=['in','hold','out'].includes(st.k);
+  if(breath){chime(st.k==='in'?'in':st.k==='out'?'out':'hold');if((st.round||1)<=2||(st.k!=='hold'&&(st.round%5===0)))say(st.t)}
+  else{chime('step');say(i===0&&pr.intro?pr.intro+' '+st.t+'. '+(st.c||''):st.t+'. '+(st.c||''))}}
+function audControls(){return `<div class="audbar"><div class="segmini">${[['ocean','🌊 Ocean'],['rain','🌧 Rain'],['off','🔇 Quiet']].map(([v,l])=>`<button type="button" data-asnd="${v}" aria-pressed="${AUD.snd===v}">${l}</button>`).join('')}</div><button type="button" class="vtog" data-avoice aria-pressed="${AUD.voice}">${AUD.voice?'🗣 Voice on':'🗣 Voice off'}</button></div>`}
+// ---- photo review before logging ----
+let PR=null;
+function photoReviewHTML(){if(!PR)return '';
+  return `<div class="cfwrap" id="prWrap"><div class="cfsheet prsheet" role="dialog" aria-label="Check your plate"><h2>Here's what I see</h2>${PR.seen?`<p class="prseen">${esc(PR.seen)}</p>`:''}<p class="ds" style="margin:0">An estimate from a photo, so it can be 20-30% out. Fix anything that's wrong.</p>
+    <div class="prall"><span>How much did you eat?</span><div class="segmini">${[25,50,75,100].map(p=>`<button type="button" data-prall="${p}" aria-pressed="${PR.items.every(x=>x.pct===p)}">${p===100?'All':p+'%'}</button>`).join('')}</div></div>
+    <div class="pritems">${PR.items.map((x,i)=>`<div class="pritem ${x.off?'off':''}"><div class="prtop"><input type="text" value="${esc(x.name)}" data-prname="${i}" aria-label="Food name"><span class="num">${Math.round(kcalOf(x)*x.pct/100)} kcal</span><button type="button" class="x" data-proff="${i}" aria-label="${x.off?'Add back':'Didn\'t eat this'}">${x.off?'+':'×'}</button></div>
+      ${x.off?'':`<div class="segmini">${[25,50,75,100].map(p=>`<button type="button" data-prpct="${i}:${p}" aria-pressed="${x.pct===p}">${p===100?'All':p+'%'}</button>`).join('')}</div>`}</div>`).join('')}</div>
+    <div class="actions"><button type="button" class="ghost" id="prNo" style="flex:1;color:var(--fg)">Cancel</button><button type="button" class="donebtn" id="prYes" ${PR.busy?'disabled':''}>${PR.busy?'Working…':'Log it'}</button></div></div></div>`}
+function showPR(){let h=$('#prHost');if(!h){h=document.createElement('div');h.id='prHost';document.body.appendChild(h)}h.innerHTML=photoReviewHTML()}
+async function prLog(){if(!PR)return;PR.busy=true;showPR();const k=iso(sel);
+  try{const changed=PR.items.filter(x=>!x.off&&x.name.trim()&&x.name.trim()!==x.orig);
+    if(changed.length&&sample){const out=await sample.json(`Estimate nutrition for these foods from one plate (${PR.meal}), keeping the same portion sizes as described.\n${changed.map(x=>`- ${x.name} (${x.qty||'normal portion'})`).join('\n')}\n${typeof foodRules==='function'?foodRules():FOOD_RULES}`);
+      const fresh=cleanItems(out&&out.items,PR.meal,true,'photo');changed.forEach((x,i)=>{const f=fresh[i];if(f){NK.forEach(q=>x[q]=f[q]);x.plants=f.plants}})}
+    const items=PR.items.filter(x=>!x.off).map(x=>{const o={...x};delete o.pct;delete o.off;delete o.orig;o.name=x.name.trim()||x.orig;const f=x.pct/100;NK.forEach(q=>{if(isNum(o[q]))o[q]=q==='kcal'?Math.round(+o[q]*f):Math.round(+o[q]*f*10)/10});if(x.pct<100)o.qty=`${x.pct}% of ${o.qty||'a portion'}`;o.meal=PR.meal;return o});
+    if(items.length)await addFood(items,k);PR=null;showPR();toast(items.length?`Logged ${items.length} item${items.length>1?'s':''}`:'Nothing logged');render()}
+  catch(e){PR.busy=false;showPR();toast(foodErr(e))}}
+// ---- quick add that learns what you eat, and when ----
+function learnedFoods(){const meal=fState.meal||(iso(sel)===iso(todayDate())?guessMeal():'Dinner');const t=todayDate();const m={};
+  for(let i=0;i<45;i++){const k=iso(addD(t,-i));const d=D()[k];(d&&d.food||[]).forEach(it=>{if(it.src==='plan'||it.src==='alcohol'||!it.name)return;const key=String(it.name).toLowerCase().trim();if(!m[key])m[key]={...it,count:0,meals:{},score:0};const o=m[key];o.count++;o.meals[it.meal]=(o.meals[it.meal]||0)+1;o.score+=i<7?2:1})}
+  return Object.values(m).filter(o=>o.count>=2).map(o=>({...o,rank:o.score+3*(o.meals[meal]||0)})).sort((a,b)=>b.rank-a.rank).slice(0,12)}
+function foodActionsHTML(dIso){if(sampleMode||dIso>iso(todayDate()))return '';
+  const meal=fState.meal||(dIso===iso(todayDate())?guessMeal():'Dinner');const fr=learnedFoods();const dt=dayTypeFor(dIso);
+  const lib=LIB.filter(x=>x[1]==='any'||x[1]==='snack'||x[1]==='drinks'||x[1]==='treat'||(dt==='rest'&&x[1]==='rest')||(dt!=='rest'&&(x[1]==='training'||x[1]==='post')));
+  const chip=(i,ix)=>`<button type="button" data-quick="${ix}">${esc(i.name)}</button>`;
+  return `<article class="card factions"><div class="frow">${canImg?`<label class="fbtn"><span aria-hidden="true">📷</span><b>Snap plate</b><input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}<button type="button" class="fbtn" id="fSay"><span aria-hidden="true">🎤</span><b>Say it</b></button><button type="button" class="fbtn" id="fType"><span aria-hidden="true">⌨️</span><b>Type it</b></button></div>
+    <div class="mealpick">${seg('f','meal',MEALS,meal,null,'small')}</div><div class="qline"><span class="label">Quick add · ${esc(meal)}</span>${fr.length?`<div class="tags">${fr.slice(0,5).map(chip).join('')}</div>`:`<div class="hint" style="font-size:12px;color:var(--muted)">Things you eat often will appear here.</div>`}
+    ${fr.length>5||lib.length?`<details class="qmore"><summary>More</summary>${fr.length>5?`<div class="tags">${fr.slice(5).map((x,i)=>chip(x,i+5)).join('')}</div>`:''}${lib.length?`<div class="label" style="margin-top:8px">From your meal guide</div><div class="tags">${lib.map(x=>`<button type="button" data-lib="${LIB.indexOf(x)}">${esc(x[0])}</button>`).join('')}</div>`:''}</details>`:''}</div>
+    ${fState.msg&&!/^Logged/.test(fState.msg)?'':''}</article>`}
+// ---- compact meals ----
+const msOpen=new Set();
+document.addEventListener('toggle',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.ms){if(t.open)msOpen.add(t.dataset.ms);else msOpen.delete(t.dataset.ms)}},true);
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-asnd]')){AUD.snd=x.dataset.asnd;audSave();audBed();document.querySelectorAll('[data-asnd]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.asnd===AUD.snd));return}
+  if(c('[data-avoice]')){AUD.voice=!AUD.voice;audSave();if(!AUD.voice)try{speechSynthesis.cancel()}catch(e){}const b=c('[data-avoice]');b.setAttribute('aria-pressed',AUD.voice);b.textContent=AUD.voice?'🗣 Voice on':'🗣 Voice off';return}
+  if(x=c('[data-prall]')){PR.items.forEach(i=>i.pct=+x.dataset.prall);showPR();return}
+  if(x=c('[data-prpct]')){const [i,p]=x.dataset.prpct.split(':').map(Number);PR.items[i].pct=p;showPR();return}
+  if(x=c('[data-proff]')){const i=+x.dataset.proff;PR.items[i].off=!PR.items[i].off;showPR();return}
+  if(c('#prNo')){PR=null;showPR();return}if(c('#prYes')){prLog();return}
+  if(c('#fSay')){if(typeof openVoice==='function')openVoice();return}
+  if(c('#fType')){const t=$('#f-say');if(t){t.scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>t.focus(),300)}return}
+});
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.prname!=null&&PR){PR.items[+t.dataset.prname].name=t.value}});
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -1725,10 +1901,10 @@ document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[da
 let tView='today';
 function tab(){const h=location.hash.slice(1);if(h==='profile')return 'profile';if(h==='plan'){tView='plan';return 'training'}return TABS.includes(h)?h:'dashboard'}
 function render(){
-  const t=tab();document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===t||(t==='mobility'&&a.dataset.tab==='training')?'page':'false'));
+  const t=tab();document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===t||(t==='mobility'&&a.dataset.tab==='recover')?'page':'false'));
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
-  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?trainSub('mob')+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
+  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
   updateFab();
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
