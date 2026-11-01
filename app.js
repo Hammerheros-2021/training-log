@@ -680,7 +680,7 @@ function viewTraining(){
   return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+extrasCardHTML(key)+patternHTML()+pill;
 }
 function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
-function viewTrainingTab(){return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planSum(true)+viewPlan():viewTraining())}
+function viewTrainingTab(){return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+ciChip(iso(sel))+checkinHTML(iso(sel))}
 function viewFood(){return dayHeader()+(fView==='today'?signChip(iso(sel)):'')+foodHTML(iso(sel))}
 function viewPlan(){
@@ -752,12 +752,12 @@ function viewDashboard(){
   const rs=[];for(let i=13;i>=0;i--)rs.push(readiness(DD[iso(addD(now,-i))]));
   const rv=rs.filter(x=>x!=null);
   // day balance (yesterday)
-  const yd=DD[yk];const bal=[['farmHrs','var(--farm)',WORK],['deskHrs','var(--s)','Desk'],['carHrs','var(--r)','Car'],['familyHrs','var(--e)','Family']];
+  const yd=DD[yk];const bal=[['farmHrs','var(--farm)',WORK],['deskHrs','var(--s)','Desk'],['carHrs','var(--o)','Car'],['familyHrs','var(--e)','Family']];
   const balTot=yd?bal.reduce((a,[f])=>a+(+yd[f]||0),0):0;
   const balance=balTot?`<div class="stack">${bal.map(([f,c,l])=>+yd[f]?`<i style="flex:${+yd[f]};background:${c}" title="${l}"></i>`:'').join('')}</div><div class="legend">${bal.map(([f,c,l])=>`<span style="--c:${c}"><i></i>${l} ${+yd[f]||0} h</span>`).join('')}</div>`:'<div class="ds">Comes from the morning check-in, under Yesterday.</div>';
   const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'').split(' :: ')[0]):[];
   const due=!sampleMode&&planDue();
-  const su=setupChecklistHTML();return toggle+su+(su?'':todoHTML())+hero+planSum(false)+`<div class="dgrid">${tSleep}${tSess}${tFuel}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
+  const su=setupChecklistHTML();return toggle+su+(su?'':todoHTML())+hero+planBtn()+`<div class="dgrid">${tSleep}${tSess}${tFuel}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section>
@@ -1784,7 +1784,7 @@ const EMSKIP={SCRIPT:1,STYLE:1,TEXTAREA:1,TITLE:1,OPTION:1,SELECT:1,INPUT:1};
 function deEmojiNode(root){if(!root)return;if(root.nodeType===3){fixText(root);return}if(root.nodeType!==1||EMSKIP[root.tagName])return;
   const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>{let p=n.parentNode;if(!p||EMSKIP[p.tagName])return 2;EMRX.lastIndex=0;return EMRX.test(n.nodeValue)?1:2}});const list=[];let n;while(n=w.nextNode())list.push(n);list.forEach(fixText)}
 function fixText(t){const v=t.nodeValue;EMRX.lastIndex=0;if(!EMRX.test(v))return;const p=t.parentNode;if(!p||EMSKIP[p.tagName])return;EMRX.lastIndex=0;
-  const span=document.createElement('span');span.style.display='contents';span.innerHTML=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(EMRX,(m,e)=>ico(EMI[e]));p.replaceChild(span,t)}
+  const span=document.createElement('span');span.style.display='contents';span.innerHTML=v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(EMRX,(m,e)=>ico(EMI[e]||EMI[e.split('\u200d')[0]]));p.replaceChild(span,t)}
 try{const mo=new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData')fixText(m.target);else m.addedNodes.forEach(deEmojiNode)}});
   const go=()=>{deEmojiNode(document.body);mo.observe(document.body,{childList:true,subtree:true,characterData:true})};if(document.body)go();else document.addEventListener('DOMContentLoaded',go)}catch(e){}
 
@@ -1808,17 +1808,30 @@ function planSum(full){const I=planInfo(),a=I.a,canEdit=!!(I.P&&I.P.answers);
     <div class="kprog" aria-hidden="true"><i style="width:${Math.max(2,Math.min(100,(todayDate()-START)/(END-START)*100))}%"></i></div>
     <div class="krows">${rows.map(([s,l,t])=>canEdit?`<button type="button" class="krow" data-planedit="${s}"><span class="label">${l}</span><span class="kt">${esc(t)}</span><span class="ked">Change</span></button>`:`<div class="krow"><span class="label">${l}</span><span class="kt">${esc(t)}</span></div>`).join('')}</div>
     <small class="ds">${canEdit?'Changing anything rebuilds the plan from today. Everything you have logged stays.':'Your plan runs for 16 weeks. Ask to change it in a chat and it can be rebuilt.'}</small></article>`}
-function planNav(cur){return `<div class="subtabs pnav" style="grid-template-columns:repeat(3,minmax(0,1fr))">${[['today','Today'],['plan','Your plan'],['recover','Recover']].map(([v,l])=>`<button type="button" data-pnav="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
+function planNav(cur){return `<div class="subtabs pnav" style="grid-template-columns:repeat(2,minmax(0,1fr))">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-pnav="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-pnav]');if(x){const v=x.dataset.pnav;if(v==='recover'){location.hash='recover';return}tView=v;if(tab()!=='training')location.hash='training';else render();window.scrollTo({top:0});return}
   const pe=e.target.closest&&e.target.closest('[data-planedit]');if(pe&&typeof obRender==='function'){ob={step:+pe.dataset.planedit,a:Object.assign({},PROFILE.answers||{}),ret:true,fromApp:true};obSave();obRender();return}
   if(e.target.closest&&e.target.closest('#obCancel')){ob={step:-1,a:{}};obSave();showApp();render();return}});
 function kAvatarSet(){const a=document.getElementById('kAvatar');if(!a)return;let n='';try{n=(PROFILE&&PROFILE.answers&&PROFILE.answers.name)||''}catch(e){}a.textContent=(n||'Me').slice(0,1).toUpperCase()}
 
+// ================= Keel v3: plan sheet, area colours =================
+function planBtn(){const I=planInfo();return `<button type="button" class="kpbtn" data-plansheet><span class="kpic">${ico('calendar')}</span><span class="kpt"><b>Your plan</b><small>${esc(I.goal)} · ${esc(I.line.toLowerCase().replace(/^\w/,c=>c.toUpperCase()))}</small></span><span class="kpgo" aria-hidden="true">›</span></button>`}
+function planSheet(open){let h=document.getElementById('psHost');if(!h){h=document.createElement('div');h.id='psHost';document.body.appendChild(h)}
+  if(!open){h.innerHTML='';document.body.classList.remove('sheet-open');return}
+  h.innerHTML=`<div class="kshwrap" id="psWrap"><div class="ksheet" role="dialog" aria-modal="true" aria-label="Your plan"><div class="kshead"><h2>Your plan</h2><button type="button" class="x" id="psX" aria-label="Close">${ico('x')}</button></div>${planSum(true)}</div></div>`;document.body.classList.add('sheet-open')}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
+  if(c('[data-plansheet]')){planSheet(true);return}
+  if(c('#psX')||e.target.id==='psWrap'){planSheet(false);return}
+  if(c('[data-planedit]'))planSheet(false)},true);
+const AREA={dashboard:'today',checkin:'today',training:'plan',recover:'recover',mobility:'recover',food:'food',reports:'progress',profile:'today'};
+function setArea(){let t='dashboard';try{t=tab()}catch(e){}document.body.dataset.area=AREA[t]||'today'}
+window.addEventListener('hashchange',setArea);
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
 function dayLoad(dIso){return sRPE(L()[dIso])+extrasLoad(D()[dIso])}
-function lineChart(points,{h=150,fmtY=v=>v,invert=false,color='var(--accent)',yMin=null,yMax=null,pad=0}={}){
+function lineChart(points,{h=150,fmtY=v=>v,invert=false,color='var(--hi)',yMin=null,yMax=null,pad=0}={}){
   if(points.length<2)return '<div class="hint">Needs at least two entries.</div>';
   const W=380,H=h,l=40,r=12,t=14,b=22;const xs=points.map(p=>p.x),ys=points.map(p=>p.y);
   let x0=Math.min(...xs),x1=Math.max(...xs);if(x0===x1){x0-=1;x1+=1}
@@ -1929,7 +1942,7 @@ function sleepTimingChart(now){
 }
 function timeUseChart(now){
   const DD=D(),LL=L();const W=380,H=200,l=30,r=6,t=10,b=22,N=8,bw=(W-l-r)/N;
-  const keys=[['sleep','var(--x)','Sleep',(d,k)=>sleepHours(d)||0],['train','var(--accent)','Training',(d,k)=>{const lg=LL[k];return ((lg&&lg.status!=='missed'&&+lg.dur)||0)/60+(d.extras||[]).reduce((a,x)=>a+(+x.dur||0),0)/60}],['farmHrs','var(--farm)',typeof WORK!=='undefined'?WORK:'Manual labour',d=>+d.farmHrs||0],['deskHrs','var(--s)','Desk',d=>+d.deskHrs||0],['carHrs','var(--r)','Car',d=>+d.carHrs||0],['familyHrs','var(--e)','Family',d=>+d.familyHrs||0]];
+  const keys=[['sleep','var(--x)','Sleep',(d,k)=>sleepHours(d)||0],['train','var(--h)','Training',(d,k)=>{const lg=LL[k];return ((lg&&lg.status!=='missed'&&+lg.dur)||0)/60+(d.extras||[]).reduce((a,x)=>a+(+x.dur||0),0)/60}],['farmHrs','var(--farm)',typeof WORK!=='undefined'?WORK:'Manual labour',d=>+d.farmHrs||0],['deskHrs','var(--s)','Desk',d=>+d.deskHrs||0],['carHrs','var(--o)','Car',d=>+d.carHrs||0],['familyHrs','var(--e)','Family',d=>+d.familyHrs||0]];
   const weeks=[];for(let i=N-1;i>=0;i--){const end=addD(now,-i*7);const sums={};let n=0;for(let j=0;j<7;j++){const k=iso(addD(end,-j)),d=DD[k];if(d&&(dayFilled(d)||sleepHours(d)!=null)){n++;keys.forEach(([key,,,f])=>sums[key]=(sums[key]||0)+f(d,k))}}weeks.push({end,n,avg:Object.fromEntries(keys.map(([key])=>[key,n?(sums[key]||0)/n:0]))})}
   const mx=Math.max(12,...weeks.map(w=>keys.reduce((a,[key])=>a+w.avg[key],0)));const top=Math.ceil(mx/6)*6;const Y=v=>H-b-v/top*(H-t-b);
   let g='';for(let i=0;i<=top/6;i++){const v=i*6;g+=`<line class="grid" x1="${l}" x2="${W-r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${l-5}" y="${Y(v)+3}" text-anchor="end">${v}h</text>`}
@@ -2031,7 +2044,7 @@ function viewReports(){
    W('How you spend your days','Average hours per day, by week, including sleep and training.',timeUseChart(now))+
    W('Plan completion','',cbars+(swaps?`<div class="hint">${swaps} Friday threshold run${swaps>1?'s':''} swapped for a class.</div>`:''))+
    `<div class="sect">Sleep &amp; recovery</div>`+
-   W('Balance','Daily score from sleep, how you feel, niggles and, when logged, your morning pulse against your own 2-week baseline.',lineChart(series(d=>readiness(d)),{yMin:0,yMax:100,fmtY:v=>Math.round(v),color:'var(--accent)'}))+
+   W('Balance','Daily score from sleep, how you feel, niggles and, when logged, your morning pulse against your own 2-week baseline.',lineChart(series(d=>readiness(d)),{yMin:0,yMax:100,fmtY:v=>Math.round(v),color:'var(--k-green)'}))+
    W('Sleep timing','Each bar runs from bed to wake, last 28 nights. Darker = better quality. Orange tick = screens off.',slp.svg+slp.stats)+
    W('Strain','Daily strain, 0-21, from training load plus farm work, in the style of Whoop. Higher strain raises the next night\'s sleep need.',lineChart(strn,{yMin:0,yMax:21,fmtY:v=>v.toFixed(1),color:'var(--h)',h:130}))+
    (rhr.length>1?W('Morning pulse','Counted by hand before getting up. A rise of 5+ bpm above your usual is an early sign of being run down.',lineChart(rhr,{pad:2,fmtY:v=>Math.round(v),color:'var(--t)',h:110})):'')+
@@ -2049,7 +2062,7 @@ function viewReports(){
    W('5 km tests','',`<div class="tests"><div><b class="num">${base?esc(base.fivek):'-'}</b><small>Week 1 baseline</small></div><div><b class="num">${re?esc(re.fivek):'-'}</b><small>Week 12 re-test</small></div><div><b class="num" style="color:${base&&re&&toSec(re.fivek)<toSec(base.fivek)?'var(--ok)':'var(--fg)'}">${diff}</b><small>Change</small></div></div>`)+
    W('Threshold pace','Average rep pace per km. Higher on the chart is faster.',lineChart(pace,{fmtY:v=>fromSec(v),invert:true,color:'var(--t)',pad:5}))+
    W('Strength','Trap-bar deadlift top set (kg).',lineChart(tb,{fmtY:v=>Math.round(v),color:'var(--s)',pad:5,h:130})+'<div class="hint">Split squat dumbbells (kg each hand).</div>'+lineChart(ss,{fmtY:v=>Math.round(v),color:'var(--s)',pad:2,h:110}))+
-   W('Body weight','Morning weight (kg), when logged.',lineChart(series('weight'),{pad:1,fmtY:v=>v.toFixed(1),color:'var(--muted)',h:110}));
+   W('Body weight','Morning weight (kg), when logged.',lineChart(series('weight'),{pad:1,fmtY:v=>v.toFixed(1),color:'var(--o)',h:110}));
 }
 // ================= example data (preview only, never stored) =================
 let SAMPLE=null;
@@ -2118,11 +2131,11 @@ document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[da
 let tView='today';
 function tab(){const h=location.hash.slice(1);if(h==='profile')return 'profile';if(h==='plan'){tView='plan';return 'training'}return TABS.includes(h)?h:'dashboard'}
 function render(){
-  const t=tab();document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===({checkin:'dashboard',recover:'training',mobility:'training'}[t]||t)?'page':'false'));
+  const t=tab();document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===({checkin:'dashboard',mobility:'recover',profile:'dashboard'}[t]||t)?'page':'false'));
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
-  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?planNav('recover')+viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
-  updateFab();kAvatarSet();
+  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
+  updateFab();kAvatarSet();setArea();
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}

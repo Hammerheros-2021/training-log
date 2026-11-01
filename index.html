@@ -818,17 +818,77 @@ span.num,div.num{font-size:13px;line-height:18px}span.num b,div.num b{font-size:
 .gcard .seg.small button{flex:0 0 auto;font:500 15px/22px var(--font-body);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius-sm)!important;padding:0 var(--space-4);color:var(--text-body)}
 .gcard .seg.small button[aria-pressed="true"]{border-color:var(--text)}
 .obprog span{border-top-color:var(--line)}.obprog span.done,.obprog span.cur{border-top-color:var(--text)!important;color:var(--text)!important}
+
+/* ================= Keel colour layer: colour that helps you find your way =================
+   Area colours come from the Keel fade stops, lightened for text on dark. Buttons stay Sail-white. */
+:root{
+  --k-blue:#8C98FF; --k-pink:#F07BC0; --k-green:#34E3A0; --k-amber:#F2B84B; --k-violet:#B9A0FF; --k-sky:#7FD3FF; --k-clay:#D9A86C;
+  --s:var(--k-pink); --e:var(--k-green); --h:var(--k-blue); --t:var(--k-amber); --x:var(--k-violet); --o:var(--k-sky); --farm:var(--k-clay); --r:var(--line);
+  --hi:var(--k-blue);
+  --area:var(--text); --area-ink:var(--on-text);
+}
+body[data-area="plan"]{--area:var(--k-blue)}
+body[data-area="recover"]{--area:var(--k-pink)}
+body[data-area="food"]{--area:var(--k-green)}
+body[data-area="progress"]{--area:var(--k-amber)}
+/* tab bar: each tab has its colour; the current one lights up with a bar above it */
+.tabs{grid-template-columns:repeat(5,minmax(0,1fr))!important;padding-left:var(--space-2)!important;padding-right:var(--space-2)!important}
+.tabs a{position:relative}
+.tabs a[data-tab="dashboard"]{--tc:var(--text)}.tabs a[data-tab="training"]{--tc:var(--k-blue)}.tabs a[data-tab="recover"]{--tc:var(--k-pink)}.tabs a[data-tab="food"]{--tc:var(--k-green)}.tabs a[data-tab="reports"]{--tc:var(--k-amber)}
+.tabs a[aria-current="page"] svg{color:var(--tc)}
+.tabs a[aria-current="page"]::before{content:"";position:absolute;top:calc(-1 * var(--space-3) - 1px);left:50%;transform:translateX(-50%);width:32px;height:3px;border-radius:0 0 var(--radius-full) var(--radius-full);background:var(--tc)}
+.tabs a[data-tab="dashboard"][aria-current="page"]::before{background:var(--fade)}
+/* sub-menus: clearly a menu, the chosen option filled in the area colour */
+.subtabs,.seg,.segmini{border:1px solid var(--line)!important}
+body:not([data-area="today"]) .subtabs button[aria-pressed="true"],body:not([data-area="today"]) .segmini button[aria-pressed="true"]{background:var(--area)!important;color:var(--on-text)!important}
+.sect{display:flex;align-items:center;gap:var(--space-2);color:var(--text)!important}
+.sect::before{content:"";width:8px;height:8px;border-radius:var(--radius-full);background:var(--area);flex-shrink:0}
+/* icon tiles and play buttons pick up the area colour */
+.ric,.rpic{color:var(--area)!important;background:color-mix(in srgb,var(--area) 14%,var(--surface))!important}
+.rprog .go,.rprog>span:last-child,.rplay{color:var(--area)}
+.fbtn .ki{color:var(--area)}
+.rqgrid .ki,.recq .ki{color:var(--area)}
+/* Today tiles: a colour per thing you track */
+.dgrid>.dt:nth-child(1){--tc:var(--k-violet)}.dgrid>.dt:nth-child(2){--tc:var(--k-blue)}.dgrid>.dt:nth-child(3){--tc:var(--k-green)}.dgrid>.dt:nth-child(4){--tc:var(--k-amber)}
+.dgrid>.dt:nth-child(5){--tc:var(--k-pink)}.dgrid>.dt:nth-child(6){--tc:var(--k-sky)}.dgrid>.dt:nth-child(7){--tc:var(--k-green)}.dgrid>.dt:nth-child(8){--tc:var(--k-violet)}
+.dgrid>.dt .dl{color:var(--tc)!important;display:flex;align-items:center;gap:var(--space-2)}
+.dgrid>.dt .dl::before{content:"";width:8px;height:8px;border-radius:var(--radius-full);background:var(--tc);flex-shrink:0}
+.dgrid>.dt .tr .fl{background:var(--tc)!important}
+/* session card: its type colour on the title chip */
+.shead .chip:first-child,.shead .pill:first-child{background:color-mix(in srgb,var(--c,var(--k-blue)) 22%,transparent)!important;color:var(--c,var(--k-blue))!important}
+/* charts: legend dots and bars keep their series colours, gridlines quiet */
+.legend i,.lg i{border-radius:var(--radius-full)}
+/* the Your plan button and sheet */
+.kbr{display:flex;align-items:center;gap:var(--space-2)}
+.kplanchip{display:inline-flex;align-items:center;gap:var(--space-2);min-height:44px;padding:0 var(--space-4);border-radius:var(--radius-lg);border:1px solid var(--line);background:var(--surface);color:var(--text);font:600 15px/22px var(--font-body)}
+.kplanchip svg{color:var(--k-blue)}
+.kpbtn{display:flex;align-items:center;gap:var(--space-3);width:100%;text-align:left;background:var(--surface);border:0;border-radius:var(--radius-lg);padding:var(--space-4) var(--space-5);color:var(--text);min-height:64px;font:inherit}
+.kpic{width:44px;height:44px;border-radius:var(--radius-md);display:grid;place-items:center;background:color-mix(in srgb,var(--k-blue) 16%,var(--surface));color:var(--k-blue);flex-shrink:0;font-size:20px}
+.kpt{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-1)}.kpt b{font:600 16px/20px var(--font-body)}.kpt small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpgo{color:var(--text-muted);font-size:22px}
+.kshwrap{position:fixed;inset:0;z-index:60;background:rgba(11,12,16,.72);display:flex;align-items:flex-end;justify-content:center}
+.ksheet{width:100%;max-width:560px;max-height:88vh;overflow:auto;background:var(--bg);border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-top:1px solid var(--line);padding:var(--space-5) var(--space-5) calc(var(--space-6) + env(safe-area-inset-bottom,0px))}
+.kshead{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-4)}
+.ksheet .kplan{padding:0!important;background:transparent!important}
+.ksheet .krow{background:var(--surface)}
+.ksheet .krow .ked{color:var(--k-blue)}
+body.sheet-open{overflow:hidden}
+.kprog i{background:var(--fade)}
+.ksheet .kplan>.label{display:none}
+.rgo{background:var(--area)!important;color:var(--on-text)!important;border:0!important}.rgo .ki,.rgo svg{color:var(--on-text)!important}
+body:not([data-area="today"]) .seg button[aria-pressed="true"]{background:var(--area)!important;color:var(--on-text)!important}
 </style>
 </head>
 <body>
 <div id="gate" class="gate"><div class="gcard"><div class="gbrand"><img src="/keel-wordmark.svg" alt="keel" class="kwm" style="height:34px"></div><p class="gsub">Loading…</p></div></div>
 <div id="appwrap" hidden>
 <div class="wrap">
-  <div class="kbar"><a class="kmark" href="#dashboard" aria-label="keel, today"><img src="/keel-wordmark.svg" alt="keel" class="kwm"></a><a class="avatar" id="kAvatar" href="#profile" aria-label="Profile and settings">·</a></div>
+  <div class="kbar"><a class="kmark" href="#dashboard" aria-label="keel, today"><img src="/keel-wordmark.svg" alt="keel" class="kwm"></a><span class="kbr"><button type="button" class="kplanchip" data-plansheet><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Your plan</button><a class="avatar" id="kAvatar" href="#profile" aria-label="Profile and settings">·</a></span></div>
   <header class="top">
     <nav class="tabs" aria-label="Sections">
       <a href="#dashboard" data-tab="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M7 12h10"/></svg><span>Today</span></a>
       <a href="#training" data-tab="training"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg><span>Plan</span></a>
+      <a href="#recover" data-tab="recover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 6-14 15-14 0 9-6 15-14 15M5 19l7-7"/></svg><span>Recover</span></a>
       <a href="#food" data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11h14a7 7 0 0 1-14 0z"/><path d="M9 7c0-2 2-2 2-4M13 7c0-2 2-2 2-4"/></svg><span>Food</span></a>
       <a href="#reports" data-tab="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-8M3 20h18"/></svg><span>Progress</span></a>
     </nav>
