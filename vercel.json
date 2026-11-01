@@ -1,3 +1,13 @@
 {
-  "functions": { "api/claude.js": { "maxDuration": 300 }, "api/transcribe.js": { "maxDuration": 60 } }
+  "functions": {
+    "api/claude.js": {
+      "maxDuration": 300
+    },
+    "api/transcribe.js": {
+      "maxDuration": 60
+    },
+    "api/plan.js": {
+      "maxDuration": 300
+    }
+  }
 }

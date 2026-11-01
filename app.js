@@ -530,8 +530,39 @@ For each day list the meals in time order. ${FASTED()?`On training days start wi
 For each meal give ${NUT_JSON}.
 ${eatRules()}
 Reply with ONLY JSON: {"days":[{"date":"YYYY-MM-DD","dayType":"training","session":"short","note":"one short practical line, e.g. defrost the salmon tonight","meals":[{"slot":"Post-training breakfast","time":"08:00","when":"after training","where":"Home","name":"meal name","items":[{"name":"oats","qty":"70 g"}],"prep":10,"servings":1,"method":["step"],"kcal":0,"protein":0,"carbs":0,"fat":0,"fibre":0,"sodium":0,"potassium":0,"magnesium":0,"calcium":0,"iron":0,"zinc":0,"selenium":0,"iodine":0,"vitA":0,"vitC":0,"vitD":0,"vitK":0,"b12":0,"folate":0,"choline":0,"omega3":0,"caffeine":0,"plants":["oats"],"options":[{"name":"","where":"Shop","get":"what to pick up or order","kcal":0,"protein":0,"carbs":0,"fat":0}]}]}],"shopping":[{"name":"","qty":"","why":"which meal"}]}`;
+  if(SERVER_PLAN){await serverPlan(dlist.map(d=>mk([d])),req);return}
   try{const outs=await Promise.all(dlist.map(d=>sample.json(mk([d]),{maxTokens:12000}).catch(e=>({__err:e}))));const ok=outs.filter(o=>o&&!o.__err);if(!ok.length)throw outs[0].__err;
     const seen=new Set();const out={days:ok.flatMap(o=>Array.isArray(o.days)?o.days:[]).sort((x,y)=>String(x.date).localeCompare(String(y.date))),shopping:ok.flatMap(o=>Array.isArray(o.shopping)?o.shopping:[]).filter(x=>{const k=String(x&&x.name||'').toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true})};
+    await finishPlan(out,req);
+  }catch(e){pState={...pState,busy:false,msg:e&&e.code==='invalid_json'?'The plan came back garbled. Try again.':foodErr(e)}}
+  render();
+}
+
+// ---------- meal plans built on the server (keeps going if the app is closed) ----------
+let SERVER_PLAN=false,planTimer=null;
+async function serverPlan(prompts,req){
+  const jobAt=new Date().toISOString();
+  try{await persistMeta('planJob',{at:jobAt});
+    const {data:{session}}=await sb.auth.getSession();if(!session)throw {code:'session_expired',message:'Signed out'};
+    const r=await fetch('/api/plan',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({prompts,req,jobAt})});
+    const j=await r.json().catch(()=>({}));if(!r.ok)throw {code:'upstream_error',message:j.error||('HTTP '+r.status)};
+    pState={busy:true,req,msg:'Planning your next 3 days. It takes a minute or two, and carries on even if you close the app.'};render();watchPlanJob();
+  }catch(e){await persistMeta('planJob',{at:jobAt,error:'not started'});pState={...pState,busy:false,msg:foodErr(e)};render()}
+}
+async function checkPlanJob(){
+  if(!sb||!UID)return 'idle';
+  const {data,error}=await sb.from('entries').select('key,data').eq('user_id',UID).eq('kind','meta').in('key',['planRaw','planJob','plan']);
+  if(error)return 'wait';const m={};(data||[]).forEach(r=>m[r.key]=r.data);
+  const job=m.planJob,raw=m.planRaw,plan=m.plan;if(m.plan)meta.plan=m.plan;
+  if(raw&&job&&raw.jobAt===job.at&&!(plan&&plan.createdAt>raw.createdAt)){meta.planRaw=raw;await finishPlan(raw.out,raw.req);render();return 'done'}
+  if(job&&job.error){if(!job.seen){await persistMeta('planJob',Object.assign({},job,{seen:true}));pState={...pState,busy:false,msg:'The plan could not be made ('+job.error+'). Tap Plan to try again.'};render()}return 'failed'}
+  if(job&&!(plan&&plan.createdAt>job.at)&&Date.now()-new Date(job.at)<7*60000){if(!pState.busy){pState={...pState,busy:true,msg:'Still planning your next 3 days. It carries on even if you close the app.'};render()}return 'wait'}
+  if(job&&!(plan&&plan.createdAt>job.at)&&pState.busy){pState={...pState,busy:false,msg:'Planning took too long. Tap Plan to try again.'};render()}
+  return 'idle';
+}
+function watchPlanJob(){clearTimeout(planTimer);const tick=async()=>{let st='wait';try{st=await checkPlanJob()}catch(e){}if(st==='wait')planTimer=setTimeout(tick,6000)};planTimer=setTimeout(tick,6000)}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&SERVER_PLAN&&UID)checkPlanJob().then(st=>{if(st==='wait')watchPlanJob()})});
+async function finishPlan(out,req){
     const ds=(Array.isArray(out&&out.days)?out.days:[]).filter(d=>d&&d.date&&Array.isArray(d.meals)).map(d=>({date:String(d.date).slice(0,10),dayType:DAYT[d.dayType]?d.dayType:dayTypeFor(String(d.date).slice(0,10)),session:String(d.session||'').slice(0,60),note:String(d.note||'').slice(0,160),
       meals:d.meals.filter(m=>m&&m.name).map(m=>{const o={slot:String(m.slot||'').slice(0,40),time:tmin(m.time)!=null?fmtT(tmin(m.time)):'',name:String(m.name).slice(0,70),items:(Array.isArray(m.items)?m.items:[]).slice(0,12).map(x=>({name:String(x.name||'').slice(0,40),qty:String(x.qty||'').slice(0,20)})),plants:Array.isArray(m.plants)?m.plants.map(p=>String(p).toLowerCase().slice(0,30)).slice(0,15):[],method:Array.isArray(m.method)?m.method.map(String).slice(0,8):[],prep:+m.prep||null,servings:+m.servings||1};NK.forEach(k=>o[k]=Math.max(0,+m[k]||0));Object.assign(o,mealExtras(m));return o})}));
     if(!ds.length){pState={...pState,busy:false,msg:'The plan came back empty. Try again.'};render();return}
@@ -540,8 +571,6 @@ Reply with ONLY JSON: {"days":[{"date":"YYYY-MM-DD","dayType":"training","sessio
     if(!savedOK){pState={busy:false,req,msg:'Your plan was made but could not be saved ('+(window.__lastSaveErr||'unknown error')+'). Try again, and send a screenshot if it keeps happening.'};render();return}
     savePlanHist(ds);stepDone();
     pState={busy:false,req:'',msg:`Planned ${ds.length} days${shopping.length?` with ${shopping.length} things to buy`:''}.`};toast('Plan ready');
-  }catch(e){pState={...pState,busy:false,msg:e&&e.code==='invalid_json'?'The plan came back garbled. Try again.':foodErr(e)}}
-  render();
 }
 async function ateThis(ref){
   const [k,ix]=[ref.slice(0,10),+ref.slice(11)];const pd=planDay(k);const m=pd&&pd.meals[ix];if(!m)return;
@@ -2077,6 +2106,7 @@ async function enterApp(){
   if(keepMeta.settings&&!meta.settings)meta.settings=keepMeta.settings;
   SAMPLE=null;sampleMode=false;sel=todayDate();sDraft=null;dDraft=null;
   showApp();if(!location.hash)location.hash='dashboard';render();
+  if(SERVER_PLAN)checkPlanJob().then(st=>{if(st==='wait')watchPlanJob()}).catch(()=>{});
 }
 document.addEventListener('input',e=>{if(e.target.id==='ob-talk'){ob.talk=e.target.value;obSave()}if(e.target.id==='ks-say')kSetup.text=e.target.value});
 document.addEventListener('submit',e=>{if(e.target.id==='authForm'){e.preventDefault();doAuth()}},true);
@@ -2110,7 +2140,7 @@ document.addEventListener('click',async e=>{
   if(id==='fbLoad'){loadFeedback();return}
 });
 (async()=>{
-  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
+  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;SERVER_PLAN=!!cfg.plan;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
   sb.auth.onAuthStateChange((ev,s)=>{SESSION=s;if(ev==='PASSWORD_RECOVERY'){showGate(`<div class="gcard"><h1>Set a new password</h1><form id="pwForm" class="form" style="padding:0"><div class="field"><label class="label" for="np">New password</label><input id="np" type="password" minlength="8" required></div><button class="primary" type="submit">Save password</button></form></div>`)}});
   document.addEventListener('submit',async e=>{if(e.target.id==='pwForm'){e.preventDefault();const {error}=await sb.auth.updateUser({password:$('#np').value});if(error)toast(error.message,4000);else{toast('Password saved');location.hash='';location.reload()}}},true);
