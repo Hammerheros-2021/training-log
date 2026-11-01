@@ -90,3 +90,16 @@ Before they sign up, tell them two things:
 - **Photos** (meals, class boards) are sent to Claude to read and aren't stored.
 - **Changing the app:** edit the files on GitHub and Vercel redeploys automatically within a minute.
 - **If something fails,** the Vercel dashboard's **Logs** tab shows errors from the AI function.
+
+## Keel rebrand (2 November 2026)
+
+The app was rebranded to **Keel** using the Keel Brand Kit: new colours, fonts, logo, app icon, Lucide outline icons instead of emoji, four tabs (Today, Plan, Food, Progress), a plan summary card, and Irish voices for guided sessions.
+
+**To go back to the version before the rebrand:** the code as it was is saved on the GitHub branch `pre-keel` (commit 90cebe4). In Vercel, open the project, go to Deployments, find the deployment of commit 90cebe4 ("Check-in Say/Type, sleeker Recover pages…") and choose **Promote to Production** (or **Instant Rollback**). To make it permanent, merge `pre-keel` back into `main`.
+
+### Irish voices (optional, best quality)
+
+Guided sessions use OpenAI speech with a soft Irish accent by default. For real Irish voices (Emily and Connor), add two environment variables in Vercel from an Azure Speech resource (free tier covers normal use):
+
+- `AZURE_SPEECH_KEY`
+- `AZURE_SPEECH_REGION` (for example `northeurope` or `westeurope`)
