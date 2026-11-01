@@ -384,7 +384,7 @@ function planMealsHTML(k,compact){
 }
 
 // ---------- views ----------
-function foodSub(){return `<div class="subtabs">${[['today','Today'],['plan','Plan'],['kitchen','Kitchen']].map(([v,l])=>`<button type="button" data-fview="${v}" aria-pressed="${fView===v}">${l}${v==='plan'&&planDue()&&kitchen().length?' <i class="due"></i>':''}${v==='kitchen'&&!kitchen().length?' <i class="due"></i>':''}</button>`).join('')}</div>`}
+function foodSub(){return `<div class="subtabs">${[['today','Today'],['plan','Plan'],['kitchen','Food available']].map(([v,l])=>`<button type="button" data-fview="${v}" aria-pressed="${fView===v}">${l}${v==='plan'&&planDue()&&kitchen().length?' <i class="due"></i>':''}${v==='kitchen'&&!kitchen().length?' <i class="due"></i>':''}</button>`).join('')}</div>`}
 function foodHTML(dIso){return foodSub()+(fView==='plan'?planHTML():fView==='kitchen'?kitchenHTML():foodTodayHTML(dIso))}
 function foodTodayHTML(dIso){
   const DD=D(),d=DD[dIso]||{date:dIso,food:[]};const t=foodTotals(d),dt=dayTypeFor(dIso),win=mealWindow(d),fh=fastHours(DD,dIso);
@@ -444,16 +444,16 @@ function planHTML(){
   return head+daysH+(shop.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>Shopping list</h2><div class="sub">Not in your kitchen yet</div></div></div><div class="shop">${shop.map((s,i)=>`<label class="toggle"><input type="checkbox" data-shop="${i}" ${s.got?'checked':''}> <span style="flex:1"><b>${esc(s.name)}</b>${s.qty?` · ${esc(s.qty)}`:''}${s.why?`<br><small style="color:var(--muted)">${esc(s.why)}</small>`:''}</span></label>`).join('')}</div></article>`:'');
 }
 function kitchenHTML(){
-  const items=kitchen();const where=['Fridge','Freezer','Cupboard','Other'];
+  const items=kitchen();const where=KWHERE;
   const grouped=where.map(w=>{const its=items.map((x,i)=>({...x,i})).filter(x=>(where.includes(x.where)?x.where:'Other')===w);if(!its.length)return '';
     return `<div class="mgrp"><div class="mgh"><b>${w}</b><span class="num">${its.length}</span></div>${its.map(x=>`<div class="fitem"><div style="min-width:0"><div class="fn">${esc(x.name)}</div>${x.qty?`<div class="fq">${esc(x.qty)}</div>`:''}</div><span></span><button type="button" class="x" data-del-kit="${x.i}" aria-label="Remove ${esc(x.name)}">×</button></div>`).join('')}</div>`}).join('');
-  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Kitchen</h2><div class="sub">${items.length?`${items.length} items${meta.kitchen&&meta.kitchen.updatedAt?` · updated ${fmtD(new Date(meta.kitchen.updatedAt))}`:''}`:'Empty. Tap or say what you have in.'}</div></div></div>
+  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Food available</h2><div class="sub">${items.length?`${items.length} items${meta.kitchen&&meta.kitchen.updatedAt?` · updated ${fmtD(new Date(meta.kitchen.updatedAt))}`:''}`:'Empty. Tap what you have, or say where you will be eating.'}</div></div></div>
     <div class="form">
-      <div class="hint" style="font-size:13px;color:var(--muted)">Tap what you have in now. Tap again when it runs out.</div>
+      <div class="hint" style="font-size:13px;color:var(--muted)"><b style="color:var(--fg)">At home:</b> tap what you have in, and tap again when it runs out. <b style="color:var(--fg)">Away or eating out:</b> just say where you will be eating, e.g. a hotel buffet or Thai restaurants, and it fills in what is usually there.</div>
       ${staplesHTML(new Set(items.map(x=>x.name.toLowerCase())))}
-      <div class="field"><label class="label" for="k-say">Anything else, or what's used up</label><textarea id="k-say" placeholder="e.g. Just did the shop: dozen eggs, 1 kg Greek yogurt, 4 chicken thighs, 2 ribeyes, salmon fillets, broccoli, spinach, avocados, frozen raspberries. Used the last of the oats." style="min-height:100px">${esc(kState.text)}</textarea>
-      <div class="hint" style="font-size:12px;color:var(--muted)">Say what you bought and what's run out; the list updates either way.</div></div>
-      ${sample?`<div class="actions">${speakBtn('k-say')}<button type="button" class="primary" id="kUpdate" ${kState.busy?'disabled':''}>${kState.busy?'Updating…':'Update kitchen'}</button></div>`:''}
+      <div class="field"><label class="label" for="k-say">Say it in your own words</label><textarea id="k-say" placeholder="e.g. Just did the shop: eggs, Greek yogurt, chicken thighs, salmon, broccoli, spinach. Used the last of the oats. Or: on holidays, two meals a day, a 5-star hotel breakfast buffet in the morning, Thai food in the evening, nothing in between." style="min-height:100px">${esc(kState.text)}</textarea>
+      <div class="hint" style="font-size:12px;color:var(--muted)">Say what you bought or ran out of, or where and how you will be eating. The list and your meal plan settings update from it.</div></div>
+      ${sample?`<div class="actions">${speakBtn('k-say')}<button type="button" class="primary" id="kUpdate" ${kState.busy?'disabled':''}>${kState.busy?'Updating…':'Update'}</button></div>`:''}
       ${items.length?`<button type="button" class="ghost" data-fview="plan" style="color:var(--fg)">Plan my next 3 days from this ›</button>`:''}
       ${kState.msg?`<div class="hsum" role="status">${esc(kState.msg)}</div>`:''}
     </div>${grouped?`<div class="meals" style="border-top:1px solid var(--line);padding-top:6px">${grouped}</div>`:''}</article>`;
@@ -500,15 +500,10 @@ async function parseFoodPhoto(file){
   render();
 }
 async function updateKitchen(){
-  const ta=$('#k-say');const text=(ta&&ta.value||'').trim();kState.text=text;if(!text){toast('Say what you have in first');return}
-  kState.busy=true;kState.msg='Updating your kitchen…';render();
-  try{const out=await sample.json(`Here is the current kitchen stock list as JSON: ${JSON.stringify(kitchen().map(x=>({name:x.name,qty:x.qty,where:x.where})))}
-The person just said: """${text.slice(0,4000)}"""
-Update the list: add what was bought, reduce or remove what was used or has run out, keep everything else. Put each item in "Fridge", "Freezer", "Cupboard" or "Other". Keep names short and generic (e.g. "Chicken thighs"), quantities as said ("4", "1 kg", "half a bag").
-Reply with ONLY JSON: {"items":[{"name":"","qty":"","where":"Fridge"}],"summary":"one short line of what changed"}`,{modelTier:'quick'});
-    const items=(Array.isArray(out&&out.items)?out.items:[]).filter(x=>x&&x.name).map(x=>({name:String(x.name).slice(0,50),qty:String(x.qty||'').slice(0,30),where:['Fridge','Freezer','Cupboard','Other'].includes(x.where)?x.where:'Other'}));
-    await persistMeta('kitchen',{items,updatedAt:new Date().toISOString()});
-    kState={busy:false,text:'',msg:(out&&out.summary?String(out.summary).slice(0,160)+'. ':'')+`${items.length} items in stock.`};toast('Kitchen updated');
+  const ta=$('#k-say');const text=(ta&&ta.value||'').trim();kState.text=text;if(!text){toast('Say what food you have, or where you will be eating');return}
+  kState.busy=true;kState.msg='Updating your food list…';render();
+  try{const out=await sample.json(kitchenPrompt(kitchen(),text));const r=await applyKitchenOut(out);
+    kState={busy:false,text:r.items.length?'':text,msg:r.msg};toast(r.items.length?'Food list updated':'Nothing added');
   }catch(e){kState={...kState,busy:false,msg:foodErr(e)}}
   render();
 }
@@ -788,7 +783,7 @@ Map plain words to scales: "slept badly" sleepQ 2, "wrecked" energy 1, "flying" 
 "session": only if he talks about the planned session: {"status":"done"|"partial"|"missed","dur":min,"rpe":1-10,"tb":${KEYLIFTS[0]||'main lift'} top set kg,"ss":${KEYLIFTS[1]||'second lift'} kg,"pace":"m:ss" average threshold rep pace per km,"fivek":"mm:ss","swap":true if he did a Hyrox class instead of the Friday threshold run,"notes":"short"}
 "food": only if he mentions eating or drinking: {"items":[{"name","qty","meal":"Breakfast"|"Lunch"|"Dinner"|"Snack","at":"HH:MM" or null, ${NUT_JSON}}]}. Irish portions for him unless stated; cooked weights; NET carbs. Coffees and teas are items (almond cappuccino about 44 kcal, 4 g net carbs, 125 mg caffeine; tea about 45 mg caffeine). If a meal matches one of the guide recipes use its figures: ${LIB.map(x=>`${x[0]}: ${x[2]} kcal ${x[3]}p ${x[4]}f ${x[5]}c ${x[6]} fibre`).join('; ')}.
 "water": litres of water if said, else null.
-"kitchen": only if he mentions buying, having or running out of food: {"items":[the full updated stock list, each {"name","qty","where":"Fridge"|"Freezer"|"Cupboard"|"Other"}]}, else null.
+"kitchen": only if he mentions buying, having or running out of food, or describes where he will be eating (hotel buffet, restaurants, shop, work): {"items":[the full updated list, each {"name","qty","where":"Fridge"|"Freezer"|"Cupboard"|"Hotel / buffet"|"Restaurant"|"Shop"|"Work"|"Other"}]}, adding the foods realistically available at any place he describes; else null.
 "eating": if they describe how they will eat over the coming days (where they will be, how many times a day, what they can get): {"style":"home"|"mixed"|"away","meals":2|3|4 or null,"note":"their description in a sentence or two"}, else null.
 "plan": if he asks for his meals to be planned, a short line of anything to work around (or ""), else null.
 "summary": one short line of what you filled in.
@@ -819,7 +814,7 @@ async function applyVoice(out){
   const fi=out.food&&Array.isArray(out.food.items)?cleanItems(out.food.items,guessMeal(),true,'voice'):[];
   if(fi.length){await addFood(fi,k);done.push(`${fi.length} food item${fi.length>1?'s':''}`)}
   if(isNum(out.water)&&+out.water>0){await persistDay(k,{water:+out.water});done.push('water')}
-  if(out.kitchen&&Array.isArray(out.kitchen.items)){const items=out.kitchen.items.filter(x=>x&&x.name).map(x=>({name:String(x.name).slice(0,50),qty:String(x.qty||'').slice(0,30),where:['Fridge','Freezer','Cupboard','Other'].includes(x.where)?x.where:'Other'}));await persistMeta('kitchen',{items,updatedAt:new Date().toISOString()});done.push('kitchen')}
+  if(out.kitchen&&Array.isArray(out.kitchen.items)){const items=out.kitchen.items.filter(x=>x&&x.name).map(x=>({name:String(x.name).slice(0,50),qty:String(x.qty||'').slice(0,30),where:kwOf(x.where)}));await persistMeta('kitchen',{items,updatedAt:new Date().toISOString()});done.push('kitchen')}
   const ea=out.eating;if(ea&&typeof ea==='object'){const st=Object.assign({},meta.settings||{});if(['home','mixed','away'].includes(ea.style))st.eatStyle=ea.style;if([2,3,4].includes(+ea.meals))st.meals=String(+ea.meals);if(ea.note)st.eatNote=String(ea.note).slice(0,800);await persistMeta('settings',st);done.push('how you eat')}
   return done;
 }
@@ -1000,6 +995,24 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(x=c('[data-eset]')){const t=$('#p-req');if(t)pState.req=t.value;persistMeta('settings',Object.assign({},meta.settings||{},{[x.dataset.eset]:x.dataset.v})).then(()=>render());return}
 });
 document.addEventListener('input',e=>{if(e.target.id==='x-say')xState.text=e.target.value;if(e.target.id==='p-req')pState.req=e.target.value});
+// ---- food available: home stock or where they'll be eating ----
+const KWHERE=['Fridge','Freezer','Cupboard','Hotel / buffet','Restaurant','Shop','Work','Other'];
+const kwOf=w=>KWHERE.includes(w)?w:/buffet|hotel/i.test(w||'')?'Hotel / buffet':/restaurant|café|cafe|out/i.test(w||'')?'Restaurant':/shop|store|market/i.test(w||'')?'Shop':/work|canteen/i.test(w||'')?'Work':'Other';
+function kitchenPrompt(cur,text){return `A meal-planning app keeps a list of the food a person can get. Here is the current list as JSON: ${JSON.stringify(cur.map(x=>({name:x.name,qty:x.qty,where:x.where})))}
+The person just said, in their own words: """${text.slice(0,4000)}"""
+They may be listing food at home (bought, used up, run out), OR describing where they will be eating instead (on holiday, a hotel breakfast buffet, eating out, a work canteen, a shop near work, travelling). Handle both:
+- Home food: add what was bought, reduce or remove what was used or has run out, and keep everything else. "where" is "Fridge", "Freezer" or "Cupboard".
+- Eating away: add the foods realistically available there, using your general knowledge, as items with "where" set to "Hotel / buffet", "Restaurant", "Shop" or "Work". For example, a good hotel breakfast buffet usually has eggs cooked to order, omelettes, bacon, sausages, smoked salmon, cold meats, cheese, Greek yogurt, fresh fruit, oats or muesli, nuts and seeds, breads, pastries and fresh juice. Thai restaurants usually have grilled chicken or pork, fish, stir-fries, curries, jasmine or sticky rice, som tam (papaya salad), tom yum soup, fresh fruit and coconut water. Give 8-15 items for each place they describe; qty is "".
+- When they describe eating away, remove nothing from the home list unless they say it's gone.
+Also capture how they will eat if they say it: "eating": {"style":"home"|"mixed"|"away","meals":2|3|4 or null,"note":"one or two sentences in plain words: where and when they eat, and any long gaps"}, else null.
+Keep names short and generic. Reply with ONLY JSON: {"items":[{"name":"","qty":"","where":"Fridge"}],"eating":null,"summary":"one short line of what changed"}`}
+async function applyKitchenOut(out,prevN){
+  const items=(Array.isArray(out&&out.items)?out.items:[]).filter(x=>x&&x.name).map(x=>({name:String(x.name).slice(0,50),qty:String(x.qty||'').slice(0,30),where:kwOf(x.where)}));
+  const ea=out&&out.eating;let eat=false;
+  if(ea&&typeof ea==='object'){const st=Object.assign({},meta.settings||{});if(['home','mixed','away'].includes(ea.style))st.eatStyle=ea.style;if([2,3,4].includes(+ea.meals))st.meals=String(+ea.meals);if(ea.note)st.eatNote=String(ea.note).slice(0,800);await persistMeta('settings',st);eat=true}
+  if(items.length)await persistMeta('kitchen',{items,updatedAt:new Date().toISOString()});
+  return {items,eat,msg:(out&&out.summary?String(out.summary).slice(0,180)+'. ':'')+(items.length?`${items.length} items on your list.`:'Nothing was added. Try naming the foods, or say where you will be eating.')+(eat?' Your meal plan settings were updated too.':'')};
+}
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -1921,10 +1934,10 @@ async function toggleStaple(n){
 let kSetup={sel:[],text:'',busy:false,msg:''};
 function kitchenSetupHTML(){
   return `<div class="gcard wide"><div class="obprog">${OB_STEPS.concat(['Kitchen']).map((x,i)=>`<span class="${i<6?'done':'cur'}">${x}</span>`).join('')}</div>
-    <div class="gbrand">Last step</div><h1>What's in your kitchen?</h1>
+    <div class="gbrand">Last step</div><h1>What food can you get?</h1>
     <p class="gsub">Your meal plans are built from food you actually have. Tap what's in now, and add anything else by voice or typing. Update it after each shop.</p>
     ${staplesHTML(new Set(kSetup.sel.map(x=>x.toLowerCase())))}
-    <div class="field"><label class="label" for="ks-say">Anything else?</label><textarea id="ks-say" placeholder="e.g. 2 packs of chicken, a bag of frozen peas, half a block of feta, the last of the rice, a dozen eggs">${esc(kSetup.text)}</textarea></div>
+    <div class="field"><label class="label" for="ks-say">Anything else?</label><textarea id="ks-say" placeholder="e.g. 2 packs of chicken, frozen peas, feta, rice, a dozen eggs. Or if you don't cook much: lunch from the Centra beside work, dinner at home.">${esc(kSetup.text)}</textarea></div>
     <div class="actions">${speakBtn('ks-say')}</div>
     <button type="button" class="primary" id="ksDone" ${kSetup.busy?'disabled':''}>${kSetup.busy?'Saving your kitchen…':`Save and plan my first 3 days${kSetup.sel.length?` (${kSetup.sel.length} items)`:''}`}</button>
     ${kSetup.msg?`<div class="hsum" role="status">${esc(kSetup.msg)}</div>`:''}
@@ -1935,11 +1948,7 @@ async function kitchenSetupDone(){
   if(!kSetup.sel.length&&!kSetup.text){toast('Tap a few things you have in, or say them');return}
   kSetup.busy=true;showGate(kitchenSetupHTML());
   let items=kSetup.sel.map(n=>({name:n,qty:'',where:whereOf(n)}));
-  if(kSetup.text&&sample){try{const out=await sample.json(`Kitchen stock so far: ${JSON.stringify(items)}
-The person also said: """${kSetup.text.slice(0,3000)}"""
-Add what they said to the list (merge duplicates). Put each item in "Fridge", "Freezer", "Cupboard" or "Other". Keep names short and generic, quantities as said.
-Reply with ONLY JSON: {"items":[{"name":"","qty":"","where":"Fridge"}]}`);
-    const got=(Array.isArray(out&&out.items)?out.items:[]).filter(x=>x&&x.name).map(x=>({name:String(x.name).slice(0,50),qty:String(x.qty||'').slice(0,30),where:['Fridge','Freezer','Cupboard','Other'].includes(x.where)?x.where:'Other'}));if(got.length)items=got}catch(e){}}
+  if(kSetup.text&&sample){try{const out=await sample.json(kitchenPrompt(items,kSetup.text));const r=await applyKitchenOut(out);if(r.items.length)items=r.items}catch(e){}}
   await persistMeta('kitchen',{items,updatedAt:new Date().toISOString()});
   kSetup={sel:[],text:'',busy:false,msg:''};
   await enterApp();fView='plan';location.hash='food';render();if(sample)buildPlan('');
