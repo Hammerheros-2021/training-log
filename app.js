@@ -159,7 +159,7 @@ function readAll(){
 }
 
 // ================= daily check-in =================
-const CHECKIN_KEYS=['bed','wake','screenOff','sleepQ','energy','mood','stress','sore','niggles','rhr','weight','flags','notes'];
+const CHECKIN_KEYS=['bed','wake','screenOff','sleepQ','energy','mood','stress','sore','niggles','rhr','weight','flags','notes','trainIntent','trainTime'];
 const FOOD_KEYS=['food','diary','water','lastCaffeine','firstMeal','lastMeal','dayType','trainTime'];
 function blankDay(dIso){const x=D()[dIso];const b={date:dIso,niggles:[],habits:[],flags:[],extras:[],food:[]};return x?Object.assign(b,clone(x)):b}
 const pick=(o,keys)=>{const r={};keys.forEach(k=>{if(o[k]!==undefined)r[k]=o[k]});return r};
@@ -187,7 +187,7 @@ function checkinSummary(saved){
   if(isNum(saved.rhr))m.push(`Pulse <b>${saved.rhr}</b>`);
   const need=sleepNeed(saved.date),debt=sleepDebt(saved.date);if(need)m.push(`Sleep need <b>${need} h</b>${debt>0.2?` · debt <b style="color:${debt>=3?'var(--bad)':'var(--warn)'}">${debt} h</b> this week`:''}`);
   (saved.niggles||[]).forEach(n=>m.push(`<span style="color:${+n.pain>=5?'var(--bad)':+n.pain>=3?'var(--warn)':'inherit'}">${esc(n.side&&n.side!=='Both'?n.side+' ':'')}${esc(n.area)} <b>${n.pain}/10</b></span>`));
-  (saved.flags||[]).forEach(f=>m.push(`<span style="color:var(--bad)">${esc(f)}</span>`));
+  (saved.flags||[]).forEach(f=>m.push(`<span style="color:var(--bad)">${esc(f)}</span>`));if(intentChip(saved))m.push(`<b>${intentChip(saved)}</b>`);
   const stn=strain(prevKey(saved.date));if(stn!=null)dd.push(`Strain <b>${stn}</b> / 21`);
   if(wp.manual&&isNum(y.farm))dd.push(`Manual labour <b>${FARM[y.farm]}</b>${isNum(y.farmHrs)?` · ${y.farmHrs} h`:''}`);
   if(wp.desk&&isNum(y.deskHrs))dd.push(`Desk <b>${y.deskHrs} h</b>`);
@@ -231,7 +231,7 @@ function checkinHTML(dIso){
   const miss=f.date===iso(todayDate())?[!f.bed&&'bed time',!f.wake&&'wake time',!isNum(f.sleepQ)&&'sleep quality',!isNum(f.energy)&&'energy',!isNum(f.mood)&&'mood',!isNum(f.stress)&&'stress',!isNum(f.sore)&&'soreness'].filter(Boolean):[];
   const workRows=[wp.manual?`<div class="field"><span class="label">Manual labour</span>${seg('y','farm',[0,1,2,3,4],y.farm,FARM,'small')}</div>`:'',
     `<div class="row2">${wp.manual?num('y-fh','Manual labour (h)','y.farmHrs',0.5,y.farmHrs):''}${wp.desk?num('y-desk','Desk / office (h)','y.deskHrs',0.5,y.deskHrs):''}${wp.car?num('y-car','Driving (h)','y.carHrs',0.5,y.carHrs):''}${wp.family?num('y-fam','Quality time with family (h)','y.familyHrs',0.5,y.familyHrs):''}${num('y-steps','Steps','y.steps',100,y.steps,'numeric')}</div>`].join('');
-  return `${ciDictbar()}<article class="card"><div class="chead"><div style="flex:1"><h2>Morning check-in</h2><div class="sub">About last night, this morning, and yesterday's day. Ratings are 1 to 5.</div></div></div>
+  return `${ciDictbar()}${dIso===iso(todayDate())?intentHTML(dIso,f):''}<article class="card"><div class="chead"><div style="flex:1"><h2>Morning check-in</h2><div class="sub">About last night, this morning, and yesterday's day. Ratings are 1 to 5.</div></div></div>
   <form class="form" id="dayForm" autocomplete="off">
     ${miss.length&&miss.length<7?`<div class="alert amber">Still to answer: ${miss.join(', ')}.</div>`:''}
     <div class="group"><h4><span class="qn">1</span>Last night</h4>
@@ -262,6 +262,7 @@ function checkinFields(c,curD,curY){
   const d={},y={};if(!c||typeof c!=='object')return {d,y};
   ['bed','wake','screenOff'].forEach(x=>{if(tmin(c[x])!=null)d[x]=fmtT(tmin(c[x]))});
   const sc=(o,x,lo,hi)=>{if(isNum(c[x]))o[x]=Math.max(lo,Math.min(hi,Math.round(+c[x])))};['sleepQ','energy','mood','stress','sore'].forEach(x=>sc(d,x,1,5));sc(y,'farm',0,4);
+  if(['yes','no','extra'].includes(c.trainIntent))d.trainIntent=c.trainIntent;if(tmin(c.trainTime)!=null)d.trainTime=fmtT(tmin(c.trainTime));
   ['rhr','weight'].forEach(x=>{if(isNum(c[x])&&+c[x]>0)d[x]=+c[x]});
   ['farmHrs','deskHrs','carHrs','familyHrs','steps'].forEach(x=>{if(isNum(c[x])&&+c[x]>=0)y[x]=+c[x]});
   if(Array.isArray(c.habits)&&c.habits.length)y.habits=[...new Set((curY.habits||[]).concat(c.habits.filter(h=>HABITS.includes(h))))];
@@ -341,7 +342,7 @@ let fState={busy:false,msg:'',meal:null,text:null,manual:false};
 let fView='today', pState={busy:false,msg:'',req:''}, kState={busy:false,msg:'',text:''};
 
 // ---------- targets ----------
-function dayTypeFor(k){const d=D()[k];if(d&&DAYT[d.dayType])return d.dayType;const p=planFor(parse(k));return p&&p.type!=='R'?'training':'rest'}
+function dayTypeFor(k){const d=D()[k];if(d&&DAYT[d.dayType])return d.dayType;return dayTypeAuto(k)}
 function trainTimeFor(k){const d=D()[k];return (d&&d.trainTime)||(meta.settings&&meta.settings.trainTime)||(PROFILE&&PROFILE.plan&&PROFILE.plan.trainTime)||'06:30'}
 function nutTarget(k,dt){const T=DAYT[dt];const n=NUTS.find(x=>x.k===k);
   if(k==='kcal')return {lo:Math.round(T.kcal*.95),hi:Math.round(T.kcal*1.05),t:T.kcal,txt:`${T.kcal}`};
@@ -404,7 +405,7 @@ function foodTodayHTML(dIso){
     <details class="wu" style="margin:0 16px 10px"><summary>Vitamins &amp; minerals · ${t.n?`${microOk} of ${micros.length} on target`:'none logged'}</summary><div class="macs" style="padding:4px 0 12px">${micros.map(n=>nutBar(n,t[n.k],nutTarget(n.k,dt))).join('')}${t.n&&t.microN<t.n?`<div class="hint" style="font-size:12px;color:var(--muted)">${t.n-t.microN} item${t.n-t.microN>1?'s have':' has'} macros only, so these may read low.</div>`:''}</div></details>
     <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants this week${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
   </article>
-  ${planVsHTML(dIso)}${pd?`<article class="card"><div class="chead"><div style="flex:1"><h2>${dIso===iso(todayDate())?'Your plan for today':'Your plan for this day'}</h2><div class="sub">${esc(pd.note||'Tap Ate this as you go. Changes go in the diary.')}</div></div></div>${planMealsHTML(dIso)}</article>`:''}
+  ${planMismatch(dIso)}${planVsHTML(dIso)}${pd?`<article class="card"><div class="chead"><div style="flex:1"><h2>${dIso===iso(todayDate())?'Your plan for today':'Your plan for this day'}</h2><div class="sub">${esc(pd.note||'Tap Ate this as you go. Changes go in the diary.')}</div></div></div>${planMealsHTML(dIso)}</article>`:''}
   <article class="card"><div class="form">
       <h3>Food diary</h3>
       ${ai?`<div class="field"><label class="label" for="f-say">Say it in your own words, any time of day</label><textarea id="f-say" placeholder="e.g. Coffee and SIS tab before training. Porridge with whey after at 8. Chicken salad bowl at 1. Cappuccino at 3. Ribeye and mushrooms at 7, 2 brownies after." style="min-height:110px">${esc(diaryText)}</textarea>
@@ -691,7 +692,7 @@ function viewTraining(){
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
   const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food available and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
-  return dayHeader()+pre+adjBanner(pl)+(pl?sessionHTML(sel,pl):none)+moveHTML(pl)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
+  return dayHeader()+pre+adjBanner(pl)+intentNudge(key)+(pl?sessionHTML(sel,pl):none)+moveHTML(pl)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
 }
 function viewTrainingTab(){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Full 16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${tView===v}">${l}</button>`).join('')}</div>`+(tView==='plan'?viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+checkinHTML(iso(sel))}
@@ -812,7 +813,7 @@ function voicePrompt(text,ci){
 Planned training session that day: ${pl&&pl.type!=='R'&&!pl.pre?(pl.type==='T'&&!THRMIN[pl.wk-1]?'5 km time trial':TNAME[pl.type]):'none'}.
 Kitchen stock now: ${kitchen().map(x=>x.name+(x.qty?` (${x.qty})`:'')).join(', ')||'empty'}.
 Fields:
-"checkin": {"bed":"HH:MM","wake":"HH:MM","screenOff":"HH:MM" (when he stopped looking at screens before bed),"sleepQ":1-5,"energy":1-5,"mood":1-5,"stress":1-5 (5 = very stressed),"sore":1-5 (5 = very sore),"rhr":morning pulse bpm,"weight":kg,"farm":0-4 (0 none, 1 light, 2 moderate, 3 heavy, 4 very heavy ${WORK.toLowerCase()}),"farmHrs":h,"deskHrs":h office/desk,"carHrs":h driving,"familyHrs":h quality time with wife and kids,"steps":n,"habits":subset of ${JSON.stringify(HABITS)},"flags":subset of ${JSON.stringify(FLAGS)},"niggles":[{"area":one of ${JSON.stringify(AREAS)},"side":"Left"|"Right"|"Both","pain":0-10,"note":"cause if said"}],"extras":[{"kind":one of ${JSON.stringify(EXTRA_KINDS)},"dur":min,"rpe":1-10}] for training other than the planned session,"notes":"anything else worth keeping, short","workDay":"yesterday" or "today": which day the work hours, family time, steps, habits and other training refer to (in a morning check-in they are almost always yesterday)}
+"checkin": {"bed":"HH:MM","wake":"HH:MM","screenOff":"HH:MM" (when he stopped looking at screens before bed),"sleepQ":1-5,"energy":1-5,"mood":1-5,"stress":1-5 (5 = very stressed),"sore":1-5 (5 = very sore),"rhr":morning pulse bpm,"weight":kg,"farm":0-4 (0 none, 1 light, 2 moderate, 3 heavy, 4 very heavy ${WORK.toLowerCase()}),"farmHrs":h,"deskHrs":h office/desk,"carHrs":h driving,"familyHrs":h quality time with wife and kids,"steps":n,"habits":subset of ${JSON.stringify(HABITS)},"flags":subset of ${JSON.stringify(FLAGS)},"niggles":[{"area":one of ${JSON.stringify(AREAS)},"side":"Left"|"Right"|"Both","pain":0-10,"note":"cause if said"}],"extras":[{"kind":one of ${JSON.stringify(EXTRA_KINDS)},"dur":min,"rpe":1-10}] for training other than the planned session,"trainIntent":"yes" if they say they will do today's planned session, "no" if they won't train today, "extra" if no session is planned but they will train anyway,"trainTime":"HH:MM" roughly when they will train today,"notes":"anything else worth keeping, short","workDay":"yesterday" or "today": which day the work hours, family time, steps, habits and other training refer to (in a morning check-in they are almost always yesterday)}
 Map plain words to scales: "slept badly" sleepQ 2, "wrecked" energy 1, "flying" energy 5, "half eleven" 23:30.
 "session": only if he talks about the planned session: {"status":"done"|"partial"|"missed","dur":min,"rpe":1-10,"tb":${KEYLIFTS[0]||'main lift'} top set kg,"ss":${KEYLIFTS[1]||'second lift'} kg,"pace":"m:ss" average threshold rep pace per km,"fivek":"mm:ss","swap":true if he did a Hyrox class instead of the Friday threshold run,"notes":"short"}
 "food": only if he mentions eating or drinking: {"items":[{"name","qty","meal":"Breakfast"|"Lunch"|"Dinner"|"Snack","at":"HH:MM" or null, ${NUT_JSON}}]}. Irish portions for him unless stated; cooked weights; NET carbs. Coffees and teas are items (almond cappuccino about 44 kcal, 4 g net carbs, 125 mg caffeine; tea about 45 mg caffeine). If a meal matches one of the guide recipes use its figures: ${LIB.map(x=>`${x[0]}: ${x[2]} kcal ${x[3]}p ${x[4]}f ${x[5]}c ${x[6]} fibre`).join('; ')}.
@@ -900,7 +901,8 @@ async function addExtra(){
     if(!items.length){xState={...xState,busy:false,msg:"Couldn't pick out a session. Say what you did and for roughly how long."};render();return}
     const cur=(days[k]&&days[k].extras)||[];await persistDay(k,{extras:cur.concat(items)});
     const applied=await applyAdjust(adjust,'extra');
-    xState={...xState,open:false,text:'',busy:false,msg:'',last:{date:k,summary:summary||`Logged ${items.map(x=>x.desc||x.kind).join(', ')}.`,applied}};dDraft=null;toast('Session added');
+    if(k===iso(todayDate())&&!(days[k]&&days[k].dayType))toast('Session added. Food targets now count today as a training day.',3500);
+    xState={...xState,open:false,text:'',busy:false,msg:'',last:{date:k,summary:summary||`Logged ${items.map(x=>x.desc||x.kind).join(', ')}.`,applied}};dDraft=null;if(!(k===iso(todayDate())&&!(days[k]&&days[k].dayType)))toast('Session added');
   }catch(e){xState={...xState,busy:false,msg:foodErr(e)}}
   render();
 }
@@ -1056,7 +1058,7 @@ function dayTodo(){
   if(sampleMode)return null;const t=todayDate(),k=iso(t),d=D()[k]||{},pl=planFor(t),pd=planDay(k),due=planDue(),lg=L()[k];
   const pm=pd?(pd.meals||[]).map((m,ix)=>({m,ix})).filter(x=>!/fasted|drink/i.test(x.m.slot||'')):[];const ticked=pm.filter(x=>planLogged(k,x.ix)).length;
   const items=[['Morning check-in',ciDone(d),'How you slept, how you feel, yesterday\'s work','href="#checkin" data-dtab']];
-  if(pl&&pl.type!=='R'&&!pl.pre)items.push([`Log today's session: ${TNAME[pl.type]}`,!!(lg&&lg.status),'Done, partly done or missed. Anything extra goes in Training too.','href="#training" data-dtab']);
+  if(pl&&pl.type!=='R'&&!pl.pre)items.push([`Log today's session: ${TNAME[pl.type]}`,!!(lg&&lg.status)||d.trainIntent==='no','Done, partly done or missed. Anything extra goes in Training too.','href="#training" data-dtab']);
   if(!kitchen().length)items.push(['Add your food available',false,'What you have at home, or where you\'ll be eating','data-fview="kitchen"']);
   else if(due)items.push(['Plan your next 3 days of meals',false,'Check your food available is up to date first','data-fview="plan"']);
   items.push(['Log today\'s food',!!d.foodDone,pm.length?`${ticked} of ${pm.length} planned meals ticked off. Tap "That's everything" at the end of the day.`:'Log what you eat, then tap "That\'s everything" at the end of the day.','data-fview="today"']);
@@ -1106,6 +1108,36 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(c('#foodDoneBtn')){const k=iso(sel);persistDay(k,{foodDone:true}).then(()=>{toast('Food logged for the day');render();stepDone()});return}
   if(c('#foodUndone')){persistDay(iso(sel),{foodDone:false}).then(()=>render());return}
 });
+
+// ================= today's training intent → food targets follow what you actually do =================
+function dayTypeAuto(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));const planned=!!(p&&p.type!=='R'&&!p.pre);
+  const ex=(d.extras||[]).filter(x=>x&&(x.dur||x.rpe||x.desc));
+  if(ex.some(x=>x.kind==='Match'))return 'match';
+  if(l&&(l.status==='done'||l.status==='partial'))return 'training';
+  if(ex.length)return 'training';
+  if(d.trainIntent==='no'||(l&&l.status==='missed'))return 'rest';
+  if(d.trainIntent==='yes'||d.trainIntent==='extra')return 'training';
+  return planned?'training':'rest'}
+function dayTypeWhy(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));if(d.dayType)return 'set by you';
+  if((d.extras||[]).length)return 'you logged extra training';if(l&&l.status)return l.status==='missed'?'session marked missed':'session logged';
+  if(d.trainIntent==='no')return 'not training today';if(d.trainIntent==='extra')return 'training today';return p&&p.type!=='R'&&!p.pre?'from your plan':'no session planned'}
+function intentHTML(k,f){
+  const p=planFor(parse(k));const planned=!!(p&&p.type!=='R'&&!p.pre);const cur=f.trainIntent||null;
+  const opts=planned?[['yes',`Yes, as planned`],['no','Not today']]:[['no','No, rest day'],['extra','Yes, something']];
+  return `<article class="card"><div class="form"><div class="group" style="padding-top:0"><h4>Training today${planned?`: ${esc(TNAME[p.type])}`:''}</h4>
+    <div class="hint" style="font-size:12.5px;color:var(--muted)">${planned?'Are you doing it today? Your food targets follow your answer.':'No session planned. Are you training anyway? Your food targets follow your answer.'}</div>
+    <div class="seg">${opts.map(([v,l])=>`<button type="button" data-form="d" data-seg="trainIntent" data-v="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>
+    ${cur&&cur!=='no'?`<div class="field" style="max-width:200px"><label class="label" for="ci-tt">Roughly when?</label><input id="ci-tt" type="time" value="${esc(f.trainTime||trainTimeFor(k))}" data-bind="d.trainTime"></div>`:''}
+    ${cur==='no'&&planned?`<div class="hint" style="font-size:12.5px;color:var(--muted)">Want to do it another day instead? Use <b>Move this session</b> in Training.</div>`:''}</div></div></article>`}
+function intentChip(d){const k=d.date,p=planFor(parse(k));const planned=!!(p&&p.type!=='R'&&!p.pre);const t=d.trainIntent;
+  if(!t)return '';return t==='no'?(planned?'Skipping today\'s session':'Rest day'):`Training today${d.trainTime?` · ${esc(d.trainTime)}`:''}`}
+async function setIntent(v){const k=iso(sel);await persistDay(k,{trainIntent:v});dDraft=null;toast(v==='no'?'Got it. Food targets switched to a rest day.':'Got it. Food targets switched to a training day.',3500);render()}
+function intentNudge(k){if(k!==iso(todayDate())||sampleMode)return '';const d=D()[k]||{},l=L()[k],p=planFor(parse(k));if(!p||p.type==='R'||p.pre||l||d.trainIntent==='no')return '';
+  const t=tmin(d.trainTime||trainTimeFor(k)),now=new Date().getHours()*60+new Date().getMinutes();if(t==null||now<t+120)return '';
+  return `<div class="adjb"><div><b>Did today's session happen?</b><br><span>Log it below, or tell the app you're skipping it so your food targets drop to a rest day.</span></div><button type="button" class="ghost" data-intent="no">Skipping it</button></div>`}
+function planMismatch(k){const pd=planDay(k);if(!pd)return '';const now=dayTypeFor(k);if(!DAYT[pd.dayType]||pd.dayType===now)return '';
+  return `<div class="adjb"><div><b>Today changed to a ${esc(DAYT[now].label.toLowerCase())}</b><br><span>Your targets above have switched (${esc(dayTypeWhy(k))}). The meal plan was made for a ${esc(DAYT[pd.dayType].label.toLowerCase())}; follow it loosely or re-plan.</span></div><button type="button" class="ghost" data-fview="plan">Re-plan</button></div>`}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-intent]');if(b){setIntent(b.dataset.intent)}});
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
