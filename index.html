@@ -422,6 +422,20 @@ input[type=time]{width:100%;background:var(--sunk);border:1px solid var(--line);
 .popts>span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:2px}
 .popt{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line)}.popts>span+.popt{border-top:0}
 .popt em{font-style:normal;font-size:11px;color:var(--accent);font-weight:600}.popt small{color:var(--muted)}.popt .ate{flex:none}
+
+.todo{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.todo h3{font-size:20px;text-transform:uppercase}
+.todo .step{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;text-align:left;background:var(--sunk);border:1px solid transparent;border-radius:10px;padding:10px 12px;color:var(--fg);text-decoration:none;width:100%;font:inherit}
+.todo .sn,.alldone .sn{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--bg);font-family:var(--display);font-weight:700;color:var(--muted);flex:none}
+.todo .st b{display:block;font-size:14.5px}.todo .st small{font-size:12px;color:var(--muted)}
+.todo .step.next{border-color:var(--accent)}.todo .step.next .sn{background:var(--accent);color:var(--on-accent)}
+.todo .step.ok{opacity:.6}.todo .step.ok .sn{background:var(--ok);color:var(--on-accent)}.todo .step.ok b{text-decoration:line-through}
+.todo.alldone{order:90;flex-direction:row;align-items:center;gap:12px;border-top-color:var(--ok)}.alldone .sn{background:var(--ok);color:var(--on-accent)}.alldone b{display:block}.alldone small{font-size:12px;color:var(--muted)}
+.setup.later{order:91}
+.plantop{display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:10px 12px}
+.plantop b{display:block;font-family:var(--display);font-size:18px;text-transform:uppercase}.plantop small{font-size:12px;color:var(--muted)}.plantop .ghost{flex:none;color:var(--fg)}
+.donebar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:color-mix(in srgb,var(--ok) 14%,transparent);border:1px solid var(--ok);border-radius:12px;padding:10px 14px;font-weight:600}
+.form.logged{padding:12px 16px}.lgrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lgrow .ds{flex:1;min-width:0}
 </style>
 </head>
 <body>
