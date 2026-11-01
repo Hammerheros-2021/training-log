@@ -460,6 +460,13 @@ body{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
 .todolist .sn{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--bg);font-family:var(--display);font-weight:700;color:var(--muted)}
 .todolist .st b{display:block;font-size:14px}.todolist .st small{font-size:12px;color:var(--muted)}
 .todolist .step.ok{opacity:.6}.todolist .step.ok .sn{background:var(--ok);color:var(--on-accent)}.todolist .step.ok b{text-decoration:line-through}
+
+.hgrid{grid-template-columns:auto minmax(0,1fr) auto}.hc{grid-template-columns:repeat(28,minmax(0,1fr))}.hc i{min-width:0}
+html,body{overflow-x:clip}
+
+.dtop{gap:8px}.dtop>div:first-child{min-width:0}.dtop b{font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dtop small{font-size:12px}
+.dtop #sampleBtn{padding:4px 9px!important;font-size:12px}
+.dtop+.prog{height:4px;margin-top:-6px}
 </style>
 </head>
 <body>
