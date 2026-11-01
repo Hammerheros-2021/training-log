@@ -231,7 +231,7 @@ function checkinHTML(dIso){
   const miss=f.date===iso(todayDate())?[!f.bed&&'bed time',!f.wake&&'wake time',!isNum(f.sleepQ)&&'sleep quality',!isNum(f.energy)&&'energy',!isNum(f.mood)&&'mood',!isNum(f.stress)&&'stress',!isNum(f.sore)&&'soreness'].filter(Boolean):[];
   const workRows=[wp.manual?`<div class="field"><span class="label">Manual labour</span>${seg('y','farm',[0,1,2,3,4],y.farm,FARM,'small')}</div>`:'',
     `<div class="row2">${wp.manual?num('y-fh','Manual labour (h)','y.farmHrs',0.5,y.farmHrs):''}${wp.desk?num('y-desk','Desk / office (h)','y.deskHrs',0.5,y.deskHrs):''}${wp.car?num('y-car','Driving (h)','y.carHrs',0.5,y.carHrs):''}${wp.family?num('y-fam','Quality time with family (h)','y.familyHrs',0.5,y.familyHrs):''}${num('y-steps','Steps','y.steps',100,y.steps,'numeric')}</div>`].join('');
-  return `${ciDictbar()}${dIso===iso(todayDate())?intentHTML(dIso,f):''}<article class="card"><div class="chead"><div style="flex:1"><h2>Morning check-in</h2><div class="sub">About last night, this morning, and yesterday's day. Ratings are 1 to 5.</div></div></div>
+  return `${ciActions()}${dIso===iso(todayDate())?intentHTML(dIso,f):''}<article class="card"><div class="chead"><div style="flex:1"><h2>Morning check-in</h2><div class="sub">About last night, this morning, and yesterday's day. Ratings are 1 to 5.</div></div></div>
   <form class="form" id="dayForm" autocomplete="off">
     ${miss.length&&miss.length<7?`<div class="alert amber">Still to answer: ${miss.join(', ')}.</div>`:''}
     <div class="group"><h4><span class="qn">1</span>Last night</h4>
@@ -677,7 +677,7 @@ function viewTraining(){
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
   const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food available and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
-  return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
+  return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+extrasCardHTML(key)+patternHTML()+pill;
 }
 function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 function viewTrainingTab(){return (tView==='today'?dayHeader()+sessChip(iso(sel)):'')+trainSub(tView)+(tView==='plan'?viewPlan():viewTraining())}
@@ -1270,7 +1270,7 @@ function recoveryHTML(k){
   const wk=(()=>{let n=0;for(let i=0;i<7;i++){const x=D()[iso(addD(parse(k),-i))];(x&&x.recovery||[]).forEach(()=>n++)}return n})();
   return `<article class="card"><div class="chead"><div style="flex:1"><h2>Recovery</h2><div class="sub">${list.length?`${list.length} logged ${k===iso(todayDate())?'today':'this day'} · ${wk} this week`:'Walks, swims, sauna, ice baths and anything that helps you recover. Tap to log.'}</div></div></div>
     ${done?`<div class="kchips" style="padding:12px 16px 0">${done}</div>`:''}
-    ${can?`<div class="rgrid">${RECOV.map(([n,ic])=>`<button type="button" data-rpick="${esc(n)}" class="${recS.pick===n?'on':''}"><span aria-hidden="true">${ic}</span>${esc(n)}</button>`).join('')}</div>${mins}`:''}</article>`;
+    ${can?`<div class="rqgrid">${RECOV.map(([n,ic])=>`<button type="button" data-rpick="${esc(n)}" class="${recS.pick===n?'on':''}"><span aria-hidden="true">${ic}</span>${esc(n)}</button>`).join('')}</div>${mins}`:''}</article>`;
 }
 async function logRecovery(min){const k=iso(sel)>iso(todayDate())?iso(todayDate()):iso(sel);const kind=recS.pick;if(!kind)return;const d=D()[k]||{};const R=RECOV.find(x=>x[0]===kind);
   const now=new Date();const list=(d.recovery||[]).concat([{kind,min,at:k===iso(todayDate())?fmtT(now.getHours()*60+now.getMinutes()):''}]);
@@ -1372,8 +1372,8 @@ const PROGS=[
   intro:'Welcome to contrast therapy. You\'ll swap between heat and cold. In the heat, sit back and slow your breathing. In the cold, focus on long slow breaths out, the first thirty seconds are the hardest. I\'ll tell you when to switch. Have your towel and water ready.',
   steps:([r,h])=>{const s=[];for(let i=1;i<=r;i++){s.push({k:'hot',s:h*60,t:`Heat, round ${i} of ${r}`,c:'Sauna or hot tub. Sit back, slow breaths, relax your shoulders.'},{k:'cold',s:120,t:`Cold, round ${i} of ${r}`,c:'Cold plunge, sea or shower. Long, slow breaths out. Up to two minutes.'});if(i<r)s.push({k:'move',s:90,t:'Rest',c:'Sit, let your body warm up naturally, sip some water.'})}return s}},
  {id:'ice',ic:'🧊',name:'Ice bath',cat:'Hot & cold',mind:'Builds calm under pressure',body:'Eases muscle soreness',
-  lens:[['2 min',2],['3 min',3],['5 min',5]],def:1,
-  prep:['Water around 10-15°C. Have a towel and warm clothes beside you.','Someone nearby, every time.','Go in on a slow breath out.'],
+  lens:[['2 min',2],['3 min',3],['5 min',5],['10 min',10]],def:1,
+  prep:['Water temperature: colder means shorter. At 10-15°C you can stay up to 10 minutes; at 3-10°C, 1-5 minutes is plenty. A cheap pool thermometer helps.','Towel and warm clothes beside you.','Someone nearby, every time.','Go in on a slow breath out.'],
   safety:'Never alone. Not after alcohol. Skip if you have a heart condition unless your GP says it\'s fine. Get out if you shiver hard or feel unwell.',
   intro:'Welcome to your ice bath. First, a minute of slow breathing to get ready. When I say, lower yourself in on a long breath out. The gasp in the first thirty seconds is normal and it passes. Stay still and keep your breaths slow and long. I\'ll tell you when it\'s time to get out.',
   steps:v=>[{k:'move',s:60,t:'Get ready',c:'Slow breaths. In through the nose, long breath out through the mouth.'},{k:'cold',s:v*60,t:'In the cold',c:'Breathe out slowly. Stay still. You\'re doing well.'},{k:'move',s:90,t:'Warm up',c:'Out you get. Dry off, layer up and move around to rewarm.'}]},
@@ -1385,22 +1385,9 @@ const PROGS=[
   steps:v=>[{k:'hot',s:v*60,t:'Sauna',c:'Sit back. Slow breaths. Let the heat loosen you.'},{k:'move',s:300,t:'Cool down',c:'Cool shower, sit down, drink some water.'}]}];
 let PL=null,rpTimer=null,rpWake=null;
 function rpGo(i){if(!PL)return;if(i>=PL.steps.length){rpFinish();return}PL.i=i;PL.stepEnd=Date.now()+PL.steps[i].s*1000;PL.paused=false;rpRender(true);audStepSay(PL.steps[i],i,PL.pr);clearInterval(rpTimer);rpTimer=setInterval(rpTick,250)}
-function rpTick(){if(!PL||PL.paused||PL.end)return;const left=Math.max(0,Math.ceil((PL.stepEnd-Date.now())/1000));const el=$('#plCount');if(el)el.textContent=left>=60?fromSec(left):left;rpCues(left);if(left<=0)rpGo(PL.i+1)}
+function rpTick(){if(!PL||PL.paused||PL.end)return;const left=Math.max(0,Math.ceil((PL.stepEnd-Date.now())/1000));const el=$('#plCount');if(el)el.textContent=left>=60?fromSec(left):left;rpCues(left);rpProg();if(left<=0)rpGo(PL.i+1)}
 function rpFinish(){clearInterval(rpTimer);PL.end=true;chime('end');say('Well done. Take a moment before you get up.');setTimeout(audBedStop,3000);keepAwake(false);PL.mins=Math.max(1,Math.round((Date.now()-PL.started)/60000));try{rpWake&&rpWake.release()}catch(e){}rpRender()}
 function rpClose(){clearInterval(rpTimer);PL=null;audBedStop();sayStop();keepAwake(false);try{rpWake&&rpWake.release()}catch(e){}const h=$('#plHost');if(h)h.innerHTML=''}
-function rpRender(fresh){let h=$('#plHost');if(!h){h=document.createElement('div');h.id='plHost';document.body.appendChild(h)}if(!PL){h.innerHTML='';return}
-  const pr=PL.pr;
-  if(PL.end){h.innerHTML=`<div class="plwrap2"><div class="plbox"><div class="plic">${pr.ic}</div><h2>${esc(pr.name)} done</h2><p class="ds">${PL.mins} minute${PL.mins>1?'s':''}. ${esc(pr.mind)}.</p><p style="margin:14px 0 8px;font-weight:600">How do you feel now?</p>
-    <div class="plfeel">${[['😣',1],['😐',2],['🙂',3],['😌',4],['😁',5]].map(([e,v])=>`<button type="button" data-plfeel="${v}" aria-label="${v} out of 5">${e}</button>`).join('')}</div><button type="button" class="linkbtn" data-plfeel="0">Skip</button></div></div>`;return}
-  const st=PL.steps[PL.i];const nx=PL.steps[PL.i+1];const breath=['in','hold','out'].includes(st.k);const pv=PL.steps[PL.i-1];const bcls=st.k==='hold'?(pv&&pv.k==='in'?'hbig':'hsmall'):st.k;
-  h.innerHTML=`<div class="plwrap2 ${st.k}"><div class="plhead"><span>${pr.ic} ${esc(pr.name)}</span><button type="button" class="x" id="plX" aria-label="Stop">×</button></div>${audControls()}
-    <div class="plmain"><div class="plorb ${breath?bcls:'still'}" style="--d:${st.s}s"><span id="plCount">${st.s>=60?fromSec(st.s):st.s}</span></div>
-      <h2>${esc(st.t)}</h2>${st.c?`<p>${esc(st.c)}</p>`:''}${st.round?`<small class="ds">Round ${st.round} of ${st.of}</small>`:(PL.i===0?'':PL.steps.length<30?`<small class="ds">Step ${PL.i} of ${PL.steps.length-1}</small>`:'')}
-      ${pr.safety&&PL.i===0?`<div class="plsafe">${esc(pr.safety)}</div>`:''}</div>
-    <div class="plnext">${nx?`Next: ${esc(nx.t)}`:'Last step'}</div>
-    <div class="plctl"><button type="button" class="ghost" id="plBack" ${PL.i?'':'disabled'}>‹ Back</button><button type="button" class="primary" id="plPause">${PL.paused?'Resume':'Pause'}</button><button type="button" class="ghost" id="plSkip">Skip ›</button></div></div>`;
-  if(fresh&&breath){const pv=PL.steps[PL.i-1];const bcls=st.k==='hold'?(pv&&pv.k==='in'?'hbig':'hsmall'):st.k;const o=h.querySelector('.plorb');if(o){o.classList.remove(bcls);void o.offsetWidth;o.classList.add(bcls)}}
-}
 async function rpLog(feel){const pr=PL.pr,mins=PL.mins;const k=iso(todayDate());const d=D()[k]||{};const now=new Date();
   const habit={box:'Breathwork / meditation',sigh:'Breathwork / meditation','478':'Breathwork / meditation',scan:'Breathwork / meditation',loosen:'Mobility / stretch',stretch:'Mobility / stretch',yoga:'Mobility / stretch',sauna:'Hot tub / sauna',contrast:'Hot tub / sauna',walk:'Walk',nap:'Nap'}[pr.id];
   const fields={recovery:(d.recovery||[]).concat([{kind:pr.name,min:mins,at:fmtT(now.getHours()*60+now.getMinutes()),feel:feel||null,prog:pr.id}])};if(habit&&HABITS.includes(habit))fields.habits=[...new Set((d.habits||[]).concat([habit]))];
@@ -1551,11 +1538,11 @@ const LEARN=[
   ['Simple swaps','Alternate with water, try alcohol-free beers, keep drinks away from the night before a big session, and eat before you go out.'],
   ['Try this week','Track your standard drinks with the alcohol line on the Food log, and plan at least two alcohol-free days.']],q:['How many standard drinks are in a pint of beer?',['1','2','3'],1]},
  {id:'ice',ic:'🧊',cat:'Recovery',t:'Ice baths and cold water',s:[
-  ['What it does','2-10 minutes in cold water at around 10-15°C can reduce how sore you feel after hard training or a match.'],
+  ['What it does','Sitting in cold water up to your chest can reduce how sore you feel after hard training or a match. Most research uses water at 10-15°C for up to 10-15 minutes.'],
   ['The mental side','Many people feel alert and in good form for hours afterwards. Staying calm in the cold is practice for staying calm under pressure.'],
   ['Timing matters','Cold straight after a strength session may blunt muscle gains. If building muscle is your goal, leave at least a few hours, or use cold on other days.'],
   ['Cold showers count','Finishing a shower with 30-90 seconds of cold gives some of the same lift with less fuss.'],
-  ['How to do it','Breathe out slowly as you go in. The gasp in the first 30 seconds is normal and passes. Keep still, and get out before you start shivering hard.'],
+  ['Temperature and time','Colder means shorter. At 10-15°C, 5-10 minutes is enough. Many home ice baths are 3-10°C: there, 1-5 minutes is plenty. Below about 3°C, keep it to a minute or two and only once you are used to cold.'],['How to do it','Breathe out slowly as you go in. The gasp in the first 30 seconds is normal and passes. Keep still, and get out before you start shivering hard.'],
   ['Stay safe','Never alone and never after alcohol. Check with your GP first if you have a heart condition or high blood pressure. Rewarm gradually by moving, not with a hot shower straight away.'],
   ['Try this week','End three showers with 30 seconds of cold, breathing out slowly, or try the guided Ice bath in Recover.']],q:['If you want to build muscle, when is cold water best avoided?',['Straight after a strength session','On a rest day','In the morning'],0]},
  {id:'sauna',ic:'♨️',cat:'Recovery',t:'Sauna',s:[
@@ -1614,9 +1601,9 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(c('#signOpen')){showSign();return}if(c('#signNo')||(e.target.id==='signWrap')){hideSign();return}
   if(c('#signYes')){const k=iso(sel);hideSign();persistDay(k,{foodDone:true});toast('Day signed off ✓');render();stepDone();return}
   if(x=c('[data-prog]')){const pr=PROGS.find(p=>p.id===x.dataset.prog);if(pr){RI={pr,li:pr.def||0};showRI()}return}
-  if(c('#plX')){if(PL&&!PL.end&&Date.now()-PL.started>60000){rpFinish()}else rpClose();return}
-  if(c('#plPause')){if(!PL)return;if(PL.paused){PL.stepEnd=Date.now()+PL.pausedLeft;PL.paused=false}else{PL.pausedLeft=PL.stepEnd-Date.now();PL.paused=true}rpRender();const o=$('.plorb');if(o)o.style.animationPlayState=PL.paused?'paused':'running';return}
-  if(c('#plSkip')){rpGo(PL.i+1);return}if(c('#plBack')){rpGo(Math.max(0,PL.i-1));return}
+  if(c('#rpX')){if(PL&&!PL.end&&Date.now()-PL.started>60000){rpFinish()}else rpClose();return}
+  if(c('#rpPause')){if(!PL)return;if(PL.paused){PL.stepEnd=Date.now()+PL.pausedLeft;PL.paused=false}else{PL.pausedLeft=PL.stepEnd-Date.now();PL.paused=true}rpRender();const o=$('.plorb');if(o)o.style.animationPlayState=PL.paused?'paused':'running';return}
+  if(c('#rpSkip')){rpGo(PL.i+1);return}if(c('#rpBack')){rpGo(Math.max(0,PL.i-1));return}
   if(x=c('[data-plfeel]')){rpLog(+x.dataset.plfeel);return}
   if(x=c('[data-pview]')){pView=x.dataset.pview;lv={topic:null,i:0,ans:null};render();window.scrollTo({top:0});return}
   if(x=c('[data-learn-cat]')){pView='learn';lv={topic:null,i:0,ans:null};location.hash='reports';return}
@@ -1698,29 +1685,7 @@ document.addEventListener('input',e=>{const t=e.target;if(t&&t.dataset&&t.datase
 
 // ================= v6: real voice, session intros with length choice =================
 let TTS_ON=false;const ttsBuf=new Map(),ttsPend=new Map();let ttsSrc=null;
-function ttsGet(text){if(ttsBuf.has(text))return Promise.resolve(ttsBuf.get(text));if(ttsPend.has(text))return ttsPend.get(text);
-  const p=(async()=>{const c=audCtx();if(!c)return null;let ab=null;
-    try{let cache=null,key=null;try{cache=window.caches?await caches.open('tts-v1'):null;key=new Request(location.origin+'/tts-cache/'+encodeURIComponent(text));const hit=cache&&await cache.match(key);if(hit)ab=await hit.arrayBuffer()}catch(e){}
-      if(!ab){const {data:{session}}=await sb.auth.getSession();if(!session)return null;const r=await fetch('/api/tts',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({text})});if(!r.ok)return null;ab=await r.arrayBuffer();try{cache&&cache.put(key,new Response(ab.slice(0),{headers:{'content-type':'audio/mpeg'}}))}catch(e){}}
-      const b=await c.decodeAudioData(ab.slice(0));ttsBuf.set(text,b);return b}catch(e){return null}})();
-  ttsPend.set(text,p);return p}
-async function say(t){if(!AUD.voice||!t)return;const tok={};say.tok=tok;
-  if(TTS_ON){const b=await ttsGet(t);if(say.tok!==tok)return;if(b){try{ttsSrc&&ttsSrc.stop()}catch(e){}const c=audCtx();const s=c.createBufferSource();s.buffer=b;const g=c.createGain();g.gain.value=1.1;s.connect(g);g.connect(c.destination);s.start();ttsSrc=s;return}}
-  if(!window.speechSynthesis)return;try{if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.82;u.pitch=.95;u.volume=1;const v=pickVoice();if(v)u.voice=v;setTimeout(()=>{try{speechSynthesis.speak(u)}catch(e){}},80)}catch(e){}}
-function sayStop(){say.tok=null;try{ttsSrc&&ttsSrc.stop()}catch(e){}try{window.speechSynthesis&&speechSynthesis.cancel()}catch(e){}}
-function primeAudio(){try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}audCtx();try{if(window.speechSynthesis&&!TTS_ON){const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}}catch(e){}}
 let RI=null;
-function riHTML(){if(!RI)return '';const pr=RI.pr;const v=pr.lens[RI.li][1];const steps=pr.steps(v);const breath=steps.some(s=>s.k==='in');
-  const coming=breath?[`${steps[0].of} rounds of: ${steps.filter(s=>s.round===1).map(s=>`${s.t} (${s.s}s)`).join(', ')}`,'Soft tones keep the rhythm after the first few rounds']:[...new Set(steps.map(s=>s.t))];
-  return `<div class="cfwrap" id="riWrap"><div class="cfsheet risheet" role="dialog" aria-label="${esc(pr.name)}"><div class="rih"><span class="ric" aria-hidden="true">${pr.ic}</span><div style="flex:1"><h2>${esc(pr.name)}</h2><small class="ds">${esc(pr.cat)}</small></div><button type="button" class="x" id="riX" aria-label="Close">×</button></div>
-    <div class="ritags"><span>🧠 ${esc(pr.mind)}</span><span>💪 ${esc(pr.body)}</span></div>
-    <div><div class="label">How long?</div><div class="segmini" style="display:inline-flex;margin-top:6px">${pr.lens.map(([l],i)=>`<button type="button" data-rilen="${i}" aria-pressed="${RI.li===i}">${esc(l)}</button>`).join('')}</div></div>
-    <div><div class="label">What's coming</div><ol class="rilist">${coming.slice(0,10).map(t=>`<li>${esc(t)}</li>`).join('')}${coming.length>10?'<li>…and a few more</li>':''}</ol></div>
-    <div><div class="label">Before you start</div><ul class="cover" style="margin-top:6px">${pr.prep.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div>
-    ${pr.safety?`<div class="plsafe">${esc(pr.safety)}</div>`:''}
-    <div><div class="label">Sound</div>${audControls()}</div>
-    <button type="button" class="donebtn" id="riGo" style="flex:none;width:100%;padding:15px">▶ Start</button>
-    <small class="ds" style="text-align:center">${TTS_ON?'A calm voice will guide you. Turn your volume up.':'Your phone\'s voice will guide you. Turn your volume up and check the silent switch.'} The screen stays on.</small></div></div>`}
 function showRI(){let h=$('#riHost');if(!h){h=document.createElement('div');h.id='riHost';document.body.appendChild(h)}h.innerHTML=riHTML()}
 function rpStart(id,v){const pr=PROGS.find(p=>p.id===id);if(!pr)return;if(v==null)v=pr.lens[pr.def||0][1];
   const settle=Math.min(50,Math.max(18,Math.round(pr.intro.split(/\s+/).length/2.1)+5));
@@ -1735,13 +1700,76 @@ function audStepSay(st,i,pr){if(st.intro){chime('step');say(pr.intro);return}con
 function rpCues(left){if(!PL)return;const st=PL.steps[PL.i];if(!st||st.quiet||st.intro)return;const k=PL.i;
   if(st.s>=90&&left===Math.round(st.s/2)&&!PL.cues[k+'h']){PL.cues[k+'h']=1;say('Halfway. Keep breathing slowly.')}
   if((st.k==='hot'||st.k==='cold')&&left===10&&!PL.cues[k+'t']){PL.cues[k+'t']=1;say('Ten seconds.')}}
-function updateFab(){const f=$('#fab');let t='';try{t=tab()}catch(e){}if(f)f.hidden=!sample||vState.open||sampleMode||t==='recover'||t==='reports'}
+function updateFab(){const f=$('#fab');let t='';try{t=tab()}catch(e){}if(f)f.hidden=!sample||vState.open||sampleMode||t==='recover'||t==='reports'||t==='checkin'||t==='mobility'}
 window.addEventListener('hashchange',()=>{try{updateFab()}catch(e){}});
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(x=c('[data-rilen]')){RI.li=+x.dataset.rilen;showRI();return}
   if(c('#riX')||e.target.id==='riWrap'){RI=null;showRI();return}
   if(c('#riGo')){const {pr,li}=RI;RI=null;showRI();primeAudio();rpStart(pr.id,pr.lens[li][1]);return}
 },true);
+
+// ================= v7: voice through an audio element, sleeker session pages =================
+const SILENT_MP3='data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//NwwAAAAAAAAAAAAEluZm8AAAAPAAAADgAABm0ALCwsLCwsLDw8PDw8PDxNTU1NTU1NXV1dXV1dXW1tbW1tbW19fX19fX19jo6Ojo6Ojp6enp6enp6erq6urq6urr6+vr6+vr7Pz8/Pz8/P39/f39/f3+/v7+/v7+//////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQDaQAAAAAAAAZtL+ircQAAAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsRbAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQMSkAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NCxKMAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NAxKQAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80LEowAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80DEpAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsSjAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQMSkAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NCxKMAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NAxKQAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80LEowAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80DEpAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsSjAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==';
+const VST={state:'',msg:''};
+function vstatText(){if(!AUD.voice)return 'Voice off';if(TTS_ON)return VST.state==='err'?`Voice problem: ${esc(VST.msg)}. Using your phone's voice instead.`:VST.state==='loading'?'Preparing the voice…':'';return 'Using your phone\'s built-in voice'}
+function vstatSet(s,m){VST.state=s;VST.msg=m||'';const e=$('#vStat');if(e)e.innerHTML=vstatText()}
+const ttsUrl=new Map(),ttsP=new Map();
+function ttsGet(text){if(ttsUrl.has(text))return Promise.resolve(ttsUrl.get(text));if(ttsP.has(text))return ttsP.get(text);
+  const p=(async()=>{try{let blob=null,cache=null,key=null;try{cache=window.caches?await caches.open('tts-v2'):null;key=new Request(location.origin+'/tts-cache/'+encodeURIComponent(text));const hit=cache&&await cache.match(key);if(hit)blob=await hit.blob()}catch(e){}
+      if(!blob){const {data:{session}}=await sb.auth.getSession();if(!session){vstatSet('err','signed out');return null}
+        const r=await fetch('/api/tts',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({text})});
+        if(!r.ok){let m='error '+r.status;try{const j=await r.json();m=j.error||m}catch(e){}vstatSet('err',String(m).slice(0,140));ttsP.delete(text);return null}
+        blob=await r.blob();try{cache&&cache.put(key,new Response(blob,{headers:{'content-type':'audio/mpeg'}}))}catch(e){}}
+      const u=URL.createObjectURL(blob);ttsUrl.set(text,u);if(VST.state==='loading')vstatSet('ok');return u}
+    catch(e){vstatSet('err',String(e&&e.message||e).slice(0,100));ttsP.delete(text);return null}})();
+  ttsP.set(text,p);return p}
+let vEl=null;function voiceEl(){if(!vEl){vEl=document.createElement('audio');vEl.setAttribute('playsinline','');vEl.preload='auto';vEl.style.display='none';document.body.appendChild(vEl)}return vEl}
+function phoneSay(t){if(!window.speechSynthesis)return;try{if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.82;u.pitch=.95;u.volume=1;const v=pickVoice();if(v)u.voice=v;setTimeout(()=>{try{speechSynthesis.speak(u)}catch(e){}},80)}catch(e){}}
+async function say(t){if(!AUD.voice||!t)return;const tok={};say.tok=tok;
+  if(TTS_ON&&VST.state!=='err'){const u=await ttsGet(t);if(say.tok!==tok)return;if(u){try{const a=voiceEl();a.pause();a.src=u;a.volume=1;await a.play();return}catch(e){vstatSet('err','the phone blocked playback ('+(e&&e.name||'')+')')}}}
+  phoneSay(t)}
+function sayStop(){say.tok=null;try{vEl&&vEl.pause()}catch(e){}try{window.speechSynthesis&&speechSynthesis.cancel()}catch(e){}}
+function primeAudio(){try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}audCtx();
+  try{const a=voiceEl();a.src=SILENT_MP3;const p=a.play();p&&p.catch(()=>{})}catch(e){}
+  try{if(window.speechSynthesis){const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}}catch(e){}
+  if(TTS_ON&&AUD.voice&&VST.state!=='ok')vstatSet('loading')}
+function riHTML(){if(!RI)return '';const pr=RI.pr;const v=pr.lens[RI.li][1];const steps=pr.steps(v);const breath=steps.some(s=>s.k==='in');
+  const tot=steps.reduce((a,x)=>a+x.s,0)+Math.min(50,Math.max(18,Math.round(pr.intro.split(/\s+/).length/2.1)+5));
+  const coming=breath?`<div class="rptl">${steps.filter(s=>s.round===1).map(s=>`<span class="k-${s.k}">${esc(s.t)} <b>${s.s}s</b></span>`).join('')}</div><small class="ds">Repeat ${steps[0].of} times. The voice guides the first few rounds, then soft tones keep the rhythm.</small>`
+    :`<ol class="rilist">${[...new Set(steps.map(s=>s.t))].slice(0,12).map(t=>`<li>${esc(t)}</li>`).join('')}</ol>`;
+  return `<div class="rpage" id="riPage" role="dialog" aria-label="${esc(pr.name)}"><div class="rpscroll">
+    <div class="rptop"><button type="button" class="pli" id="riX" aria-label="Close">✕</button></div>
+    <div class="rphero"><div class="rpic" aria-hidden="true">${pr.ic}</div><h1>${esc(pr.name)}</h1><div class="rpchips"><span>🧠 ${esc(pr.mind)}</span><span>💪 ${esc(pr.body)}</span></div></div>
+    <div class="rpsec"><div class="label">Length</div><div class="subtabs" style="grid-template-columns:repeat(${pr.lens.length},1fr)">${pr.lens.map(([l],i)=>`<button type="button" data-rilen="${i}" aria-pressed="${RI.li===i}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="rpsec"><div class="label">What's coming</div>${coming}</div>
+    <details class="wu rpprep"><summary>Before you start</summary><ul class="cover" style="margin-top:4px">${pr.prep.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></details>
+    ${pr.safety?`<div class="plsafe" style="max-width:none">${esc(pr.safety)}</div>`:''}
+    <div class="rpsec"><div class="label">Sound</div><div class="subtabs">${[['ocean','🌊 Ocean'],['rain','🌧 Rain'],['off','🔇 Quiet']].map(([k,l])=>`<button type="button" data-asnd="${k}" aria-pressed="${AUD.snd===k}">${l}</button>`).join('')}</div>
+      <label class="vswitch"><input type="checkbox" id="riVoice" ${AUD.voice?'checked':''}><span></span>Voice guide ${TTS_ON?'(calm guide voice)':'(your phone\'s voice)'}</label></div></div>
+    <div class="rpgo"><button type="button" class="donebtn" id="riGo">▶ Start · ${fromSec(tot)}</button><small class="ds">Turn your volume up${TTS_ON?'':' and check the silent switch'}. The screen stays on.</small></div></div>`}
+function rpRender(fresh){let h=$('#plHost');if(!h){h=document.createElement('div');h.id='plHost';document.body.appendChild(h)}if(!PL){h.innerHTML='';return}
+  const pr=PL.pr;
+  if(PL.end){h.innerHTML=`<div class="plwrap2"><div class="plbox"><div class="plic">${pr.ic}</div><h2>${esc(pr.name)} done</h2><p class="ds">${PL.mins} minute${PL.mins>1?'s':''} · ${esc(pr.mind)}</p><p style="margin:18px 0 10px;font-weight:600">How do you feel now?</p>
+    <div class="plfeel">${[['😣',1],['😐',2],['🙂',3],['😌',4],['😁',5]].map(([e,v])=>`<button type="button" data-plfeel="${v}" aria-label="${v} out of 5">${e}</button>`).join('')}</div><button type="button" class="linkbtn" data-plfeel="0" style="margin-top:10px">Skip</button></div></div>`;return}
+  const st=PL.steps[PL.i];const nx=PL.steps[PL.i+1];const breath=['in','hold','out'].includes(st.k);const pv=PL.steps[PL.i-1];const bcls=st.k==='hold'?(pv&&pv.k==='in'?'hbig':'hsmall'):st.k;
+  PL.tot=PL.steps.reduce((a,x)=>a+x.s,0);
+  h.innerHTML=`<div class="plwrap2 ${st.k}"><div class="plhead"><button type="button" class="pli" id="rpX" aria-label="Stop">✕</button><span class="pln">${pr.ic} ${esc(pr.name)}</span><span class="plic2"><button type="button" class="pli" id="plSnd" aria-label="Sound">${{ocean:'🌊',rain:'🌧',off:'🔇'}[AUD.snd]}</button><button type="button" class="pli ${AUD.voice?'':'off'}" id="plVc" aria-label="Voice ${AUD.voice?'on':'off'}">🗣</button></span></div>
+    <div class="plprog"><i id="plBar"></i></div><div class="pltime" id="plTime"></div>
+    <div class="plmain"><div class="plorb ${breath?bcls:'still'}" style="--d:${st.s}s"><span id="plCount">${st.s>=60?fromSec(st.s):st.s}</span></div><h2>${esc(st.t)}</h2>${st.c?`<p>${esc(st.c)}</p>`:''}${st.round?`<small class="ds">Round ${st.round} of ${st.of}</small>`:''}${pr.safety&&PL.i===1?`<div class="plsafe">${esc(pr.safety)}</div>`:''}</div>
+    <div class="plnext">${nx?`Next · ${esc(nx.t)}`:'Last step'}</div>
+    <div class="plctl"><button type="button" class="pcb" id="rpBack" ${PL.i?'':'disabled'} aria-label="Back">⏮</button><button type="button" class="pcb main" id="rpPause" aria-label="${PL.paused?'Resume':'Pause'}">${PL.paused?'▶':'❚❚'}</button><button type="button" class="pcb" id="rpSkip" aria-label="Skip">⏭</button></div>
+    <div class="vstat" id="vStat">${vstatText()}</div></div>`;
+  rpProg();if(fresh&&breath){const o=h.querySelector('.plorb');if(o){o.classList.remove(bcls);void o.offsetWidth;o.classList.add(bcls)}}}
+function rpProg(){if(!PL||PL.end||!PL.tot)return;const st=PL.steps[PL.i];const left=PL.paused?Math.ceil((PL.pausedLeft||0)/1000):Math.max(0,Math.ceil((PL.stepEnd-Date.now())/1000));let done=0;for(let j=0;j<PL.i;j++)done+=PL.steps[j].s;done+=st.s-left;
+  const b=$('#plBar');if(b)b.style.width=Math.min(100,done/PL.tot*100)+'%';const t=$('#plTime');if(t)t.textContent=`${fromSec(done)} / ${fromSec(PL.tot)}`}
+function ciActions(){if(!sample||sampleMode)return '';return `<article class="card factions"><div class="frow" style="grid-template-columns:1fr 1fr"><button type="button" class="fbtn" id="ciSay"><span aria-hidden="true">🎤</span><b>Say it</b></button><button type="button" class="fbtn" id="ciType"><span aria-hidden="true">⌨️</span><b>Type it</b></button></div><small class="ds" style="text-align:center">Or tap through the questions below</small></article>`}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
+  if(c('#plSnd')){AUD.snd=AUD.snd==='ocean'?'rain':AUD.snd==='rain'?'off':'ocean';audSave();audBed();const b=c('#plSnd');b.textContent={ocean:'🌊',rain:'🌧',off:'🔇'}[AUD.snd];return}
+  if(c('#plVc')){AUD.voice=!AUD.voice;audSave();if(!AUD.voice)sayStop();const b=c('#plVc');b.classList.toggle('off',!AUD.voice);const e2=$('#vStat');if(e2)e2.innerHTML=vstatText();return}
+  if(c('#ciSay')){if(typeof openVoice==='function')openVoice();return}
+  if(c('#ciType')){if(typeof openVoice==='function'){openVoice();setTimeout(()=>{const t=$('#v-text');if(t)t.focus()},120)}return}
+});
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='riVoice'){AUD.voice=e.target.checked;audSave()}});
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
