@@ -378,11 +378,15 @@ function planDue(){const p=plan();const t=todayDate();if(!p||!p.days||!p.days.le
 const slotMeal=s=>/break|post-train|fasted/i.test(s)?'Breakfast':/lunch|top-up|pre-game|recovery/i.test(s)?(/pre-game breakfast/i.test(s)?'Breakfast':/lunch/i.test(s)?'Lunch':'Snack'):/dinner/i.test(s)?'Dinner':'Snack';
 function planLogged(k,idx){const d=days[k];return !!(d&&(d.food||[]).some(i=>i.planRef===k+':'+idx))}
 function planMealsHTML(k,compact){
-  const pd=planDay(k);if(!pd)return '';
-  return `<div class="pmeals">${(pd.meals||[]).map((m,ix)=>{const logged=planLogged(k,ix);const fasted=/fasted/i.test(m.slot||'');
-    return `<div class="pmeal ${logged?'done':''}"><div class="pmh"><span class="pt num">${esc(m.time||'')}</span><span class="ps">${esc(m.slot||'')}${m.where&&m.where!=='Home'?` · ${esc(m.where)}`:''}${!m.time&&m.when?` · ${esc(m.when)}`:''}</span>${fasted?'':`<span class="pk num">${kcalOf(m)} kcal · ${Math.round(+m.protein||0)}p · ${Math.round(+m.carbs||0)}c</span>`}</div>
-      ${fasted||/drink/i.test(m.slot||'')||(m.where&&m.where!=='Home'&&!(m.method||[]).length)?`<div class="pn">${esc(m.name)}</div>`:`<button type="button" class="pn recl" data-recipe="${k}:${ix}">${esc(m.name)} <i>Recipe</i></button>`}${!compact&&m.items&&m.items.length?`<div class="pi">${esc(m.items.map(x=>x.qty?`${x.qty} ${x.name}`:x.name).join(', '))}</div>`:''}${compact?'':optsHTML(k,ix,m)}
-      ${fasted?'':k===iso(todayDate())||k<iso(todayDate())?(logged?'<span class="pl">Logged</span>':`<button type="button" class="ghost ate" data-ate="${k}:${ix}">Ate this</button>`):''}</div>`}).join('')}</div>`;
+  const pd=planDay(k);if(!pd)return '';const canLog=k<=iso(todayDate());
+  return `<div class="pmeals">${(pd.meals||[]).map((m,ix)=>{const logged=planLogged(k,ix);const fasted=/fasted/i.test(m.slot||'');const drink=/drink/i.test(m.slot||'');
+    const canRecipe=typeof recipeSheet==='function'&&!fasted&&!drink&&!(m.where&&m.where!=='Home'&&!(m.method||[]).length);const when=m.time||m.when||'';
+    const its=(m.items||[]).length,ops=(m.options||[]).length;
+    return `<div class="pm ${logged?'done':''} ${fasted||drink?'minor':''}"><div class="pmt"><span class="pslot">${esc(m.slot||'')}</span>${when?`<span class="pwhen">${esc(when)}</span>`:''}${m.where&&m.where!=='Home'?`<span class="pwhere">${esc(m.where)}</span>`:''}</div>
+      <div class="pmn">${esc(m.name)}</div>
+      ${fasted?'':`<div class="pmm"><span>${kcalOf(m)} kcal</span><span>${Math.round(+m.protein||0)} g protein</span><span>${Math.round(+m.carbs||0)} g carbs</span></div>`}
+      ${!compact&&(its||ops)?`<details class="pmd"><summary>${its?'What\'s in it':''}${its&&ops?' · ':''}${ops?`${ops} backup option${ops>1?'s':''}`:''}</summary>${its?`<div class="pi">${esc(m.items.map(x=>x.qty?`${x.qty} ${x.name}`:x.name).join(', '))}</div>`:''}${optsHTML(k,ix,m)}</details>`:''}
+      ${fasted?'':`<div class="pma">${canRecipe?`<button type="button" class="ghost" data-recipe="${k}:${ix}">Recipe</button>`:''}${canLog?(logged?'<span class="pl">✓ Eaten</span>':`<button type="button" class="ghost pate" data-ate="${k}:${ix}">Ate this</button>`):''}</div>`}</div>`}).join('')}</div>`;
 }
 
 // ---------- views ----------
@@ -401,7 +405,7 @@ function foodTodayHTML(dIso){
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Time to plan ahead'}</b><br><small>Update your food available, then let the app build the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
   <article class="card"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label}</h2><div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
     <div class="form" style="padding-bottom:4px"><div class="field"><span class="label">Day type</span>${seg('dt','dayType',['rest','training','match'],dt,['Rest','Training','Match'],'small')}</div></div>
-    ${macroRings(t,dt)}
+    ${macroRings(t,dt)}${waterHTML(dIso)}
     ${microsHTML(t,dt,dIso)}
     <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants this week${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
   </article>
@@ -410,7 +414,7 @@ function foodTodayHTML(dIso){
       <h3>Food diary</h3>
       ${ai?`<div class="field"><label class="label" for="f-say">Say it in your own words, any time of day</label><textarea id="f-say" placeholder="e.g. Coffee and SIS tab before training. Porridge with whey after at 8. Chicken salad bowl at 1. Cappuccino at 3. Ribeye and mushrooms at 7, 2 brownies after." style="min-height:110px">${esc(diaryText)}</textarea>
         <div class="hint" style="font-size:12px;color:var(--muted)">Use the microphone on your phone keyboard to talk. Mention times and they set your fasting hours. Only log things not already ticked off from the plan.</div></div>
-      <div class="actions"><button type="button" class="primary" id="fParse" ${fState.busy?'disabled':''} style="font-size:17px">${fState.busy?'Working…':(d.food||[]).some(i=>i.src==='diary')?'Update from diary':'Work out my day'}</button></div>`:'<div class="hint">Claude estimates are not available in this view. Use the quick adds below.</div>'}
+      <div class="actions"><button type="button" class="primary" id="fParse" ${fState.busy?'disabled':''} style="font-size:17px">${fState.busy?'Working…':(d.food||[]).some(i=>i.src==='diary')?'Update from diary':'Work out my day'}</button></div>`:'<div class="hint">Smart estimates are not available in this view. Use the quick adds below.</div>'}
       ${canImg?`<label class="cambtn">📷 Snap your plate<input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}
       ${fState.msg?`<div class="hsum" role="status">${esc(fState.msg)}</div>`:''}
       <div class="field"><span class="label">Meal for photos and quick adds</span>${seg('f','meal',MEALS,meal,null,'small')}</div>
@@ -433,7 +437,7 @@ function planHTML(){
       <div class="hint" style="font-size:13px;color:var(--muted)">Builds the next 3 days from your food available (${k.length} item${k.length===1?'':'s'}), your meal guide and each day's targets, timed around ${esc(set.trainTime||trainTimeFor(iso(todayDate())))} ${FASTED()?'fasted ':''}training.${k.length?'':' Add your food available first for a better plan.'}</div>
       ${eatSetHTML()}
       <div class="row2"><div class="field"><label class="label" for="s-tt">Usual training time</label><input id="s-tt" type="time" value="${esc(set.trainTime||'06:30')}" data-setting="trainTime"></div><div class="field"><label class="label" for="s-fh">Overnight fast target (h)</label><input id="s-fh" type="number" step="0.5" value="${set.fastH||14}" data-setting="fastH"></div></div>
-      ${sample?`<button type="button" class="primary" id="pBuild" ${pState.busy?'disabled':''}>${pState.busy?'Planning… up to 2 minutes':p?'Re-plan the next 3 days':'Plan the next 3 days'}</button>`:'<div class="hint">Planning needs Claude, which is not available in this view.</div>'}
+      ${sample?`<button type="button" class="primary" id="pBuild" ${pState.busy?'disabled':''}>${pState.busy?'Planning… up to 2 minutes':p?'Re-plan the next 3 days':'Plan the next 3 days'}</button>`:'<div class="hint">Planning is not available in this view.</div>'}
       ${pState.msg?`<div class="hsum" role="status">${esc(pState.msg)}</div>`:''}
     </div></article>`;
   if(!p)return head;
@@ -448,19 +452,16 @@ function planHTML(){
 function kitchenHTML(){
   const items=kitchen();const where=KWHERE;
   const grouped=where.map(w=>{const its=items.map((x,i)=>({...x,i})).filter(x=>(where.includes(x.where)?x.where:'Other')===w);if(!its.length)return '';
-    return `<div class="mgrp"><div class="mgh"><b>${w}</b><span class="num">${its.length}</span></div>${its.map(x=>`<div class="fitem"><div style="min-width:0"><div class="fn">${esc(x.name)}</div>${x.qty?`<div class="fq">${esc(x.qty)}</div>`:''}</div><span></span><button type="button" class="x" data-del-kit="${x.i}" aria-label="Remove ${esc(x.name)}">×</button></div>`).join('')}</div>`}).join('');
-  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Food available</h2><div class="sub">${items.length?`${items.length} items${meta.kitchen&&meta.kitchen.updatedAt?` · updated ${fmtD(new Date(meta.kitchen.updatedAt))}`:''}`:'Empty. Tap what you have, or say where you will be eating.'}</div></div></div>
-    <div class="form">
-      <div class="hint" style="font-size:13px;color:var(--muted)"><b style="color:var(--fg)">At home:</b> tap what you have in, and tap again when it runs out. <b style="color:var(--fg)">Away or eating out:</b> just say where you will be eating, e.g. a hotel buffet or Thai restaurants, and it fills in what is usually there.</div>
-      ${staplesHTML(new Set(items.map(x=>x.name.toLowerCase())))}
-      <div class="field"><label class="label" for="k-say">Say it in your own words</label><textarea id="k-say" placeholder="e.g. Just did the shop: eggs, Greek yogurt, chicken thighs, salmon, broccoli, spinach. Used the last of the oats. Or: on holidays, two meals a day, a 5-star hotel breakfast buffet in the morning, Thai food in the evening, nothing in between." style="min-height:100px">${esc(kState.text)}</textarea>
-      <div class="hint" style="font-size:12px;color:var(--muted)">Say what you bought or ran out of, or where and how you will be eating. The list and your meal plan settings update from it.</div></div>
+    return `<div class="kgrp"><div class="kgh">${w} <span>${its.length}</span></div><div class="kchips">${its.map(x=>`<span class="kchip">${esc(x.name)}${x.qty?` <small>${esc(x.qty)}</small>`:''}<button type="button" data-del-kit="${x.i}" aria-label="Remove ${esc(x.name)}">×</button></span>`).join('')}</div></div>`}).join('');
+  const st=typeof staplesHTML==='function'?staplesHTML(new Set(items.map(x=>x.name.toLowerCase()))):'';
+  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Food available</h2><div class="sub">${items.length?`${items.length} items${meta.kitchen&&meta.kitchen.updatedAt?` · updated ${fmtD(new Date(meta.kitchen.updatedAt))}`:''}`:'What you have at home, or where you\'ll be eating'}</div></div></div>
+    <div class="form" style="gap:10px"><textarea id="k-say" aria-label="What food you have, or where you'll eat" placeholder="Say what you bought or ran out of, or where you'll eat, e.g. on holidays: hotel buffet breakfast, Thai food in the evening." style="min-height:72px">${esc(kState.text)}</textarea>
       ${sample?`<div class="actions">${speakBtn('k-say')}<button type="button" class="primary" id="kUpdate" ${kState.busy?'disabled':''}>${kState.busy?'Updating…':'Update'}</button></div>`:''}
-      ${items.length?`<button type="button" class="ghost" data-fview="plan" style="color:var(--fg)">Plan my next 3 days from this ›</button>`:''}
       ${kState.msg?`<div class="hsum" role="status">${esc(kState.msg)}</div>`:''}
-    </div>${grouped?`<div class="meals" style="border-top:1px solid var(--line);padding-top:6px">${grouped}</div>`:''}</article>`;
+      ${st?`<details class="wu"><summary>Tap common staples</summary>${st}</details>`:''}
+      ${items.length?`<button type="button" class="ghost" data-fview="plan" style="color:var(--fg)">Plan my next 3 days from this ›</button>`:''}</div>
+    ${grouped?`<div class="kwrap">${grouped}</div>`:''}</article>`;
 }
-
 // ---------- Claude calls ----------
 const NUT_JSON=`"kcal","protein","carbs" (NET carbs = total minus fibre),"fat","fibre" in g; "sodium","potassium","magnesium","calcium","iron","zinc","choline","vitC","caffeine" in mg; "selenium","iodine","vitA","vitD","vitK","b12","folate" in micrograms; "omega3" g EPA+DHA; "plants": array of distinct plant foods in it (vegetables, fruit, nuts, seeds, legumes, grains, herbs, coffee and tea count)`;
 const foodRules=()=>`Estimate realistic portions for ${PORTION} unless amounts are given. Use cooked weights for meat and fish.
@@ -478,7 +479,7 @@ async function persistDay(k,fields){
 }
 async function persistMeta(id,doc){meta[id]=doc;if(metaCol){try{await metaCol.doc(id).set(doc);return true}catch(e){window.__lastSaveErr=e&&(e.message||e.code);toast('Could not save. Try again.');return false}}return true}
 async function addFood(items,k){k=k||iso(sel);const cur=(days[k]&&days[k].food)||[];await persistDay(k,{food:cur.concat(items)})}
-function foodErr(e){const m={not_granted:'This needs your permission to use Claude.',rate_limited:'Too many requests just now. Try again in a few minutes.',image_rejected:'That photo could not be read. Try another.',invalid_json:'Could not work that out. Try again.'};return m[e&&e.code]||(e&&e.message?'That did not work: '+String(e.message).slice(0,160):'That did not work. Try again.')}
+function foodErr(e){const m={not_granted:'This needs your permission to use the AI coach.',rate_limited:'Too many requests just now. Try again in a few minutes.',image_rejected:'That photo could not be read. Try another.',invalid_json:'Could not work that out. Try again.'};return m[e&&e.code]||(e&&e.message?'That did not work: '+String(e.message).slice(0,160):'That did not work. Try again.')}
 async function parseDiary(){
   const ta=$('#f-say');const text=(ta&&ta.value||'').trim();fState.text=text;if(!text){toast('Add what you ate first');return}
   fState.busy=true;fState.msg='Working out your day… this can take up to a minute.';render();
@@ -631,7 +632,7 @@ If the photo is not a workout, reply {"summary":"Not a workout board","runM":0,"
     scanState={busy:false,msg:items.length?`Found ${items.length} exercises. Check them, then save the log.`:'No exercises found. Try a straighter, closer photo or add them by hand.'};
   }catch(e){
     readAll();if(photo){sDraft.hyrox=Object.assign({items:[]},sDraft.hyrox,{photo});sDirty=true}
-    const m={not_granted:'Scanning needs your permission to use Claude. Add the exercises by hand instead.',rate_limited:'Too many scans just now. Try again in a few minutes.',image_rejected:'That photo could not be read. Try a different one.',invalid_json:'Could not read the board clearly. Try again or add by hand.',refused:'Could not read that photo. Add the exercises by hand.'};
+    const m={not_granted:'Scanning needs your permission to use the AI coach. Add the exercises by hand instead.',rate_limited:'Too many scans just now. Try again in a few minutes.',image_rejected:'That photo could not be read. Try a different one.',invalid_json:'Could not read the board clearly. Try again or add by hand.',refused:'Could not read that photo. Add the exercises by hand.'};
     scanState={busy:false,msg:m[e&&e.code]||'Scan failed. Try again or add the exercises by hand.'};
   }
   render();
@@ -668,14 +669,13 @@ async function delLog(){
 
 // ================= views =================
 function dotClass(d,pl){if(!pl||pl.type==='R')return 'rest';if(pl.pre)return 'pre';const l=L()[iso(d)];return !l?'':l.status==='done'?'done':l.status==='partial'?'part':'miss'}
+let stripOpen=false;
 function dayHeader(){
   const key=iso(sel),pl=planFor(sel);const mon=addD(sel,-((sel.getDay()+6)%7));let strip='';
   for(let i=0;i<7;i++){const d=addD(mon,i),p=planFor(d),t=p?p.type:'R',lt=L()[iso(d)],col=lt&&lt.type==='H'&&t==='T'?'H':t;const rs=readiness(D()[iso(d)]);
     strip+=`<button type="button" data-goto="${iso(d)}" class="${iso(d)===key?'sel':''}" style="--c:var(${TVAR[col]});--rc:${rColor(rs)}" aria-label="${fmtD(d,{weekday:'long',day:'numeric',month:'long'})}"><span class="d">${DOW[i]}</span><span class="n">${d.getDate()}</span><span class="dot ${dotClass(d,p)}"></span><span class="rd"></span></button>`}
   const isToday=key===iso(todayDate());
-  return `<div class="dnav"><button type="button" id="prevD" aria-label="Previous day">‹</button><div class="mid"><b>${fmtD(sel,{weekday:'long',day:'numeric',month:'short'})}</b><small>${isToday?'Today':pl?`Week ${pl.wk} of 16`:''}</small></div><button type="button" id="nextD" aria-label="Next day">›</button></div>
-    ${!isToday&&todayDate()>=FIRST&&todayDate()<=END?'<div style="text-align:center"><button type="button" class="ghost todaybtn" id="goToday">Jump to today</button></div>':''}
-    <div class="strip">${strip}</div>`;
+  return `<div class="dbar"><button type="button" id="prevD" aria-label="Previous day">‹</button><button type="button" class="dmid" id="stripTog" aria-expanded="${stripOpen}"><b>${isToday?'Today':fmtD(sel,{weekday:'short'})} · ${fmtD(sel,{day:'numeric',month:'short'})}</b><small>${pl?`Week ${pl.wk}`:'This week'} ${stripOpen?'▴':'▾'}</small></button>${isToday?'':'<button type="button" class="dtoday" id="goToday">Today</button>'}<button type="button" id="nextD" aria-label="Next day">›</button></div>${stripOpen?`<div class="strip">${strip}</div>`:''}`;
 }
 function ensureDrafts(){const key=iso(sel);
   if(!sDraft||sDraft.date!==key){sDraft=blankLog(key);sDirty=false;scanState=null}
@@ -692,10 +692,10 @@ function viewTraining(){
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
   const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food available and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
-  return dayHeader()+pre+adjBanner(pl)+intentNudge(key)+(pl?sessionHTML(sel,pl):none)+moveHTML(pl)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
+  return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
 }
 function trainSub(cur){return `<div class="subtabs">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}<button type="button" data-tomob aria-pressed="${cur==='mob'}">Mobility</button></div>`}
-function viewTrainingTab(){return trainSub(tView)+(tView==='plan'?viewPlan():viewTraining())}
+function viewTrainingTab(){return (tView==='today'?dayHeader():'')+trainSub(tView)+(tView==='plan'?viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+checkinHTML(iso(sel))}
 function viewFood(){return dayHeader()+foodHTML(iso(sel))+(fView==='today'?foodDoneHTML(iso(sel)):'')}
 function viewPlan(){
@@ -785,7 +785,7 @@ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let vState={open:false,busy:false,listening:false,blocked:false};let rec=null;
 function updateFab(){const f=$('#fab');if(f)f.hidden=!sample||vState.open||sampleMode}
 function openVoice(){
-  if(!sample){toast('Dictation needs Claude, which is not available in this view');return}
+  if(!sample){toast('Dictation is not available in this view');return}
   vState.open=true;updateFab();const v=$('#voice');const k=sel;
   v.innerHTML=`<div class="vsheet" role="dialog" aria-label="Dictate"><div class="vh"><b>${vTab().head}</b><span>${fmtD(k,{weekday:'long',day:'numeric',month:'short'})}</span><button type="button" class="x" id="vClose" aria-label="Close">×</button></div>
     <textarea id="v-text" placeholder="${esc(vTab().ph)}"></textarea>
@@ -807,7 +807,7 @@ function toggleListen(){
   rec.onend=()=>{if(vState.listening)stopListen();const it=$('#v-interim');if(it)it.textContent=''};
   try{rec.start();vState.listening=true;const b=$('#vSpeak');if(b){b.classList.add('on');b.querySelector('span').textContent='Stop'}}catch(e){speechBlocked()}
 }
-function speechBlocked(){vState.blocked=true;stopListen();const b=$('#vSpeak');if(b)b.remove();const h=$('#v-hint');if(h)h.textContent="The microphone can't be used directly inside the Claude app. Tap in the box and use the microphone on your keyboard instead; it works the same.";const t=$('#v-text');if(t)t.focus()}
+function speechBlocked(){vState.blocked=true;stopListen();const b=$('#vSpeak');if(b)b.remove();const h=$('#v-hint');if(h)h.textContent="The microphone can't be used directly here. Tap in the box and use the microphone on your keyboard instead; it works the same.";const t=$('#v-text');if(t)t.focus()}
 function voicePrompt(text,ci){
   const k=iso(sel),pl=planFor(sel),n=new Date();
   return `Turn this spoken update from ${ABOUT} into structured log entries for ${k} (${fmtD(sel,{weekday:'long'})}). It is now ${fmtT(n.getHours()*60+n.getMinutes())} on ${iso(todayDate())}. Only include what they actually say or clearly imply; leave everything else out.${ci?' This is their morning check-in: sleep is last night, how they feel is this morning, and work, family time, habits and other training are yesterday.':''}
@@ -925,7 +925,7 @@ function adjBanner(pl){if(!pl||!pl.adj)return '';const a=pl.adj;const k=iso(sel)
   return `<div class="adjb"><div><b>${a.src==='move'?'Moved':'Adjusted'}${a.was&&a.was!==pl.type?`: was ${esc(TNAME[a.was]||'')}`:''}</b>${a.note?`<br><span>${esc(a.note)}</span>`:''}</div>${k>=iso(todayDate())&&!L()[k]?`<button type="button" class="ghost" data-xundo="${k}">Undo</button>`:''}</div>`}
 function moveHTML(pl){const k=iso(sel);if(!pl||pl.type==='R'||L()[k]||k<iso(todayDate()))return '';
   const isToday=k===iso(todayDate());const skip=isToday&&!((D()[k]||{}).trainIntent==='no');
-  if(!xState.moveOpen)return `<div class="movebar"><button type="button" class="ghost" id="mvPost">⏭ Postpone a day</button><button type="button" class="ghost" id="mvOpen">⇄ Move</button>${skip?`<button type="button" class="ghost" id="mvSkip">Skip today</button>`:''}</div>`;
+  if(!xState.moveOpen)return `<div class="movebar"><button type="button" class="ghost" id="mvPost">⏭ Postpone</button><button type="button" class="ghost" id="mvOpen">⇄ Move</button>${skip?`<button type="button" class="ghost" id="mvSkip">Skip today</button>`:''}</div>`;
   const opts=[];for(let i=-3;i<=7;i++){const d=addD(sel,i),kk=iso(d),p=planFor(d);if(kk===k||kk<iso(todayDate())||!p||L()[kk])continue;opts.push(`<button type="button" data-mvto="${kk}" style="--c:var(${TVAR[p.type]})"><b>${fmtD(d,{weekday:'short'})} ${d.getDate()}</b><span>${esc(TNAME[p.type])}</span></button>`)}
   return `<article class="card"><div class="chead"><div style="flex:1"><h2>Move ${esc(TNAME[pl.type])} to…</h2><div class="sub">The two days swap. Then the app checks the rest of your week and eases anything that ends up too close together.</div></div><button type="button" class="x" id="mvClose" aria-label="Close">×</button></div><div class="mvgrid">${opts.join('')||'<div class="hint">No free days in the next week.</div>'}</div></article>`}
 function extrasCardHTML(k){
@@ -1061,7 +1061,7 @@ function dayTodo(){
   if(sampleMode)return null;const t=todayDate(),k=iso(t),d=D()[k]||{},pl=planFor(t),pd=planDay(k),due=planDue(),lg=L()[k];
   const pm=pd?(pd.meals||[]).map((m,ix)=>({m,ix})).filter(x=>!/fasted|drink/i.test(x.m.slot||'')):[];const ticked=pm.filter(x=>planLogged(k,x.ix)).length;
   const items=[['Morning check-in',ciDone(d),'How you slept, how you feel, yesterday\'s work','href="#checkin" data-dtab']];
-  if(pl&&pl.type!=='R'&&!pl.pre)items.push([`Log today's session: ${TNAME[pl.type]}`,!!(lg&&lg.status)||d.trainIntent==='no','Done, partly done or missed. Anything extra goes in Training too.','href="#training" data-dtab']);
+  if(pl&&pl.type!=='R'&&!pl.pre)items.push([`Log today's session: ${TNAME[pl.type]}`,!!(lg&&lg.status)||d.trainIntent==='no','Done, partly done or missed. Anything extra goes in Movement too.','href="#training" data-dtab']);
   if(!kitchen().length)items.push(['Add your food available',false,'What you have at home, or where you\'ll be eating','data-fview="kitchen"']);
   else if(due)items.push(['Plan your next 3 days of meals',false,'Check your food available is up to date first','data-fview="plan"']);
   items.push(['Log today\'s food',!!d.foodDone,pm.length?`${ticked} of ${pm.length} planned meals ticked off. Tap "That's everything" at the end of the day.`:'Log what you eat, then tap "That\'s everything" at the end of the day.','data-fview="today"']);
@@ -1136,7 +1136,7 @@ function intentHTML(k,f){
     <div class="hint" style="font-size:12.5px;color:var(--muted)">${planned?'Are you doing it today? Your food targets follow your answer.':'No session planned. Are you training anyway? Your food targets follow your answer.'}</div>
     <div class="seg">${opts.map(([v,l])=>`<button type="button" data-form="d" data-seg="trainIntent" data-v="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>
     ${cur&&cur!=='no'?`<div class="field" style="max-width:200px"><label class="label" for="ci-tt">Roughly when?</label><input id="ci-tt" type="time" value="${esc(f.trainTime||trainTimeFor(k))}" data-bind="d.trainTime"></div>`:''}
-    ${cur==='no'&&planned?`<div class="hint" style="font-size:12.5px;color:var(--muted)">Want to do it another day instead? Use <b>Move this session</b> in Training.</div>`:''}</div></div></article>`}
+    ${cur==='no'&&planned?`<div class="hint" style="font-size:12.5px;color:var(--muted)">Want to do it another day instead? Use <b>Move</b> in Movement.</div>`:''}</div></div></article>`}
 function intentChip(d){const k=d.date,p=planFor(parse(k));const planned=!!(p&&p.type!=='R'&&!p.pre);const t=d.trainIntent;
   if(!t)return '';return t==='no'?(planned?'Skipping today\'s session':'Rest day'):`Training today${d.trainTime?` · ${esc(d.trainTime)}`:''}`}
 async function setIntent(v){const k=iso(sel);await persistDay(k,{trainIntent:v});dDraft=null;toast(v==='no'?'Got it. Food targets switched to a rest day.':'Got it. Food targets switched to a training day.',3500);render()}
@@ -1179,7 +1179,7 @@ function microsHTML(t,dt,k){
   const gaps=t.microN>=2?micros.map(n=>{const tg=nutTarget(n.k,dt);return {n,pct:tg.lo?t[n.k]/tg.lo:1}}).filter(x=>x.pct<.6).sort((a,b)=>a.pct-b.pct).slice(0,4):[];
   const fib=NUTS.find(x=>x.k==='fibre');const ftg=nutTarget('fibre',dt);if(t.microN>=2&&ftg.lo&&t.fibre<ftg.lo*.6&&gaps.length<4)gaps.push({n:fib,pct:t.fibre/ftg.lo});
   const all=NUTS.filter(n=>!n.macro);const ok=all.filter(n=>status(t[n.k],nutTarget(n.k,dt))==='ok').length;
-  return `${gaps.length?`<div class="gapbox"><div class="gh"><b>${late?'Worth topping up':'Running low so far today'}</b><small>Tap one to see which foods have it</small></div><div class="gchips">${gaps.map(g=>`<button type="button" class="gchip ${fx.gap===g.n.k?'on':''}" data-gap="${g.n.k}">${esc(g.n.l)} <i>${Math.round(g.pct*100)}%</i></button>`).join('')}</div>${fx.gap&&NUT_FOODS[fx.gap]&&gaps.some(g=>g.n.k===fx.gap)?`<div class="gfood"><b>Good sources of ${esc(NUTS.find(x=>x.k===fx.gap).l.toLowerCase())}:</b> ${esc(NUT_FOODS[fx.gap])}.</div>`:''}</div>`:''}
+  return `${gaps.length?`<button type="button" class="gapbar" id="gapTog" aria-expanded="${gapOpen}"><span aria-hidden="true" style="flex:none;color:var(--s)">ⓘ</span><b>${late?'Worth topping up':'Low so far'}: ${gaps.length}</b><span>${esc(gaps.map(g=>g.n.l).join(', '))}</span>${gapOpen?'▴':'▾'}</button>`:''}${gaps.length&&gapOpen?`<div class="gapbox"><div class="gh"><b>${late?'Worth topping up':'Running low so far today'}</b><small>Tap one to see which foods have it</small></div><div class="gchips">${gaps.map(g=>`<button type="button" class="gchip ${fx.gap===g.n.k?'on':''}" data-gap="${g.n.k}">${esc(g.n.l)} <i>${Math.round(g.pct*100)}%</i></button>`).join('')}</div>${fx.gap&&NUT_FOODS[fx.gap]&&gaps.some(g=>g.n.k===fx.gap)?`<div class="gfood"><b>Good sources of ${esc(NUTS.find(x=>x.k===fx.gap).l.toLowerCase())}:</b> ${esc(NUT_FOODS[fx.gap])}.</div>`:''}</div>`:''}
   <details class="wu" style="margin:0 16px 10px"><summary>All vitamins &amp; minerals · ${t.n?`${ok} of ${all.length} on target`:'none logged'}</summary><div class="macs" style="padding:4px 0 12px">${all.map(n=>nutBar(n,t[n.k],nutTarget(n.k,dt))).join('')}${t.n&&t.microN<t.n?`<div class="hint" style="font-size:12px;color:var(--muted)">${t.n-t.microN} item${t.n-t.microN>1?'s have':' has'} calories and macros only, so these may read low.</div>`:''}</div></details>`;
 }
 function drinksHTML(k){
@@ -1190,7 +1190,7 @@ function drinksHTML(k){
   const alc=alcOn()?`<div class="arow"><button type="button" class="alink" id="alcTog"><span aria-hidden="true">🍺</span> Alcohol: <b>${wk} standard drink${wk===1?'':'s'}</b> this week${alcToday.length?` · ${alcToday.length} today`:''} <i>${fx.alc?'▴':'▾'}</i></button>
     ${fx.alc?`<div class="apick">${can?ALC.map((a,i)=>`<button type="button" class="ghost" data-alc="${i}">${a[0]}</button>`).join(''):''}</div><div class="hint" style="font-size:12px;color:var(--muted)">Irish low-risk guide: up to ${lim} standard drinks a week, spread out, with 2-3 alcohol-free days. A pint is 2, a pub measure 1. Drinks count toward your calories.${alcToday.length?' Remove one from the food list below.':''} <button type="button" class="linkbtn" id="alcOff" style="padding:0">I don't drink: hide this</button></div>`:''}</div>`
     :`<button type="button" class="linkbtn" id="alcOn" style="font-size:12px;padding:0 16px 10px;color:var(--muted)">+ Track alcohol</button>`;
-  return `<article class="card drinks"><div class="form" style="gap:10px">${water}</div>${alc}${suppHTML(k)}</article>`;
+  return `<article class="card drinks">${alc}${suppHTML(k)}</article>`;
 }
 function suppHTML(k){
   const d=D()[k]||{};const list=supps();const can=!sampleMode&&k<=iso(todayDate());const miss=d.suppMissed||[];
@@ -1214,8 +1214,8 @@ Reply with ONLY JSON: {"name":"","dose":"","nut":{}}`,photo?{images:photo}:{mode
   if(!s.name){fx={...fx,supBusy:false,supMsg:'Type the name, or try a clearer photo.'};render();return}
   await persistMeta('supps',{list:supps().concat([s])});fx={...fx,supAdd:false,supBusy:false,supMsg:''};toast(`Added ${s.name}. It counts as taken each day unless you untick it.`,4000);render();
 }
-async function toggleSupp(id){const k=iso(sel);const d=D()[k]||{};const m=(d.suppMissed||[]).slice();const i=m.indexOf(id);if(i>=0)m.splice(i,1);else m.push(id);await persistDay(k,{suppMissed:m});render()}
-async function addWater(v){const k=iso(sel);const d=D()[k]||{};const w=Math.max(0,Math.round(((+d.water||0)+v)*100)/100);await persistDay(k,{water:w});render()}
+async function toggleSupp(id){const k=iso(sel);const d=D()[k]||{};const m=(d.suppMissed||[]).slice();const i=m.indexOf(id);if(i>=0)m.splice(i,1);else m.push(id);persistDay(k,{suppMissed:m});render()}
+async function addWater(v){const k=iso(sel);const d=D()[k]||{};const w=Math.max(0,Math.round(((+d.water||0)+v)*100)/100);persistDay(k,{water:w});render()}
 async function addAlc(i){const a=ALC[i];const k=iso(sel);const now=new Date();const it={name:a[0],qty:'1',meal:'Snack',at:k===iso(todayDate())?fmtT(now.getHours()*60+now.getMinutes()):'21:00',est:true,src:'alcohol',sd:a[1],micros:false,plants:[]};NK.forEach(x=>it[x]=0);it.kcal=a[2];it.carbs=a[3];
   await addFood([it],k);toast(`${a[0]} logged (${a[1]} standard drink${a[1]===1?'':'s'})`);render()}
 // ---- coach's overview as short points that open up ----
@@ -1260,6 +1260,11 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(c('#mvSkip')){setIntent('no');return}
 });
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='spPhoto'&&e.target.files&&e.target.files[0])addSupp('',e.target.files[0])});
+
+function waterHTML(k){const d=D()[k]||{};const w=+d.water||0;const tgt=WATER[1]||3;const pct=Math.min(100,w/tgt*100);const can=!sampleMode&&k<=iso(todayDate());
+  return `<div class="wline"><span class="wico" aria-hidden="true">💧</span><div class="wbar"><div class="wh"><b>Water</b><span class="num">${Math.round(w*100)/100} of ${WATER[0]}-${WATER[1]} L</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:var(--h)"></div></div></div>${can?`<div class="wbtns">${[[.25,'Glass'],[.5,'500 ml'],[.75,'Bottle']].map(([v,l])=>`<button type="button" data-water="${v}">+ ${l}</button>`).join('')}${w>0?`<button type="button" data-water="-0.25" aria-label="Take off a glass">−</button>`:''}</div>`:''}</div>`}
+let gapOpen=false;
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);if(c('#stripTog')){stripOpen=!stripOpen;render();return}if(c('#gapTog')){gapOpen=!gapOpen;render();return}});
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -1436,7 +1441,7 @@ Write a short review in plain text, no headings, no bold. Use 6-10 bullet points
   try{const {text}=await sample(prompt,{onText:({text})=>{aiState.text=text;const el=$('#aiOut');if(el)el.textContent=text},cache:false});
     aiState={busy:false,text,err:''};
     if(!sampleMode&&metaCol){try{meta.overview={text,at:new Date().toISOString()};await metaCol.doc('overview').set(meta.overview)}catch(e){}}
-  }catch(e){const m={not_granted:'The overview needs your permission to use Claude.',rate_limited:'Too many requests just now. Try again in a few minutes.'};aiState={busy:false,text:e.text||'',err:m[e&&e.code]||'Could not finish the overview. Try again.'}}
+  }catch(e){const m={not_granted:'The overview needs your permission to use the AI coach.',rate_limited:'Too many requests just now. Try again in a few minutes.'};aiState={busy:false,text:e.text||'',err:m[e&&e.code]||'Could not finish the overview. Try again.'}}
   render();
 }
 function viewReports(){
@@ -1468,7 +1473,7 @@ function viewReports(){
   const inj=injuryAnalysis(),slp=sleepTimingChart(now);
   const rhr=series('rhr'),strn=[];for(let i=41;i>=0;i--){const d=addD(now,-i),s=strain(iso(d));if(s!=null)strn.push({x:d/DAY,y:s,lab:short(d)})}
   const savedAI=!sampleMode&&meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');
-  const aiPanel=`<section class="panel"><h3>Coach's overview</h3><div class="hint">Claude reads your last 4 weeks of check-ins, food and sessions and picks out what matters.${savedAI&&!aiState.text?` Last run ${fmtD(new Date(savedAI.at))}.`:''}</div>
+  const aiPanel=`<section class="panel"><h3>Coach's overview</h3><div class="hint">Your coach reads your last 4 weeks of check-ins, food and sessions and picks out what matters.${savedAI&&!aiState.text?` Last run ${fmtD(new Date(savedAI.at))}.`:''}</div>
     ${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
     ${sample?`<button type="button" class="primary" id="aiBtn" ${aiState.busy?'disabled':''} style="flex:none">${aiState.busy?'Working…':aiText?'Refresh overview':'Get overview'}</button>`:'<div class="hint">Not available in this view.</div>'}</section>`;
   const W=(title,hint,body)=>`<section class="panel"><h3>${title}</h3>${hint?`<div class="hint">${hint}</div>`:''}${body}</section>`;
@@ -1586,7 +1591,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('#vSpeak')){toggleListen();return}
   if(e.target.closest('#vGo')){if(!vState.busy)runVoice();return}
   const s=e.target.closest('[data-seg]');if(s){
-    if(s.dataset.form==='dt'){const t=$('#f-say');if(t)fState.text=t.value;persistDay(iso(sel),{dayType:s.dataset.v}).then(()=>render());return}
+    if(s.dataset.form==='dt'){const t=$('#f-say');if(t)fState.text=t.value;persistDay(iso(sel),{dayType:s.dataset.v});render();return}
     if(s.dataset.form==='f'){const t=$('#f-say');if(t)fState.text=t.value;fState.meal=s.dataset.v;render();return}
     readAll();const tgt=s.dataset.form==='s'?sDraft:s.dataset.form==='y'?yDraft:dDraft;const v=s.dataset.v;const val=isNaN(+v)?v:Number(v);tgt[s.dataset.seg]=String(tgt[s.dataset.seg])===String(val)&&s.dataset.seg!=='status'?null:val;if(s.dataset.form==='s')sDirty=true;else dDirty=true;render();return}
   const hb=e.target.closest('[data-habit]');if(hb){readAll();toggleIn(yDraft.habits=yDraft.habits||[],hb.dataset.habit);dDirty=true;render();return}
@@ -1776,7 +1781,7 @@ function obHTML(){
       ${pr.rules?`<details class="wu"><summary>Food planning rules</summary><div style="white-space:pre-wrap;font-size:13.5px;padding-bottom:10px">${esc(pr.rules)}</div></details>`:''}
       <div class="hint" style="font-size:13px;color:var(--muted)">Starts ${fmtD(parse(pr.plan.firstDay))}. You can rebuild it any time from your profile.</div>
       <button type="button" class="primary" id="obStart">${kitchen().length?'Start':'Next: your food ›'}</button><button type="button" class="ghost" id="obBuild">Build it again</button>`
-    :`<h2>Build your plan</h2>${ob.msg&&!ob.busy?`<div class="note" style="margin:0">${esc(ob.msg)}</div>`:''}<p class="gsub" style="margin:0">Check your answers. Tap any section to change it. Then Claude builds your 16-week training plan, your food targets for training and rest days, and the rules your meal planning follows. It takes about a minute.</p>${obReview()}
+    :`<h2>Build your plan</h2>${ob.msg&&!ob.busy?`<div class="note" style="margin:0">${esc(ob.msg)}</div>`:''}<p class="gsub" style="margin:0">Check your answers. Tap any section to change it. Then the app builds your 16-week training plan, your food targets for training and rest days, and the rules your meal planning follows. It takes about a minute.</p>${obReview()}
       <button type="button" class="primary" id="obBuild" ${ob.busy?'disabled':''}>${ob.busy?'Building your plan… up to 2 minutes':'Build my plan'}</button>${ob.err?`<div class="alert amber">${esc(ob.err)}</div>`:''}
       ${IS_OWNER?`<div class="note" style="margin-top:6px"><b>Owner shortcut.</b> Skip the build and load the original Road to February plan and nutrition guide.<div class="field" style="margin-top:8px"><label class="label" for="ob-about">Describe yourself in a line (used by the coach and food estimates)</label><textarea id="ob-about" data-ob="about" placeholder="e.g. 82 kg sheep and cattle farmer, senior Gaelic footballer, father of two, no alcohol">${esc(ob.a.about||'')}</textarea></div><button type="button" class="ghost" id="obOwner" style="margin-top:8px;color:var(--fg)">Load my original plan</button></div>`:''}`}
   return `<div class="gcard wide"><div class="obprog">${OB_STEPS.map((x,i)=>`<span class="${i<s?'done':i===s?'cur':''}">${x}</span>`).join('')}</div>${body}
@@ -1990,7 +1995,7 @@ async function howtoSheet(name){
     <div class="row2"><div class="note" style="margin:0"><b style="color:var(--ok)">Easier:</b> ${esc(g.easier||'')}</div><div class="note" style="margin:0"><b style="color:var(--s)">Harder:</b> ${esc(g.harder||'')}</div></div>
     <a class="ghost vidlink" href="${ytLink(name)}" target="_blank" rel="noopener">▶ Watch video demos</a>`);return}
   const pose=POSES.find(p=>p.name.toLowerCase()===name.toLowerCase());if(pose){poseSheet(pose);return}
-  openSheet(head+`<div class="ds" role="status">${sample?'Writing the guide… a few seconds.':'Guides need Claude, which is not available here.'}</div><a class="ghost vidlink" href="${ytLink(name)}" target="_blank" rel="noopener">▶ Watch video demos</a>`);
+  openSheet(head+`<div class="ds" role="status">${sample?'Writing the guide… a few seconds.':'Guides are not available here.'}</div><a class="ghost vidlink" href="${ytLink(name)}" target="_blank" rel="noopener">▶ Watch video demos</a>`);
   if(!sample||howBusy)return;howBusy=true;
   try{const out=await sample.json(`Write a short, clear technique guide for the exercise "${name}" for ${ABOUT||'an adult who trains'}. Plain words, no jargon.
 "areas": the main areas worked, using only these keys: ${JSON.stringify(Object.keys(REG_LABEL))}.
@@ -2049,7 +2054,7 @@ document.addEventListener('input',e=>{if(e.target.id==='ci-say')ciState.text=e.t
 const DEMO_EXAMPLE=null;
 const FEATURES=[
  ['Talk, don\'t type','Tap Dictate and say how you slept, how you feel, what you ate and how training went. It fills everything in for you.','var(--accent)'],
- ['A plan built around you','Tell it your sport, goals and week. Claude builds a 16-week training plan and daily food targets to match.','var(--s)'],
+ ['A plan built around you','Tell it your sport, goals and week. It builds a 16-week plan and daily food targets to match.','var(--s)'],
  ['Meals from food you can get','Tap or say what you have in. It plans the next 3 days of meals to hit your targets and writes the shopping list.','var(--e)'],
  ['Your status at a glance','Each morning a readiness score from sleep, energy and niggles tells you whether to push on or back off.','var(--h)'],
  ['It spots the patterns','Reports link sleep, work, food and training load to how you feel, and flag what came before a niggle.','var(--x)']];
@@ -2140,7 +2145,7 @@ function obTalkHTML(){
 async function obParse(){
   const el=$('#ob-talk');const t=(el&&el.value||ob.talk||'').trim();ob.talk=t;
   if(!t){toast('Say or type a few sentences first');return}
-  if(!sample){ob.msg='This needs Claude. Answer step by step instead.';obRender();return}
+  if(!sample){ob.msg='Talking it through is not available here. Answer step by step instead.';obRender();return}
   ob.busy=true;ob.msg='';obRender();
   try{const out=await sample.json(`Fill in a fitness app's sign-up form from what this person said. Today is ${iso(todayDate())}. Only include what they said or clearly implied; leave every other key out.
 Free-text keys: "name"; "age" (number); "weight" (kg as a number, convert stone and pounds); "height" (cm as a number, convert feet and inches); "target" (event or date they're aiming for); "success" (what a great result looks like); "time" (usual training time as "HH:MM", 24 h); "fixed" (sessions they already do, with days and times); "injuries"; "jobDesc"; "start" (start date as "YYYY-MM-DD"); "foodNotes".
