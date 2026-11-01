@@ -410,23 +410,20 @@ function foodTodayHTML(dIso){
     <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants this week${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
   </article>
   ${closeDayNudge(dIso)}${drinksHTML(dIso)}${planMismatch(dIso)}${planVsHTML(dIso)}${pd?`<article class="card"><div class="chead"><div style="flex:1"><h2>${dIso===iso(todayDate())?'Your plan for today':'Your plan for this day'}</h2><div class="sub">${esc(pd.note||'Tap Ate this as you go. Changes go in the diary.')}</div></div></div>${planMealsHTML(dIso)}</article>`:''}
-  <article class="card"><div class="form">
-      <h3>Food diary</h3>
+  ${eatenHTML(d)}<article class="card"><div class="form">
+      <h3>Add food</h3>
       ${ai?`<div class="field"><label class="label" for="f-say">Say it in your own words, any time of day</label><textarea id="f-say" placeholder="e.g. Coffee and SIS tab before training. Porridge with whey after at 8. Chicken salad bowl at 1. Cappuccino at 3. Ribeye and mushrooms at 7, 2 brownies after." style="min-height:110px">${esc(diaryText)}</textarea>
         <div class="hint" style="font-size:12px;color:var(--muted)">Use the microphone on your phone keyboard to talk. Mention times and they set your fasting hours. Only log things not already ticked off from the plan.</div></div>
       <div class="actions"><button type="button" class="primary" id="fParse" ${fState.busy?'disabled':''} style="font-size:17px">${fState.busy?'Working…':(d.food||[]).some(i=>i.src==='diary')?'Update from diary':'Work out my day'}</button></div>`:'<div class="hint">Smart estimates are not available in this view. Use the quick adds below.</div>'}
       ${canImg?`<label class="cambtn">📷 Snap your plate<input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}
       ${fState.msg?`<div class="hsum" role="status">${esc(fState.msg)}</div>`:''}
       <div class="field"><span class="label">Meal for photos and quick adds</span>${seg('f','meal',MEALS,meal,null,'small')}</div>
-      ${lib.length?`<details class="wu"><summary>Quick add from your meal guide</summary><div class="tags" style="padding-bottom:10px">${lib.map(x=>`<button type="button" data-lib="${LIB.indexOf(x)}">${esc(x[0])}</button>`).join('')}</div></details>`:''}
-      ${freq.length?`<div class="field"><span class="label">Your usual extras</span><div class="tags">${freq.map((i,ix)=>`<button type="button" data-quick="${ix}">${esc(i.name)}${i.qty?` · ${esc(i.qty)}`:''}</button>`).join('')}</div></div>`:''}
+      ${lib.length||freq.length?`<details class="wu qadd"><summary>Quick add</summary>${freq.length?`<div class="label">Your usual</div><div class="tags">${freq.map((i,ix)=>`<button type="button" data-quick="${ix}">${esc(i.name)}${i.qty?` · ${esc(i.qty)}`:''}</button>`).join('')}</div>`:''}${lib.length?`<div class="label">From your meal guide</div><div class="tags">${lib.map(x=>`<button type="button" data-lib="${LIB.indexOf(x)}">${esc(x[0])}</button>`).join('')}</div>`:''}</details>`:''}
   </div>
-  ${groups?`<div class="meals" style="border-top:1px solid var(--line);padding-top:6px">${groups}</div>`:''}
-  <div class="form" style="border-top:1px solid var(--line)"><h3>Fasting &amp; water</h3>
-      <div class="row3"><div class="field"><label class="label" for="ffm">First food</label><input id="ffm" type="time" value="${esc(d.firstMeal||(win?fmtT(win.first):''))}" data-food="firstMeal"></div>
-      <div class="field"><label class="label" for="flm">Last food</label><input id="flm" type="time" value="${esc(d.lastMeal||(win?fmtT(win.last):''))}" data-food="lastMeal"></div>
-      <div class="field"><label class="label" for="fw">Water (L)</label><input id="fw" type="number" inputmode="decimal" step="0.25" value="${d.water??''}" data-food="water"></div></div>
-      <div class="hint" style="font-size:12.5px;color:var(--muted)">${fh!=null?`Overnight fast into today: <b style="color:var(--fg)">${fh} h</b> (target ${targets().fastH} h).`:'Fasting hours appear once yesterday and today both have food times.'} Black coffee, tea and the SIS tablet don't break the fast. Water target ${WATER[0]}-${WATER[1]} L.</div></div></article>`;
+  <div class="form" style="border-top:1px solid var(--line)"><h3>Fasting</h3>
+      <div class="row2"><div class="field"><label class="label" for="ffm">First food</label><input id="ffm" type="time" value="${esc(d.firstMeal||(win?fmtT(win.first):''))}" data-food="firstMeal"></div>
+      <div class="field"><label class="label" for="flm">Last food</label><input id="flm" type="time" value="${esc(d.lastMeal||(win?fmtT(win.last):''))}" data-food="lastMeal"></div></div>
+      <div class="hint" style="font-size:12.5px;color:var(--muted)">${fh!=null?`Overnight fast into today: <b style="color:var(--fg)">${fh} h</b> (target ${targets().fastH} h).`:'Fasting hours appear once yesterday and today both have food times.'} Black coffee, tea and the SIS tablet don't break the fast.</div></div></article>`;
 }
 function planHTML(){
   const p=plan();const k=kitchen();const due=planDue();
@@ -467,10 +464,10 @@ const NUT_JSON=`"kcal","protein","carbs" (NET carbs = total minus fibre),"fat","
 const foodRules=()=>`Estimate realistic portions for ${PORTION} unless amounts are given. Use cooked weights for meat and fish.
 For each item give ${NUT_JSON}.
 Coffees and teas ARE items (an almond cappuccino is about 44 kcal, 4 g net carbs, 125 mg caffeine; tea with almond milk about 45 mg caffeine). Plain water and the SIS electrolyte tablet (about 0 kcal, 500 mg sodium) can be items too if mentioned. Supplements count as items.
-"meal" is one of "Breakfast","Lunch","Dinner","Snack". "at" is the time eaten as "HH:MM" (24 h) when stated or clearly implied, else null.
+"meal" is one of "Breakfast","Lunch","Dinner","Snack". "dish" is the dish or plate the item belongs to (e.g. "Chicken stir-fry"): items eaten together on one plate share the same dish name; a stand-alone item such as a coffee has "dish":"". "at" is the time eaten as "HH:MM" (24 h) when stated or clearly implied, else null.
 Reply with ONLY JSON: {"items":[{"name":"short name","qty":"amount","meal":"Lunch","at":"13:00","kcal":0,"protein":0,"carbs":0,"fat":0,"fibre":0,"sodium":0,"potassium":0,"magnesium":0,"calcium":0,"iron":0,"zinc":0,"selenium":0,"iodine":0,"vitA":0,"vitC":0,"vitD":0,"vitK":0,"b12":0,"folate":0,"choline":0,"omega3":0,"caffeine":0,"plants":["spinach"]}],"water":litres of plain water mentioned or null}`;
 function cleanItems(arr,meal,est,src){const nowT=iso(sel)===iso(todayDate())?fmtT(new Date().getHours()*60+new Date().getMinutes()):null;
-  return (Array.isArray(arr)?arr:[]).filter(x=>x&&x.name).map(x=>{const m=MEALS.includes(x.meal)?x.meal:meal;const o={name:String(x.name).slice(0,70),qty:String(x.qty||'').slice(0,60),meal:m,at:tmin(x.at)!=null?fmtT(tmin(x.at)):(nowT&&src!=='diary'?nowT:MEAL_T[m]),est:!!est,src:src||'manual'};
+  return (Array.isArray(arr)?arr:[]).filter(x=>x&&x.name).map(x=>{const m=MEALS.includes(x.meal)?x.meal:meal;const o={name:String(x.name).slice(0,70),dish:String(x.dish||'').slice(0,50),qty:String(x.qty||'').slice(0,60),meal:m,at:tmin(x.at)!=null?fmtT(tmin(x.at)):(nowT&&src!=='diary'?nowT:MEAL_T[m]),est:!!est,src:src||'manual'};
     NK.forEach(k=>{o[k]=k==='kcal'?(isNum(x.kcal)?Math.round(+x.kcal):null):Math.max(0,+x[k]||0)});o.plants=Array.isArray(x.plants)?x.plants.map(p=>String(p).toLowerCase().slice(0,30)).slice(0,15):[];if(x.micros===false)o.micros=false;return o})}
 async function persistDay(k,fields){
   const cur=days[k]||{date:k};const doc={...cur,...fields,date:k,savedAt:new Date().toISOString()};days[k]=doc;
@@ -694,7 +691,7 @@ function viewTraining(){
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
   return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+extrasCardHTML(key)+patternHTML()+pill+food+nudge;
 }
-function trainSub(cur){return `<div class="subtabs">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}<button type="button" data-tomob aria-pressed="${cur==='mob'}">Mobility</button></div>`}
+function trainSub(cur){return `<div class="subtabs">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}<button type="button" data-tomob aria-pressed="${cur==='mob'}">Recover</button></div>`}
 function viewTrainingTab(){return (tView==='today'?dayHeader():'')+trainSub(tView)+(tView==='plan'?viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+checkinHTML(iso(sel))}
 function viewFood(){return dayHeader()+foodHTML(iso(sel))+(fView==='today'?foodDoneHTML(iso(sel)):'')}
@@ -1064,7 +1061,7 @@ function dayTodo(){
   if(pl&&pl.type!=='R'&&!pl.pre)items.push([`Log today's session: ${TNAME[pl.type]}`,!!(lg&&lg.status)||d.trainIntent==='no','Done, partly done or missed. Anything extra goes in Movement too.','href="#training" data-dtab']);
   if(!kitchen().length)items.push(['Add your food available',false,'What you have at home, or where you\'ll be eating','data-fview="kitchen"']);
   else if(due)items.push(['Plan your next 3 days of meals',false,'Check your food available is up to date first','data-fview="plan"']);
-  items.push(['Log today\'s food',!!d.foodDone,pm.length?`${ticked} of ${pm.length} planned meals ticked off. Tap "That's everything" at the end of the day.`:'Log what you eat, then tap "That\'s everything" at the end of the day.','data-fview="today"']);
+  items.push(['Log today\'s food',!!d.foodDone,pm.length?`${ticked} of ${pm.length} planned meals ticked off. Sign off at the end of the day.`:'Log what you eat, then sign off at the end of the day.','data-fview="today"']);
   return items;
 }
 let todoOpen=false;
@@ -1088,9 +1085,6 @@ function planVsHTML(k){
   const bar=(lab,a,p,u)=>{const pc=p?Math.round(a/p*100):0;const col=pc>=90&&pc<=110?'var(--ok)':pc>=75&&pc<=125?'var(--warn)':'var(--muted)';return `<div class="mac"><div class="mh"><span>${lab}</span><span><b class="num">${Math.round(a)}</b> of ${Math.round(p)}${u} planned · ${pc}%</span></div><div class="tr"><div class="fl" style="width:${Math.min(100,pc)}%;background:${col}"></div></div></div>`};
   return `<article class="card"><div class="chead"><div style="flex:1"><h2>Plan vs eaten</h2><div class="sub">${ticked} of ${pt.meals} planned meals ticked off${food.length&&!ticked?' · logged your own way':''}</div></div></div><div class="macs">${bar('Calories',ate.kcal,pt.kcal,'')}${bar('Protein',ate.protein,pt.protein,' g')}</div></article>`;
 }
-function foodDoneHTML(k){if(sampleMode||k>iso(todayDate()))return '';const d=D()[k]||{};
-  return d.foodDone?`<div class="donebar"><span>✓ All food logged for ${k===iso(todayDate())?'today':fmtD(parse(k))}</span><button type="button" class="linkbtn" id="foodUndone">Undo</button></div>`
-    :`<button type="button" class="editwide" id="foodDoneBtn">✓ That's everything I ate ${k===iso(todayDate())?'today':'that day'}</button>`}
 async function savePlanHist(ds){const h=Object.assign({},meta.planHist||{});ds.forEach(pd=>{const t=planTotals(pd);h[pd.date]={meals:t.meals,kcal:Math.round(t.kcal),protein:Math.round(t.protein)}});
   const keys=Object.keys(h).sort();keys.slice(0,Math.max(0,keys.length-90)).forEach(x=>delete h[x]);await persistMeta('planHist',h)}
 function planStickHTML(){
@@ -1202,7 +1196,7 @@ function suppHTML(k){
     <div class="sbtns">${can?`<button type="button" class="linkbtn" id="spAdd">${fx.supAdd?'Cancel':'+ Add a supplement'}</button>`:''}<details class="sinfo"><summary>Which ones are worth it?</summary><ul class="cover">${SUPP_INFO.map(([n,t])=>`<li><b>${n}:</b> ${t}</li>`).join('')}<li>Check with a pharmacist or GP before starting any supplement, especially if you take medication.</li></ul></details></div>${add}</div>`;
 }
 function closeDayNudge(k){const d=D()[k]||{};if(sampleMode||k!==iso(todayDate())||d.foodDone||!(d.food||[]).length||new Date().getHours()<19)return '';
-  return `<div class="adjb"><div><b>Finished eating for today?</b><br><span>Close the day so your totals and reports count it as complete.</span></div><button type="button" class="ghost" id="foodDoneBtn">✓ Done</button></div>`}
+  return `<div class="adjb"><div><b>Finished eating for today?</b><br><span>Close the day so your totals and reports count it as complete.</span></div><button type="button" class="ghost" id="foodDoneBtn">✓ Sign off</button></div>`}
 async function addSupp(nameText,photo){
   fx.supBusy=true;fx.supMsg=photo?'Reading the label…':'';render();
   let s={id:'s'+Date.now().toString(36),name:String(nameText||'').slice(0,50),dose:'',nut:{},since:iso(sel)<iso(todayDate())?iso(sel):iso(todayDate())};
@@ -1265,6 +1259,47 @@ function waterHTML(k){const d=D()[k]||{};const w=+d.water||0;const tgt=WATER[1]|
   return `<div class="wline"><span class="wico" aria-hidden="true">💧</span><div class="wbar"><div class="wh"><b>Water</b><span class="num">${Math.round(w*100)/100} of ${WATER[0]}-${WATER[1]} L</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:var(--h)"></div></div></div>${can?`<div class="wbtns">${[[.25,'Glass'],[.5,'500 ml'],[.75,'Bottle']].map(([v,l])=>`<button type="button" data-water="${v}">+ ${l}</button>`).join('')}${w>0?`<button type="button" data-water="-0.25" aria-label="Take off a glass">−</button>`:''}</div>`:''}</div>`}
 let gapOpen=false;
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);if(c('#stripTog')){stripOpen=!stripOpen;render();return}if(c('#gapTog')){gapOpen=!gapOpen;render();return}});
+
+// ================= polish: eaten list by meal and dish, recovery, sign-off =================
+const MICO={Breakfast:'🍳',Lunch:'🥗',Dinner:'🍽️',Snack:'🍎'};
+function itemRow(i){return `<div class="fitem"><div style="min-width:0"><div class="fn">${esc(i.name)}${i.src==='plan'?' <span class="est">plan</span>':i.src==='alcohol'?' <span class="est">drink</span>':i.est?' <span class="est">est.</span>':''}</div><div class="fq">${esc(i.qty||'')}${i.at?' · '+esc(i.at):''}</div></div><div class="fm num">${kcalOf(i)} kcal<br><span>${(+i.protein||0).toFixed(0)}p · ${(+i.carbs||0).toFixed(0)}c · ${(+i.fat||0).toFixed(0)}f</span></div>${sampleMode?'<span></span>':`<button type="button" class="x" data-del-food="${i.ix}" aria-label="Remove ${esc(i.name)}">×</button>`}</div>`}
+function eatenHTML(d){
+  const food=(d.food||[]).map((i,ix)=>({...i,ix}));if(!food.length)return '';const tot=food.reduce((a,i)=>a+kcalOf(i),0);
+  const secs=MEALS.map(m=>{const its=food.filter(i=>i.meal===m);if(!its.length)return '';
+    const gs=[];its.forEach(i=>{const key=i.dish?String(i.dish).toLowerCase()+'|'+(i.at||''):null;const g=key&&gs.find(x=>x.key===key);if(g)g.items.push(i);else gs.push({key,dish:i.dish,items:[i]})});
+    const rows=gs.map(g=>{if(g.items.length<2||!g.dish)return itemRow(g.items[0]);const kc=g.items.reduce((a,i)=>a+kcalOf(i),0),p=g.items.reduce((a,i)=>a+(+i.protein||0),0);const est=g.items.some(i=>i.est);
+      return `<details class="dish"><summary><div style="min-width:0"><div class="fn">${esc(g.dish)}${est?' <span class="est">est.</span>':''}</div><div class="fq">${g.items.length} items${g.items[0].at?' · '+esc(g.items[0].at):''} · tap to see</div></div><div class="fm num">${kc} kcal<br><span>${Math.round(p)}p</span></div>${sampleMode?'':`<button type="button" class="x" data-del-dish="${g.items.map(i=>i.ix).join(',')}" aria-label="Remove ${esc(g.dish)}">×</button>`}</summary><div class="dishin">${g.items.map(itemRow).join('')}</div></details>`}).join('');
+    const kc=its.reduce((a,i)=>a+kcalOf(i),0),p=its.reduce((a,i)=>a+(+i.protein||0),0);
+    return `<section class="msec"><div class="msh"><span class="mico" aria-hidden="true">${MICO[m]}</span><b>${m}</b><span class="num">${kc} kcal · ${Math.round(p)} g protein</span></div>${rows}</section>`}).join('');
+  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Eaten</h2><div class="sub">${food.length} item${food.length>1?'s':''} · ${tot} kcal</div></div></div><div class="msecs">${secs}</div></article>`;
+}
+// ---- recovery ----
+const RECOV=[['Walk','🚶','Walk'],['Easy cycle','🚴',null],['Swim','🏊',null],['Sea swim','🌊',null],['Ice bath','🧊',null],['Sauna','🔥','Hot tub / sauna'],['Hot tub','♨️','Hot tub / sauna'],['Loosen-out','🤸','Mobility / stretch'],['Stretch / yoga','🧘','Mobility / stretch'],['Foam roll','🌀','Foam roll / massage'],['Massage','💆','Foam roll / massage'],['Nap','😴','Nap']];
+let recS={pick:null};
+function recoveryHTML(k){
+  const d=D()[k]||{};const list=d.recovery||[];const can=!sampleMode&&k<=iso(todayDate());
+  const done=list.map((r,i)=>{const R=RECOV.find(x=>x[0]===r.kind)||['', '•'];return `<span class="kchip">${R[1]} ${esc(r.kind)} <small>${r.min} min</small>${can?`<button type="button" data-rdel="${i}" aria-label="Remove">×</button>`:''}</span>`}).join('');
+  const mins=recS.pick?`<div class="rmins"><span>${esc(recS.pick)}: how long?</span>${[5,10,15,20,30,45,60,90].map(m=>`<button type="button" data-rmin="${m}">${m}</button>`).join('')}</div>`:'';
+  const wk=(()=>{let n=0;for(let i=0;i<7;i++){const x=D()[iso(addD(parse(k),-i))];(x&&x.recovery||[]).forEach(()=>n++)}return n})();
+  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Recovery</h2><div class="sub">${list.length?`${list.length} logged ${k===iso(todayDate())?'today':'this day'} · ${wk} this week`:'Walks, swims, sauna, ice baths and anything that helps you recover. Tap to log.'}</div></div></div>
+    ${done?`<div class="kchips" style="padding:12px 16px 0">${done}</div>`:''}
+    ${can?`<div class="rgrid">${RECOV.map(([n,ic])=>`<button type="button" data-rpick="${esc(n)}" class="${recS.pick===n?'on':''}"><span aria-hidden="true">${ic}</span>${esc(n)}</button>`).join('')}</div>${mins}`:''}</article>`;
+}
+async function logRecovery(min){const k=iso(sel)>iso(todayDate())?iso(todayDate()):iso(sel);const kind=recS.pick;if(!kind)return;const d=D()[k]||{};const R=RECOV.find(x=>x[0]===kind);
+  const now=new Date();const list=(d.recovery||[]).concat([{kind,min,at:k===iso(todayDate())?fmtT(now.getHours()*60+now.getMinutes()):''}]);
+  const fields={recovery:list};if(R&&R[2]){fields.habits=[...new Set((d.habits||[]).concat([R[2]]))]}
+  recS.pick=null;persistDay(k,fields);dDraft=null;toast(`${kind} logged, ${min} min`);render()}
+async function delRecovery(i){const k=iso(sel);const d=D()[k]||{};const list=(d.recovery||[]).slice();list.splice(i,1);persistDay(k,{recovery:list});render()}
+// ---- sign off the day ----
+function foodDoneHTML(k){if(sampleMode||k>iso(todayDate()))return '';const d=D()[k]||{};const tday=k===iso(todayDate());
+  return d.foodDone?`<div class="signed"><span class="tick" aria-hidden="true">✓</span><div><b>${tday?'Today':'This day'} is signed off</b><small>Food and day complete. Reports count it as a full day.</small></div><button type="button" class="linkbtn" id="foodUndone">Undo</button></div>`
+    :`<button type="button" class="donebig" id="foodDoneBtn"><span class="tick" aria-hidden="true">✓</span><span><b>Sign off ${tday?'today':'this day'}</b><small>Tap when you've finished eating and logging</small></span></button>`}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-del-dish]')){const set=new Set(x.dataset.delDish.split(',').map(Number));const k=iso(sel);const cur=((days[k]&&days[k].food)||[]).filter((_,i)=>!set.has(i));persistDay(k,{food:cur});e.preventDefault();render();return}
+  if(x=c('[data-rpick]')){recS.pick=recS.pick===x.dataset.rpick?null:x.dataset.rpick;render();return}
+  if(x=c('[data-rmin]')){logRecovery(+x.dataset.rmin);return}
+  if(x=c('[data-rdel]')){delRecovery(+x.dataset.rdel);return}
+});
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -1573,7 +1608,7 @@ function render(){
   const t=tab();document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===t||(t==='mobility'&&a.dataset.tab==='training')?'page':'false'));
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
-  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?trainSub('mob')+viewMobility():t==='food'?viewFood():t==='dashboard'?viewDashboard():viewReports();
+  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?trainSub('mob')+recoveryHTML(iso(todayDate()))+viewMobility():t==='food'?viewFood():t==='dashboard'?viewDashboard():viewReports();
   updateFab();
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
