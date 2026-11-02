@@ -683,10 +683,10 @@ function viewTraining(){
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
   return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+extrasCardHTML(key)+patternHTML()+pill;
 }
-function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Full plan']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
+function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Overview']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 function viewTrainingTab(){return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+fullPlanTip()+viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+ciChip(iso(sel))+checkinHTML(iso(sel))}
-function viewFood(){return dayHeader()+foodHTML(iso(sel))+(fView==='today'?signChip(iso(sel)):'')}
+function viewFood(){return dayHeader()+foodHTML(iso(sel))}
 function viewPlan(){
   const LL=L(),DD=D(),td=iso(todayDate());
   let h=`<div class="legend">${['S','E','H','T','X'].map(k=>`<span style="--c:var(${TVAR[k]})"><i></i>${TNAME[k]}</span>`).join('')}<span>Solid = done · half = partial · red ring = missed · bar = balance</span></div><div class="pgrid"><span></span>${DOW.map(d=>`<span class="h">${d}</span>`).join('')}`;
@@ -1206,7 +1206,7 @@ async function addAlc(i){const a=ALC[i];const k=iso(sel);const now=new Date();co
 // ---- coach's overview as short points that open up ----
 function ovPointsHTML(text){const pts=String(text||'').split('\n').map(x=>x.trim()).filter(x=>x.startsWith('-')).map(x=>x.replace(/^-\s*/,''));
   if(!pts.length)return `<div class="ai">${esc(text)}</div>`;
-  return `<div class="ovpts">${pts.map(p=>{const [h,...rest]=p.split(' :: ');const det=rest.join(' :: ').trim();return det?`<details class="ovp"><summary>${esc(h)}</summary><p>${esc(det)}</p></details>`:`<div class="ovp"><span>${esc(h)}</span></div>`}).join('')}</div>`}
+  return `<div class="ovpts">${pts.map((p,i)=>{const [h,...rest]=p.split(' :: ');const det=rest.join(' :: ').trim();return det?`<details class="ovp"><summary><span class="ovn">${i+1}</span><span class="ovh">${esc(h)}</span><span class="ovc" aria-hidden="true">${ico('chevron-right')}</span></summary><p>${esc(det)}</p></details>`:`<div class="ovp"><span class="ovn">${i+1}</span><span class="ovh">${esc(h)}</span></div>`}).join('')}</div>`}
 // ---- training: postpone pushes the week back to the next rest day ----
 async function postponeSession(a){
   const pa=planFor(parse(a));if(!pa||pa.type==='R')return;const chain=[a];let rest=false;
@@ -1812,17 +1812,17 @@ function planSum(full){const I=planInfo(),a=I.a,canEdit=!!(I.P&&I.P.answers);
     <div class="kprog" aria-hidden="true"><i style="width:${Math.max(2,Math.min(100,(todayDate()-START)/(END-START)*100))}%"></i></div>
     <div class="krows">${rows.map(([s,l,t])=>canEdit?`<button type="button" class="krow" data-planedit="${s}"><span class="label">${l}</span><span class="kt">${esc(t)}</span><span class="ked">Change</span></button>`:`<div class="krow"><span class="label">${l}</span><span class="kt">${esc(t)}</span></div>`).join('')}</div>
     <small class="ds">${canEdit?'Changing anything rebuilds the plan from today. Everything you have logged stays.':'Your plan runs for 16 weeks. Ask to change it in a chat and it can be rebuilt.'}</small></article>`}
-function planNav(cur){return `<div class="subtabs pnav" style="grid-template-columns:repeat(2,minmax(0,1fr))">${[['today','Day'],['plan','Full plan']].map(([v,l])=>`<button type="button" data-pnav="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
+function planNav(cur){return `<div class="subtabs pnav" style="grid-template-columns:repeat(2,minmax(0,1fr))">${[['today','Day'],['plan','Overview']].map(([v,l])=>`<button type="button" data-pnav="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-pnav]');if(x){const v=x.dataset.pnav;if(v==='recover'){location.hash='recover';return}tView=v;if(tab()!=='training')location.hash='training';else render();window.scrollTo({top:0});return}
   const pe=e.target.closest&&e.target.closest('[data-planedit]');if(pe&&typeof obRender==='function'){ob={step:+pe.dataset.planedit,a:Object.assign({},PROFILE.answers||{}),ret:true,fromApp:true};obSave();obRender();return}
   if(e.target.closest&&e.target.closest('#obCancel')){ob={step:-1,a:{}};obSave();showApp();render();return}});
 function kAvatarSet(){const a=document.getElementById('kAvatar');if(!a)return;let n='';try{n=(PROFILE&&PROFILE.answers&&PROFILE.answers.name)||''}catch(e){}a.textContent=(n||'Me').slice(0,1).toUpperCase()}
 
 // ================= Keel v3: plan sheet, area colours =================
-function planBtn(){const I=planInfo();return `<button type="button" class="kpbtn" data-plansheet><span class="kpic">${ico('calendar')}</span><span class="kpt"><b>Your goal</b><small>${esc(I.goal)} · ${esc(I.line.toLowerCase().replace(/^\w/,c=>c.toUpperCase()))}</small></span><span class="kpgo" aria-hidden="true">›</span></button>`}
+function planBtn(){const I=planInfo();return `<button type="button" class="kpbtn" data-plansheet><span class="kpic">${ico('calendar')}</span><span class="kpt"><b>Your goals</b><small>${esc(I.goal)} · ${esc(I.line.toLowerCase().replace(/^\w/,c=>c.toUpperCase()))}</small></span><span class="kpgo" aria-hidden="true">›</span></button>`}
 function planSheet(open){let h=document.getElementById('psHost');if(!h){h=document.createElement('div');h.id='psHost';document.body.appendChild(h)}
   if(!open){h.innerHTML='';document.body.classList.remove('sheet-open');return}
-  h.innerHTML=`<div class="kshwrap" id="psWrap"><div class="ksheet" role="dialog" aria-modal="true" aria-label="Your goal"><div class="kshead"><h2>Your goal</h2><button type="button" class="x" id="psX" aria-label="Close">${ico('x')}</button></div>${planSum(true)}</div></div>`;document.body.classList.add('sheet-open')}
+  h.innerHTML=`<div class="kshwrap" id="psWrap"><div class="ksheet" role="dialog" aria-modal="true" aria-label="Your goals"><div class="kshead"><h2>Your goals</h2><button type="button" class="x" id="psX" aria-label="Close">${ico('x')}</button></div>${planSum(true)}</div></div>`;document.body.classList.add('sheet-open')}
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
   if(c('[data-plansheet]')){planSheet(true);return}
   if(c('#psX')||e.target.id==='psWrap'){planSheet(false);return}
@@ -1857,6 +1857,20 @@ document.addEventListener('change',e=>{const el=e.target;if(el&&el.id==='xBoard'
 // swipe the week strip left or right to move a week, like a calendar
 (function(){let x0=null,y0=null;document.addEventListener('touchstart',e=>{const st=e.target.closest&&e.target.closest('.kswipe');if(!st){x0=null;return}x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
   document.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;x0=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.5){go(iso(addD(sel,dx<0?7:-7)))}},{passive:true})})();
+// ================= Keel v6: header sign-off, coach accordion, section bands =================
+let coachOpen=false;
+function kSignSet(){const h=document.getElementById('kSign');if(!h)return;let t='';try{t=tab()}catch(e){}
+  if(t!=='food'||sampleMode){h.innerHTML='';return}const k=iso(sel);if(k>iso(todayDate())){h.innerHTML='';return}const d=D()[k]||{};
+  h.innerHTML=d.foodDone?`<button type="button" class="kschip kdone" id="foodUndone" aria-label="Signed off. Tap to undo">${ico('check')}Signed off</button>`
+    :`<button type="button" class="kschip${k===iso(todayDate())&&new Date().getHours()>=19?' kdue':''}" id="signOpen">${ico('circle')}Sign off</button>`}
+function kBands(){let t='';try{t=tab()}catch(e){}if(t!=='reports')return;const app=document.getElementById('app');if(!app||app.querySelector('.ksec'))return;
+  const kids=[...app.children];let cur=null,n=0;kids.forEach(el=>{if(el.classList&&el.classList.contains('sect')){cur=document.createElement('section');cur.className='ksec'+(n++%2?' alt':'');app.insertBefore(cur,el)}if(cur)cur.appendChild(el)})}
+document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='coachAcc')coachOpen=e.target.open},true);
+function coachHTML(aiText,savedAI){const pts=String(aiText||'').split('\n').map(x=>x.trim()).filter(x=>x.startsWith('-')).length;
+  return `<details class="kcoach" id="coachAcc" ${coachOpen||aiState.busy?'open':''}><summary><span class="kpic">${ico('sparkles')}</span><span class="kct"><b>Coach's overview</b><small>${aiState.busy?'Reading your last 4 weeks…':aiText?`${pts||'A few'} things worth knowing${savedAI&&!aiState.text?` · ${fmtD(new Date(savedAI.at))}`:''}`:'Your last 4 weeks, read for you'}</small></span><span class="kchev" aria-hidden="true">${ico('chevron-right')}</span></summary>
+    <div class="kcbody">${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
+    ${sample&&!aiState.busy?`<button type="button" class="kchbtn" id="aiBtn">${aiText?'Refresh overview':'Get my overview'}</button>`:''}</div></details>`}
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -2064,9 +2078,7 @@ function viewReports(){
   const inj=injuryAnalysis(),slp=sleepTimingChart(now);
   const rhr=series('rhr'),strn=[];for(let i=41;i>=0;i--){const d=addD(now,-i),s=strain(iso(d));if(s!=null)strn.push({x:d/DAY,y:s,lab:short(d)})}
   const savedAI=!sampleMode&&meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');
-  const aiPanel=`<section class="panel kcoach"><div class="kch"><span class="kpic">${ico('sparkles')}</span><div style="flex:1;min-width:0"><h3>Coach's overview</h3><div class="hint">The last 4 weeks, in a few points${savedAI&&!aiState.text?` · last run ${fmtD(new Date(savedAI.at))}`:''}</div></div>${sample&&!aiState.busy?`<button type="button" class="kchbtn" id="aiBtn">${aiText?'Refresh':'Get it'}</button>`:''}</div>
-    ${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
-    </section>`;
+  const aiPanel=coachHTML(aiText,savedAI);
   const W=(title,hint,body)=>`<section class="panel"><h3>${title}</h3>${hint?`<div class="hint">${hint}</div>`:''}${body}</section>`;
   return toggle+tiles+aiPanel+planStickHTML()+
    `<div class="sect">Load</div>`+
@@ -2165,7 +2177,7 @@ function render(){
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
   $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
-  updateFab();kAvatarSet();setArea();
+  updateFab();kAvatarSet();setArea();kSignSet();kBands();
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}

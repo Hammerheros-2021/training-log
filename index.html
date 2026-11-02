@@ -915,13 +915,61 @@ body:not([data-area="today"]) .seg button[aria-pressed="true"]{background:var(--
 .mrv b{font:400 17px/22px var(--font-mono)!important}.mrv small{font:400 12px/16px var(--font-body)!important;color:var(--text-muted)}
 .dgrid>.dt:last-child:nth-child(odd){grid-column:1 / -1}
 :root{--r:var(--text-muted)}
+
+/* ================= v6: one calm theme across all five menus ================= */
+body[data-area]{--area:var(--text)}
+.krest{--area:var(--text)}
+.tabs a[aria-current="page"] svg{color:var(--text)!important}
+.tabs a[aria-current="page"]::before{background:var(--fade)!important}
+body:not([data-area="today"]) .subtabs button[aria-pressed="true"],body:not([data-area="today"]) .segmini button[aria-pressed="true"],body:not([data-area="today"]) .seg button[aria-pressed="true"]{background:var(--text)!important;color:var(--on-text)!important}
+.sect::before{background:var(--fade)!important;width:16px;height:4px}
+.ric,.rpic{color:var(--text)!important;background:color-mix(in srgb,var(--text) 8%,var(--surface))!important}
+.fbtn .ki{color:var(--text)}
+.kplanchip svg,.kpic{color:var(--text)!important}.kpic{background:color-mix(in srgb,var(--text) 8%,var(--surface))!important}
+.ktip{background:var(--surface)!important}.ktip .ki{color:var(--text)!important}
+.xboard{background:var(--text)!important}
+/* header chips: goals and sign-off, small and tidy */
+.kbr{gap:var(--space-2)}
+.kplanchip,.kschip{min-height:40px;padding:0 var(--space-3);font:600 14px/20px var(--font-body);gap:6px;border-radius:var(--radius-lg)}
+.kschip{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--surface);color:var(--text)}
+.kschip .ki{font-size:16px;color:var(--text-muted)}
+.kschip.kdue{border-color:var(--status-caution)}.kschip.kdue .ki{color:var(--status-caution)}
+.kschip.kdone{color:var(--text-muted)}.kschip.kdone .ki{color:var(--status-good)}
+.kbar .avatar{width:40px;height:40px}
+/* sections on Progress: a subtle change of background tells you you've moved on */
+.ksec{display:flex;flex-direction:column;gap:var(--space-5);margin:0 calc(-1 * var(--space-5));padding:var(--space-5)}
+.ksec.alt{background:color-mix(in srgb,var(--surface) 45%,var(--bg))}
+.ksec .sect{margin-top:0}
+/* coach's overview: folded until you want it, three levels deep */
+.kcoach{background:linear-gradient(135deg,color-mix(in srgb,var(--fade-blue) 14%,var(--surface)),var(--surface) 60%)!important;border-radius:var(--radius-lg);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 8%,transparent),0 0 0 1px color-mix(in srgb,var(--fade-blue) 25%,transparent)!important;padding:0!important;display:block!important}
+.kcoach>summary{list-style:none;display:flex;align-items:center;gap:var(--space-3);padding:var(--space-4) var(--space-5);min-height:64px;cursor:pointer}
+.kcoach>summary::-webkit-details-marker{display:none}
+.kct{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.kct b{font:600 16px/20px var(--font-body);color:var(--text)}.kct small{color:var(--text-body)}
+.kchev .ki{transition:transform .2s;color:var(--text-muted)}.kcoach[open] .kchev .ki{transform:rotate(90deg)}
+.kcoach .kpic{background:color-mix(in srgb,var(--fade-blue) 22%,var(--surface))!important;color:var(--text)!important}
+.kcbody{display:flex;flex-direction:column;gap:var(--space-3);padding:0 var(--space-5) var(--space-5)}
+.kchbtn{width:100%;min-height:48px;background:var(--text)!important;color:var(--on-text)!important}
+.ovpts{gap:var(--space-2)}
+.ovp{background:var(--bg)!important;border-radius:var(--radius-md)!important;padding:0!important}
+.ovp summary,.ovp>.ovn+.ovh{list-style:none}
+.ovp summary,div.ovp{display:flex!important;align-items:flex-start;gap:var(--space-3);padding:var(--space-4)!important;font:600 15px/22px var(--font-body)!important;color:var(--text)}
+.ovp summary::before{display:none!important}
+.ovn{flex-shrink:0;width:24px;height:24px;border-radius:var(--radius-full);display:grid;place-items:center;background:var(--fade);color:var(--on-text);font:600 13px/1 var(--font-mono)}
+.ovh{flex:1}
+.ovc .ki{color:var(--text-muted);transition:transform .2s}.ovp[open] .ovc .ki{transform:rotate(90deg)}
+.ovp p{margin:0!important;padding:0 var(--space-4) var(--space-4) calc(var(--space-4) + 24px + var(--space-3))!important;font:400 15px/22px var(--font-body)!important;color:var(--text-body)!important}
+.kbr>*{flex-shrink:0}.kplanchip,.kschip{white-space:nowrap}
+.kbar .kmark{flex-shrink:1;min-width:0}
+.sample{background:var(--surface)!important;color:var(--text-body)!important;border-radius:var(--radius-md)!important}
+
+.dgrid>.dt .dl{color:var(--text-muted)!important}
 </style>
 </head>
 <body>
 <div id="gate" class="gate"><div class="gcard"><div class="gbrand"><img src="/keel-wordmark.svg" alt="keel" class="kwm" style="height:34px"></div><p class="gsub">Loading…</p></div></div>
 <div id="appwrap" hidden>
 <div class="wrap">
-  <div class="kbar"><a class="kmark" href="#dashboard" aria-label="keel, today"><img src="/keel-wordmark.svg" alt="keel" class="kwm"></a><span class="kbr"><button type="button" class="kplanchip" data-plansheet><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Your goal</button><a class="avatar" id="kAvatar" href="#profile" aria-label="Profile and settings">·</a></span></div>
+  <div class="kbar"><a class="kmark" href="#dashboard" aria-label="keel, today"><img src="/keel-wordmark.svg" alt="keel" class="kwm"></a><span class="kbr"><span id="kSign"></span><button type="button" class="kplanchip" data-plansheet><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Goals</button><a class="avatar" id="kAvatar" href="#profile" aria-label="Profile and settings">·</a></span></div>
   <header class="top">
     <nav class="tabs" aria-label="Sections">
       <a href="#dashboard" data-tab="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M7 12h10"/></svg><span>Today</span></a>
@@ -941,6 +989,6 @@ body:not([data-area="today"]) .seg button[aria-pressed="true"]{background:var(--
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/app.js"></script>
+<script src="/app.js?v=keel6"></script>
 </body>
 </html>
