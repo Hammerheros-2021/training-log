@@ -406,7 +406,7 @@ function foodTodayHTML(dIso){
   const freq=frequentFoods();const ai=!!sample;const due=planDue();
   const kEmpty=!kitchen().length&&!sampleMode;
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Time to plan ahead'}</b><br><small>Update your food, then let Keel plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
-  <article class="card kmac"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label} <span class="dtwhy">· ${esc(dayTypeWhy(dIso))}</span></h2><div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
+  <article class="card kmac"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label} <span class="dtwhy">· ${esc(dayTypeWhy(dIso))}</span></h2>${(D()[dIso]||{}).trainIntent==='extra'&&!((D()[dIso]||{}).extras||[]).length&&!sampleMode?'<button type="button" class="linkbtn" data-intentclear style="min-height:32px;padding:0">Didn\'t train? Switch back to a rest day</button>':''}<div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
     
     ${macroRings(t,dt)}${waterHTML(dIso)}
     ${microsHTML(t,dt,dIso)}
@@ -733,7 +733,7 @@ function viewDashboard(){
   if(pl&&pl.type!=='R'&&!pl.pre){const lg=LL[k];const name=pl.type==='T'&&!THRMIN[pl.wk-1]?'5 km test':TNAME[pl.type];const st=lg?lg.status:null;
     tSess=`<a class="dt" href="#training" data-dtab style="--c:var(${TVAR[lg&&lg.type==='H'&&pl.type==='T'?'H':pl.type]})"><span class="dl">Today's session</span><b class="mid">${esc(name)}</b><span class="ds">${esc(trainTimeFor(k))}${FASTED()?' · fasted':''}</span><span class="chipx ${st||'todo'}">${st==='done'?'✓ Done':st==='partial'?'◐ Partly done':st==='missed'?'Missed':d&&d.trainIntent==='no'?'Skipping':'Not logged yet'}</span></a>`}
   else{const next=(()=>{for(let i=1;i<=20;i++){const dd=addD(now,i),p=planFor(dd);if(p&&p.type!=='R'&&!p.pre)return {dd,p}}return null})();
-    tSess=`<a class="dt" href="#training" data-dtab><span class="dl">Today's session</span><b class="mid">${pl&&!pl.pre?'Rest day':'No session'}</b>${next?`<span class="ds">Next: ${TNAME[next.p.type]}<br>${fmtD(next.dd)}</span>`:''}</a>`}
+    const ix=(d&&d.extras)||[];tSess=`<a class="dt" href="#training" data-dtab><span class="dl">Today's session</span><b class="mid">${ix.length?'Extra session':d&&d.trainIntent==='extra'?'Training planned':pl&&!pl.pre?'Rest day':'No session'}</b>${ix.length?`<span class="chipx done">✓ Logged</span>`:d&&d.trainIntent==='extra'?'<span class="chipx todo">Not logged yet</span>':''}${next?`<span class="ds">Next: ${TNAME[next.p.type]}<br>${fmtD(next.dd)}</span>`:''}</a>`}
   const dt=dayTypeFor(k),ft=foodTotals(d),kt=nutTarget('kcal',dt),pt=nutTarget('protein',dt),ct=nutTarget('carbs',dt);
   const tFuel=`<a class="dt" href="#food" data-dtab><span class="dl">Fuel · ${DAYT[dt].label}</span><div class="fnum"><b class="num">${Math.round(ft.kcal)}</b><small>of ${kt.t} kcal</small></div>${miniBar('Protein',ft.protein,pt.t,SC[status(ft.protein,pt)],`${Math.round(ft.protein)} / ${pt.t} g`)}${miniBar('Carbs',ft.carbs,ct.t,ft.carbs>ct.hi?'var(--bad)':'var(--e)',`${Math.round(ft.carbs)} / ${ct.hi} g`)}</a>`;
   // fasting
@@ -899,7 +899,8 @@ async function addExtra(){
   }catch(e){xState={...xState,busy:false,msg:foodErr(e)}}
   render();
 }
-async function delExtra(i){const k=iso(sel);const cur=((days[k]&&days[k].extras)||[]).slice();cur.splice(i,1);await persistDay(k,{extras:cur});dDraft=null;render()}
+async function delExtra(i){const k=iso(sel);const cur=((days[k]&&days[k].extras)||[]).slice();cur.splice(i,1);const back=!cur.length&&days[k]&&days[k].trainIntent==='extra';await persistDay(k,back?{extras:cur,trainIntent:null}:{extras:cur});dDraft=null;toast(back?'Removed. Today is back to a rest day and your food targets are updated.':'Session removed');render()}
+document.addEventListener('click',async e=>{if(!(e.target.closest&&e.target.closest('[data-intentclear]')))return;const k=iso(sel);await persistDay(k,{trainIntent:null});dDraft=null;toast('Okay, today is back to a rest day. Food targets updated.',3500);render()});
 async function moveSession(a,b){
   const pa=planFor(parse(a)),pb=planFor(parse(b));if(!pa||!pb)return;const cur=Object.assign({},ADJ());const now=new Date().toISOString();
   const dn=k=>fmtD(parse(k),{weekday:'long'});
@@ -1116,7 +1117,7 @@ function dayTypeAuto(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));const pl
   return planned?'training':'rest'}
 function dayTypeWhy(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));
   if((d.extras||[]).length)return 'you logged extra training';if(l&&l.status)return l.status==='missed'?'session marked missed':'session logged';
-  if(d.trainIntent==='no')return 'not training today';if(d.trainIntent==='extra')return 'training today';return p&&p.type!=='R'&&!p.pre?'from your plan':'no session planned'}
+  if(d.trainIntent==='no')return 'not training today';if(d.trainIntent==='extra')return 'you said you\'d train today';return p&&p.type!=='R'&&!p.pre?'from your plan':'no session planned'}
 function intentHTML(k,f){
   const p=planFor(parse(k));const planned=!!(p&&p.type!=='R'&&!p.pre);const cur=f.trainIntent||null;
   const opts=planned?[['yes',`Yes, as planned`],['no','Not today']]:[['no','No, rest day'],['extra','Yes, something']];
@@ -1305,7 +1306,8 @@ function ciChip(k){if(sampleMode)return '';const d=D()[k]||{};if(k>iso(todayDate
   if(ciDone(d)){const s=readiness(d);return statusRow('done','Checked in',s!=null?`Balance ${s} / 100`:'Saved','')}
   return statusRow('todo','Not checked in yet',k===iso(todayDate())?'Takes 30 seconds: say it or tap below':'','')}
 function sessChip(k){if(sampleMode||tView!=='today')return '';const p=planFor(parse(k)),l=L()[k],d=D()[k]||{};
-  if(!p||p.type==='R'||p.pre)return statusRow('rest',p&&p.type==='R'?'Rest day':'No session planned',(d.extras||[]).length?`${d.extras.length} extra session${d.extras.length>1?'s':''} logged`:'Log anything you did below','');
+  if((!p||p.type==='R'||p.pre)&&d.trainIntent==='extra'&&!(d.extras||[]).length)return statusRow('todo','Training planned, not logged yet',k>iso(todayDate())?'Coming up':'Log it below once it\'s done','<button type="button" class="stbtn kghost" data-intentclear>It didn\'t happen</button>');
+  if(!p||p.type==='R'||p.pre)return statusRow((d.extras||[]).length?'done':'rest',(d.extras||[]).length?'Extra session logged':p&&p.type==='R'?'Rest day':'No session planned',(d.extras||[]).length?`${d.extras.length} extra session${d.extras.length>1?'s':''} logged`:'Log anything you did below','');
   if(l&&l.status==='done')return statusRow('done','Session done',[l.dur?`${l.dur} min`:'',l.rpe?`effort ${l.rpe}/10`:''].filter(Boolean).join(' · ')||'Logged','');
   if(l&&l.status==='partial')return statusRow('part','Partly done',l.dur?`${l.dur} min`:'','');
   if(l&&l.status==='missed')return statusRow('rest','Missed','That happens. The plan carries on.','');
