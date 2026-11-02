@@ -1882,7 +1882,7 @@ function todoSheet(open){let h=document.getElementById('tdHost');if(!h){h=docume
   h.innerHTML=`<div class="kshwrap" id="tdWrap"><div class="ksheet" role="dialog" aria-modal="true" aria-label="To do today"><div class="kshead"><h2>To do today</h2><button type="button" class="x" id="tdX" aria-label="Close">${ico('x')}</button></div>
     ${items.length?`<div class="todolist">${items.map(([t,ok,dsc,attr],i)=>{const tg=attr.startsWith('href')?'a':'button';return `<${tg} ${tg==='button'?'type="button"':''} class="step ${ok?'ok':''}" ${attr} data-todo data-tdclose><span class="sn">${ok?'✓':i+1}</span><span class="st"><b>${esc(t)}</b><small>${esc(dsc)}</small></span><span aria-hidden="true">›</span></${tg}>`}).join('')}</div>`:'<p>Nothing to do right now.</p>'}</div></div>`;document.body.classList.add('sheet-open')}
 function kTodoChip(){const items=(typeof dayTodo==='function'&&dayTodo())||[];const left=items.filter(x=>!x[1]).length;
-  return `<button type="button" class="kschip ${left?'':'kdone'}" id="tdOpen" aria-label="To do today, ${left} left">${ico(left?'clipboard-list':'check')}${left?`To do <span class="kbadge">${left}</span>`:'All done'}</button>`}
+  return `<button type="button" class="kschip ${left?'':'kdone'}" id="tdOpen" aria-label="To do today, ${left} left">${ico(left?'clipboard-list':'check')}${left?`<span class="kbadge">${left}</span>`:''}</button>`}
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
   if(c('#tdOpen')){todoSheet(true);return}if(c('#tdX')||e.target.id==='tdWrap'){todoSheet(false);return}if(c('[data-tdclose]'))todoSheet(false)},true);
 // injuries: a niggle doesn't stop you; an injury changes what you can do for a while
@@ -1899,6 +1899,7 @@ let CMPI=0;const CMPC=['var(--k-blue)','var(--k-green)','var(--k-pink)','var(--k
 
 document.addEventListener('click',async e=>{if(!(e.target.closest&&e.target.closest('#kNameSave')))return;const v=($('#kNameIn').value||'').trim().slice(0,60);if(!v){toast('Add your name first');return}
   PROFILE.answers=PROFILE.answers||{};PROFILE.answers.name=v;try{await sb.from('profiles').upsert({id:UID,data:PROFILE,updated_at:new Date().toISOString()});toast('Name saved')}catch(err){toast('Could not save. Try again.')}planSheet(false);render()});
+const KWM_AUTH='<svg xmlns="http://www.w3.org/2000/svg" viewBox="-205 -885 2190 1070" role="img" aria-label="keel" class="kwm"><defs><linearGradient id="kaua" gradientUnits="userSpaceOnUse" x1="606" y1="-745" x2="-152" y2="132"><stop offset="0" stop-color="#5B6CFF"/><stop offset=".45" stop-color="#A24BD6"/><stop offset="1" stop-color="#E23D9E"/></linearGradient><linearGradient id="kaub" gradientUnits="userSpaceOnUse" x1="330" y1="0" x2="1932" y2="0"><stop offset="0" stop-color="#E23D9E"/><stop offset=".5" stop-color="#5B6CFF"/><stop offset="1" stop-color="#34E3A0"/></linearGradient></defs><path d="M459 0 277 -254H196L427 -543H572L359 -276L362 -346L616 0ZM79 0V-730H218V0Z M889.0 19Q819.0 19 766.5 -5.0Q714.0 -29 679.5 -69.5Q645.0 -110 627.5 -160.0Q610.0 -210 610.0 -262V-281Q610.0 -335 627.5 -385.5Q645.0 -436 679.5 -475.5Q714.0 -515 765.0 -538.5Q816.0 -562 883.0 -562Q971.0 -562 1030.5 -523.5Q1090.0 -485 1120.0 -422.5Q1150.0 -360 1150.0 -288V-238H669.0V-323H1063.0L1020.0 -281Q1020.0 -333 1005.0 -370.0Q990.0 -407 959.5 -427.0Q929.0 -447 883.0 -447Q837.0 -447 805.0 -426.0Q773.0 -405 756.5 -365.5Q740.0 -326 740.0 -271Q740.0 -220 756.0 -180.5Q772.0 -141 805.0 -118.5Q838.0 -96 889.0 -96Q940.0 -96 972.0 -116.5Q1004.0 -137 1013.0 -167H1141.0Q1129.0 -111 1095.0 -69.0Q1061.0 -27 1008.5 -4.0Q956.0 19 889.0 19Z M1459.0 19Q1389.0 19 1336.5 -5.0Q1284.0 -29 1249.5 -69.5Q1215.0 -110 1197.5 -160.0Q1180.0 -210 1180.0 -262V-281Q1180.0 -335 1197.5 -385.5Q1215.0 -436 1249.5 -475.5Q1284.0 -515 1335.0 -538.5Q1386.0 -562 1453.0 -562Q1541.0 -562 1600.5 -523.5Q1660.0 -485 1690.0 -422.5Q1720.0 -360 1720.0 -288V-238H1239.0V-323H1633.0L1590.0 -281Q1590.0 -333 1575.0 -370.0Q1560.0 -407 1529.5 -427.0Q1499.0 -447 1453.0 -447Q1407.0 -447 1375.0 -426.0Q1343.0 -405 1326.5 -365.5Q1310.0 -326 1310.0 -271Q1310.0 -220 1326.0 -180.5Q1342.0 -141 1375.0 -118.5Q1408.0 -96 1459.0 -96Q1510.0 -96 1542.0 -116.5Q1574.0 -137 1583.0 -167H1711.0Q1699.0 -111 1665.0 -69.0Q1631.0 -27 1578.5 -4.0Q1526.0 19 1459.0 19Z M1793.0 0V-730H1932.0V0ZM1725.0 -626V-730H1932.0V-626Z" fill="#F4F5F8"/><path class="kl1" d="M606.5 -744.8 A482 482 0 1 0 330 132" fill="none" stroke="url(#kaua)" stroke-width="85" stroke-linecap="round" pathLength="1"/><path class="kl2" d="M330 132 L1932 132" fill="none" stroke="url(#kaub)" stroke-width="85" stroke-linecap="round" pathLength="1"/></svg>';
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -2205,7 +2206,7 @@ function render(){
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
   $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
-  updateFab();kAvatarSet();setArea();kSignSet();kBands();
+  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}
@@ -2281,7 +2282,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&vState.open)closeVo
 // ================= accounts, sign-up, storage (Supabase) and AI (via /api/claude) =================
 let sb=null,UID=null,PROFILE=null,IS_ADMIN=false,IS_OWNER=false,SESSION=null,PROFILE_ROW=null;
 const gate=()=>$('#gate');
-function showGate(html){$('#appwrap').hidden=true;$('#fab').hidden=true;const g=gate();g.hidden=false;g.innerHTML=html;window.scrollTo({top:0})}
+function showGate(html){if(!/gload/.test(html))document.body.classList.remove('kloading');$('#appwrap').hidden=true;$('#fab').hidden=true;const g=gate();g.hidden=false;g.innerHTML=html;window.scrollTo({top:0})}
 function showApp(){gate().hidden=true;gate().innerHTML='';$('#appwrap').hidden=false;updateFab()}
 
 // ---------- AI shim with the same shape the app already uses ----------
@@ -2352,9 +2353,9 @@ function authHTML(mode,msg){
       <button class="primary" type="submit" id="authGo">${mode==='up'?'Create my account':'Sign in'}</button>
       ${msg?`<div class="hsum" role="status">${esc(msg)}</div>`:''}
     </form>`;
-  if(mode==='in')return `<div class="gcard"><div class="gmark"><img src="/keel-wordmark.svg" alt="keel" class="kwm"></div><h1>Welcome back</h1>${form}
+  if(mode==='in')return `<div class="gcard"><div class="gmark">${KWM_AUTH}</div><h1>Welcome back</h1>${form}
     <button type="button" class="linkbtn" data-auth="up">New here? See what it does and create an account</button><button type="button" class="linkbtn" id="forgot">Forgot password</button></div>`;
-  return `<div class="gcard"><div class="gmark"><img src="/keel-wordmark.svg" alt="keel" class="kwm"></div><h1>Feel better day to day</h1><p class="gsub" style="margin:0">Find your balance.</p>
+  return `<div class="gcard"><div class="gmark">${KWM_AUTH}</div><h1>Feel better day to day</h1><p class="gsub" style="margin:0">Find your balance.</p>
     <p class="gsub">A coach, a food planner and a training diary in one app. Here's what it does:</p>${featuresHTML()}
     <div class="gstep"><span class="num">1</span>Create your account</div>${form}
     <div class="gnext"><span class="num">2</span>Tell it about you, in your own words if you like</div><div class="gnext"><span class="num">3</span>Get your plan, then add the food you can get</div>
