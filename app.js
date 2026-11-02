@@ -1911,7 +1911,7 @@ function stdDrinks(x){if(!x)return 0;if(isNum(x.sd)&&+x.sd>0)return +x.sd;const 
   const nm=n.toLowerCase();let per=/pint/.test(nm)?2:/(beer|lager|ale|stout|guinness|cider|ipa|seltzer|shandy)/.test(nm)?(/can|bottle/.test(nm)?1.4:2):/(prosecco|champagne|cava)/.test(nm)?1.2:/wine/.test(nm)?(/bottle/.test(nm)?7:1.7):/(cocktail|margarita|mojito|spritz|aperol)/.test(nm)?1.8:1;
   if(/bottle/.test(nm)&&/wine/.test(nm))k=1;return Math.round(Math.min(20,k*per)*10)/10}
 // Does this person train, or do physical work? Drives wording for everyone else.
-function KTRAINS(){let a={};try{a=(PROFILE&&PROFILE.answers)||{}}catch(e){return true}if(!a||!Object.keys(a).length)return true;
+function KTRAINS(ans){let a=ans||{};if(!ans){try{a=(PROFILE&&PROFILE.answers)||{}}catch(e){return true}}if(!a||!Object.keys(a).length)return true;
   const sp=[].concat(a.sport||[]);const sporty=sp.some(x=>!/^(Walking|Nothing much yet|Cycling|Other)$/i.test(x));
   const goal=/sport|run faster|hyrox|stronger|muscle/i.test(a.mainGoal||'');return sporty||goal}
 function KMANUAL(){let a={};try{a=(PROFILE&&PROFILE.answers)||{}}catch(e){return true}if(!a||!a.job)return true;return /physical|mixed/i.test(a.job)}
@@ -2434,10 +2434,10 @@ function obHTML(){
       <div class="obsum"><div><b class="num">${pr.nutrition.training.kcal}</b><small>kcal training day</small></div><div><b class="num">${pr.nutrition.rest.kcal}</b><small>kcal rest day</small></div><div><b class="num">${pr.nutrition.training.protein} g</b><small>protein</small></div></div>
       <div class="label">Your week</div><div class="obweek">${pr.plan.week.map((t,i)=>`<span style="--c:var(${TVAR[t]})"><b>${DOW[i]}</b>${esc(t==='R'?'Rest':(pr.plan.labels[t]||t))}</span>`).join('')}</div>
       <div class="label">16 weeks in 4 phases</div><div class="obweek" style="grid-template-columns:repeat(4,minmax(0,1fr))">${pr.plan.phases.map((ph,i)=>`<span style="--c:${PHC[i]}"><b>Wk ${i*4+1}-${i*4+4}</b>${esc(ph)}</span>`).join('')}</div>
-      <details class="wu"><summary>${esc(pr.plan.labels.S||'Strength')} session, week 1</summary>${pr.plan.strength.map(e=>exRow(e.tag,Array.isArray(e.nm)?e.nm[0]:e.nm,e.cue,e.d[0])).join('')}</details>
+      ${pr.plan.week.includes('S')?`<details class="wu"><summary>${esc(pr.plan.labels.S||'Strength')}, week 1</summary>${pr.plan.strength.map(e=>exRow(e.tag,Array.isArray(e.nm)?e.nm[0]:e.nm,e.cue,e.d[0])).join('')}</details>`:''}
       ${pr.plan.week.includes('X')?`<details class="wu"><summary>${esc(pr.plan.labels.X||'Speed')} block, week 1</summary>${pr.plan.speed.map(e=>exRow(e.tag,Array.isArray(e.nm)?e.nm[0]:e.nm,e.cue,e.d[0])).join('')}</details>`:''}
       ${pr.plan.week.includes('T')?`<details class="wu"><summary>${esc(pr.plan.labels.T||'Quality')} sessions, week by week</summary>${pr.plan.threshold.map((t,i)=>exRow(String(i+1),t,'',pr.plan.thresholdMin[i]?pr.plan.thresholdMin[i]+"'":'test')).join('')}</details>`:''}
-      <div class="label">Daily nutrition targets</div><div class="scroll"><table class="tbl"><thead><tr><th></th><th class="r">kcal</th><th class="r">Protein</th><th class="r">Net carbs</th><th class="r">Fat</th></tr></thead><tbody>${['training','rest','match'].map(k=>{const n=pr.nutrition[k];return `<tr><td>${k[0].toUpperCase()+k.slice(1)} day</td><td class="r num">${n.kcal}</td><td class="r num">${n.protein} g</td><td class="r num">${n.carbs} g</td><td class="r num">${n.fat} g</td></tr>`}).join('')}</tbody></table></div>
+      <div class="label">Daily nutrition targets</div><div class="scroll"><table class="tbl"><thead><tr><th></th><th class="r">kcal</th><th class="r">Protein</th><th class="r">Net carbs</th><th class="r">Fat</th></tr></thead><tbody>${(KTRAINS(ob.a)?['training','rest','match']:['training','rest']).filter(k=>k!=='match'||/GAA|Hurling|Soccer|Rugby/i.test([].concat(ob.a.sport||[]).join(' '))).map(k=>{const n=pr.nutrition[k];return `<tr><td>${KTRAINS(ob.a)?k[0].toUpperCase()+k.slice(1):k==='training'?'Active':'Rest'} day</td><td class="r num">${n.kcal}</td><td class="r num">${n.protein} g</td><td class="r num">${n.carbs} g</td><td class="r num">${n.fat} g</td></tr>`}).join('')}</tbody></table></div>
       ${pr.rules?`<details class="wu"><summary>Food planning rules</summary><div style="white-space:pre-wrap;font-size:13px;padding-bottom:12px">${esc(pr.rules)}</div></details>`:''}
       <div class="hint" style="font-size:13px;color:var(--muted)">Starts ${fmtD(parse(pr.plan.firstDay))}. You can rebuild it any time from your profile.</div>
       <button type="button" class="primary" id="obStart">${kitchen().length?'Start':'Next: your food ›'}</button><button type="button" class="ghost" id="obBuild">Build it again</button>`
@@ -2449,15 +2449,21 @@ function obHTML(){
     ${ob.fromApp?'<button type="button" class="linkbtn" id="obCancel">Keep my current plan</button>':'<button type="button" class="linkbtn" id="signOut">Sign out</button>'}</div>`;
 }
 function obRead(){document.querySelectorAll('[data-ob]').forEach(el=>{ob.a[el.dataset.ob]=el.value});obSave()}
-function obRender(){showGate(obHTML())}
+function obRender(){showGate(obHTML());try{if(!KTRAINS(ob.a))kWording(document.getElementById('gate'))}catch(e){}}
 async function obBuild(){
   obRead();ob.busy=true;ob.err='';ob.msg='';ob.result=null;obRender();
   const a=ob.a;const today=iso(todayDate());
   const ex=JSON.stringify({start:DEF_PLAN.start,firstDay:DEF_PLAN.firstDay,week:DEF_PLAN.week,labels:DEF_PLAN.labels,phases:DEF_PLAN.phases,threshold:DEF_PLAN.threshold,thresholdMin:DEF_PLAN.thresholdMin,easy:DEF_PLAN.easy,long:DEF_PLAN.long,deload:DEF_PLAN.deload,strength:DEF_PLAN.strength.slice(0,3),speed:DEF_PLAN.speed.slice(0,2),keyLifts:DEF_PLAN.keyLifts,classNote:DEF_PLAN.classNote,trainTime:DEF_PLAN.trainTime,fasted:true,goalLine:DEF_PLAN.goalLine});
   const prompt=`You are an experienced strength and conditioning coach and sports nutritionist. Build a personal 16-week plan for this person from their sign-up answers. Today is ${today}.
 Answers: ${JSON.stringify(a)}
-
-WHO THIS IS FOR: if they don't play a sport or train (for example they only picked walking, cycling or "nothing much yet", and their goal is feeling better, sleep, energy, weight or general health), build a gentle everyday-movement plan instead of a training plan: brisk or easy walks, easy cycles, short strength-at-home or stretch-and-core sessions, maybe a swim or class. Name the slot labels in plain words (e.g. "Brisk walk", "Easy cycle", "Stretch and core", "Longer walk"), use no jargon (no threshold, RPE, zone, intervals, deload), keep "threshold" descriptions as easy, friendly walks or cycles with thresholdMin as their minutes, and keep the summary warm and practical. Build up gently over the 16 weeks.
+${KTRAINS(a)?'':`THIS PERSON DOES NOT TRAIN OR PLAY SPORT. Build a gentle everyday-movement plan, not a training plan. Follow these rules over everything else below:
+- Respect what they said. If they said no gym, use no gym and no equipment at all. Their main movement is walking and easy cycling.
+- Use only slots E (easy walk or cycle), X (a longer walk or cycle) and R. Use S only as "Home moves", at most once a week, never in weeks 1-2, and only if they chose 3 or more days a week. Do not use H or T unless they named a class they already go to.
+- Labels in plain words: E "Easy walk" or "Walk or easy cycle", X "Longer walk", S "Home moves". No jargon anywhere: no threshold, RPE, zones, intervals, deload, sets of heavy lifting.
+- "strength": 4 simple equipment-free moves anyone can do at home or at a desk (e.g. sit-to-stand from a chair, wall press-ups, standing calf raises, gentle bridge), beginner amounts like "2 x 8, easy". "speed": 3 gentle mobility or balance moves (e.g. ankle circles, hip swings, standing on one leg). "keyLifts": [].
+- "easy" 16 durations starting around 15-20 min and building slowly to 30-40; "long" starting around 30 and building to 60. "threshold"/"thresholdMin": fill with easy walk descriptions and minutes.
+- The example plan further down is for a competitive athlete: copy only its JSON shape, never its exercises or tone.
+- "summary": warm and practical, about feeling better, not performance.`}
 
 The app has fixed session slots. Map their training onto them; rename the labels to fit them:
 S = strength / gym session; E = easy aerobic session (easy run, bike, swim); H = a class, club or team session they already do; T = quality session (threshold or intervals, or a time-trial test when thresholdMin is 0); X = speed and skills block followed by a longer easy session; R = rest.
@@ -2466,14 +2472,19 @@ S = strength / gym session; E = easy aerobic session (easy run, bike, swim); H =
 "threshold": 16 short session descriptions for the T slot; "thresholdMin": minutes of hard work in each; "easy": 16 durations (min) for E; "long": 16 durations (min) for the long part of X. Fill all 16 even for slots they don't use.
 "strength": 5-8 exercises, each {"tag":"A1","nm":"name" or 4 names one per phase,"cue":"short coaching cue","d":[4 prescriptions, one per phase]}. Include injury prevention for their sport and any problem areas they mentioned. "speed": 3-5 drills in the same shape, suited to their sport (skills drills for non-runners).
 "keyLifts": the 2 lifts worth tracking. "trainTime": their usual time as HH:MM. "fasted": true only if they said they train fasted. "start": the Monday on or before their start date (if none, next Monday); "firstDay": their first session date within that week.
-Nutrition from their weight, height, age, sex, goal, approach and activity (job counts): "rest","training","match" each {"kcal","protein","carbs" (net carbs g),"fat"}; protein 1.6-2.2 g/kg; for weight or fat loss use a moderate deficit of about 300-500 kcal, for building muscle or putting on mass a small surplus of about 200-400 kcal, and use their target weight if given; match day only if they play a sport with matches, else copy training. "micros": only where their needs differ from adult-male defaults (e.g. women: iron {"lo":18}). "fastH": hours from their answer, 0 for none.
+Nutrition from their weight, height, age, sex, goal, approach and activity (job counts): "rest","training","match" each {"kcal","protein","carbs" (net carbs g),"fat"}; protein 1.6-2.2 g/kg; for weight or fat loss use a moderate deficit of about 300-500 kcal, for building muscle or putting on mass a small surplus of about 200-400 kcal, and use their target weight if given; match day only if they play a sport with matches, else copy training. Call the active-day targets "training" in the JSON regardless. "micros": only where their needs differ from adult-male defaults (e.g. women: iron {"lo":18}). "fastH": hours from their answer, 0 for none.
 "rules": 5-9 short lines for their food planning (meal timing around their training time, starch on training days if lower carb, protein per meal, diet needs, alcohol), each starting "- ".
 "about": one line describing them for a coach, e.g. "Aoife, 31, 64 kg nurse on shift work, training for Hyrox, vegetarian". "portionWho": e.g. "a 64 kg active woman". "workLabel": "Physical work" if physical or mixed job, else "Active work". "approach": short phrase. "goalLine": one sentence of their goal. "summary": 2-3 friendly sentences explaining the plan.
 Here is a finished example plan from another user, to match the shape and level of detail: ${ex}
 Reply with ONLY JSON: {"plan":{"start":"","firstDay":"","week":[],"labels":{"S":"","E":"","H":"","T":"","X":"","R":"Rest"},"phases":[4 names],"threshold":[],"thresholdMin":[],"easy":[],"long":[],"deload":{},"strength":[],"speed":[],"keyLifts":[],"classNote":"","trainTime":"","fasted":false,"goalLine":""},"nutrition":{"rest":{},"training":{},"match":{},"micros":{},"fastH":0},"rules":"","about":"","portionWho":"","workLabel":"","approach":"","summary":""}`;
   try{const out=await sample.json(prompt,{maxTokens:16000});
     if(!out||!out.plan||!out.nutrition)throw {code:'invalid_json'};
-    out.plan=sanitizePlan(out.plan);['rest','training','match'].forEach(k=>{out.nutrition[k]=Object.assign({},DEF_DAYT[k],out.nutrition[k]||{})});
+    out.plan=sanitizePlan(out.plan);
+    if(!KTRAINS(a)){const pw=+a.perWeek||2,P=out.plan;const gym=/goblet|barbell|dumbbell|kettlebell|deadlift|bench|press(?!-up)|chest[- ]supported|row\b|cable|machine|squat rack|trap[- ]bar|lunge.*weight|weighted/i;
+      let sN=0;P.week=(P.week||[]).map(c=>c==='T'||(c==='H'&&!a.fixed)?'E':c==='S'?(pw>=3&&!sN++?'S':'E'):c);
+      P.labels=Object.assign({},P.labels,{E:/walk|cycle/i.test((P.labels||{}).E||'')?P.labels.E:'Walk or easy cycle',X:/walk|cycle/i.test((P.labels||{}).X||'')?P.labels.X:'Longer walk',S:'Home moves',R:'Rest'});
+      if(!Array.isArray(P.strength)||P.strength.some(e=>gym.test([].concat(e&&e.nm||'').join(' '))))P.strength=[{tag:'1',nm:'Sit-to-stand from a chair',cue:'Slow and steady, use your hands if you need to',d:['2 x 6','2 x 8','2 x 10','3 x 10']},{tag:'2',nm:'Wall press-ups',cue:'Hands on the wall at shoulder height',d:['2 x 6','2 x 8','2 x 10','3 x 10']},{tag:'3',nm:'Standing calf raises',cue:'Hold a chair or counter for balance',d:['2 x 10','2 x 12','2 x 15','3 x 15']},{tag:'4',nm:'Gentle bridge',cue:'Lie on your back, knees bent, lift your hips a little',d:['2 x 6','2 x 8','2 x 10','3 x 10']}];
+      P.keyLifts=[]}['rest','training','match'].forEach(k=>{out.nutrition[k]=Object.assign({},DEF_DAYT[k],out.nutrition[k]||{})});
     ob.result=out;ob.busy=false;obSave();
   }catch(e){ob.busy=false;ob.err=e&&e.code==='rate_limited'?'Too many requests just now. Try again in a minute.':'The build did not finish. Tap Build my plan to try again.'}
   obRender();
