@@ -715,7 +715,7 @@ function spark(vals,lo,hi){const W=300,H=56,n=vals.length;const X=i=>6+i/(n-1)*(
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Balance trend">${bands}<path d="${path}" style="fill:none;stroke:var(--k-green);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round"/>${pts.filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.5" style="fill:var(--k-green)"/>`).join('')}${last?`<circle cx="${last[0]}" cy="${last[1]}" r="5" style="fill:var(--surface);stroke:var(--k-green);stroke-width:2.5"/>`:''}</svg>`}
 function viewDashboard(){
   const now=sampleMode?SAMPLE.now:todayDate(),k=iso(now),DD=D(),LL=L(),d=DD[k],pl=planFor(now),yk=iso(addD(now,-1));
-  const toggle=`<div class="dtop"><div class="kgreet"><h1>${greet()}</h1><small>${fmtD(now,{weekday:'long',day:'numeric',month:'long'})} · ${sampleMode?'Example data, not yours':now<FIRST?`Plan starts in ${Math.round((FIRST-now)/DAY)} days`:pl?`Week ${pl.wk} of 16 · ${PHN[pl.p]}`:'Plan complete'}</small></div><div style="display:flex;gap:8px;align-items:center"><button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'My data':'Example'}</button></div></div>
+  const toggle=`<div class="dtop"><div class="kgreet"><h1>${greet()}</h1><small>${fmtD(now,{weekday:'short',day:'numeric',month:'short'})} · ${sampleMode?'Example data, not yours':now<FIRST?`Plan starts in ${Math.round((FIRST-now)/DAY)} days`:pl?`Week ${pl.wk} of 16 · ${PHN[pl.p]}`:'Plan complete'}</small></div><div style="display:flex;gap:8px;align-items:center"><button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'My data':'Example'}</button></div></div>
     <div class="prog" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,(now-FIRST)/(END-FIRST)*100))}%"></i>${[1,2,3].map(i=>`<span style="left:${i*25}%"></span>`).join('')}</div>`;
   // hero
   const s=readiness(d);let hero;
@@ -1159,7 +1159,7 @@ function suppItems(d){if(!d||!d.date)return [];return supps().filter(s=>d.date>=
 function ringSVG(v,tg,col,size){const r=size/2-6,c=2*Math.PI*r,p=Math.max(0,Math.min(1,tg?v/tg:0));return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true"><circle cx="${size/2}" cy="${size/2}" r="${r}" style="fill:none;stroke:var(--line);stroke-width:7"/><circle cx="${size/2}" cy="${size/2}" r="${r}" transform="rotate(-90 ${size/2} ${size/2})" style="fill:none;stroke:${col};stroke-width:7;stroke-linecap:round" stroke-dasharray="${(c*p).toFixed(1)} ${c.toFixed(1)}" ${p?'':'opacity="0"'}/></svg>`}
 function macroRings(t,dt){
   const one=(k,lab,col)=>{const n=NUTS.find(x=>x.k===k),tg=nutTarget(k,dt);const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);const st=status(t[k],tg);
-    return `<div class="mring">${ringSVG(t[k],ref,st==='bad'&&t[k]>ref?'var(--bad)':col,74)}<div class="mrv"><b class="num">${Math.round(t[k])}</b><small>of ${Math.round(ref)}${n.u==='kcal'?'':' '+n.u}</small></div><span>${lab}</span></div>`};
+    return `<div class="mring">${ringSVG(t[k],ref,st==='bad'&&t[k]>ref?'var(--bad)':col,74)}<div class="mrv"><b class="num">${Math.round(t[k])}</b></div><span>${lab}</span><small class="mof">of ${Math.round(ref)}${n.u==='kcal'?'':' '+n.u}</small></div>`};
   return `<div class="mrings">${one('kcal','Calories','var(--o)')}${one('protein','Protein','var(--s)')}${one('carbs','Net carbs','var(--e)')}${one('fat','Fat','var(--x)')}</div>`;
 }
 function microsHTML(t,dt,k){

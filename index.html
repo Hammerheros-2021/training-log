@@ -7,10 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Keel">
-<link rel="manifest" href="/manifest.json?v=2">
-<link rel="icon" href="/icon.svg?v=2" type="image/svg+xml">
-<link rel="icon" href="/favicon.ico?v=2" sizes="48x48">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Keel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@600&family=JetBrains+Mono:wght@400&family=Sora:wght@600&display=swap">
@@ -1018,6 +1017,28 @@ body:not([data-area="today"]) .subtabs button[aria-pressed="true"],body:not([dat
 
 /* greeting gets the full width */
 .dtop{flex-wrap:wrap}.kgreet{flex:1 1 100%}
+
+/* ================= v9: tighter greeting, macro rings that never overlap their text ================= */
+.dtop{gap:var(--space-2)!important;align-items:center!important;flex-wrap:nowrap!important}
+.kgreet{flex:1 1 auto!important;min-width:0}
+.kgreet h1{font:600 22px/28px var(--font-display)!important;letter-spacing:-0.02em;margin:0}
+.kgreet small{font-size:13px;line-height:18px;margin-top:2px!important}
+.dtop #sampleBtn{min-height:36px!important;padding:0 var(--space-3)!important;font:600 13px/18px var(--font-body)!important;flex-shrink:0}
+.dtop+.prog{margin-top:var(--space-2)!important}
+.mrings{gap:var(--space-2)!important}
+.mring{min-width:0}
+.mring svg{width:100%;max-width:64px!important}
+.mrv{max-width:64px!important}
+.mrv b{font:400 15px/20px var(--font-mono)!important}
+.mring>span{font:600 12px/16px var(--font-body)!important;color:var(--text)!important;text-align:center}
+.mof{font:400 12px/16px var(--font-mono);color:var(--text-muted);text-align:center;white-space:nowrap}
+.kgreet small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtop{padding-bottom:0!important;margin-bottom:0!important}
+.dtop+.prog,.prog{margin-top:var(--space-2)!important;margin-bottom:0!important}
+.dtop{position:relative;display:block!important}
+.dtop #sampleBtn{position:absolute;right:0;bottom:4px;min-height:32px!important;padding:0 var(--space-3)!important;font:600 12px/16px var(--font-body)!important}
+.kgreet small{padding-right:96px}
+.view>.dtop+.prog{margin-top:calc(-1 * var(--space-3))!important}
 </style>
 </head>
 <body class="kloading">
@@ -1044,6 +1065,6 @@ body:not([data-area="today"]) .subtabs button[aria-pressed="true"],body:not([dat
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/app.js?v=keel9"></script>
+<script src="/app.js?v=keel10"></script>
 </body>
 </html>
