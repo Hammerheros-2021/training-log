@@ -1813,7 +1813,7 @@ function planSum(full){const I=planInfo(),a=I.a,canEdit=!!(I.P&&I.P.answers);
     <p class="kbody">${esc(rows[1][2])}. ${esc(rows[3][2].split(' · ').slice(0,2).join(', '))}.</p><button type="button" class="ghost kfull" data-pnav="plan">See or change your plan</button></article>`;
   return `<article class="card kplan"><span class="label">Your plan</span><div class="khead"><span class="heading">${esc(I.goal)}</span><span class="data">${I.line}</span></div>
     <div class="kprog" aria-hidden="true"><i style="width:${Math.max(2,Math.min(100,(todayDate()-START)/(END-START)*100))}%"></i></div>
-    <div class="krows">${rows.map(([s,l,t])=>canEdit?`<button type="button" class="krow" data-planedit="${s}"><span class="label">${l}</span><span class="kt">${esc(t)}</span><span class="ked">Change</span></button>`:`<div class="krow"><span class="label">${l}</span><span class="kt">${esc(t)}</span></div>`).join('')}</div>
+    <div class="krows">${rows.map(([s,l,t])=>canEdit&&s===0?`<div class="krow kname"><span class="label">Your name</span><span class="kt"><input id="kNameIn" type="text" autocomplete="name" value="${esc(userName())}" placeholder="First and last name"></span><button type="button" class="ked kedb" id="kNameSave">Save</button></div>`:canEdit?`<button type="button" class="krow" data-planedit="${s}"><span class="label">${l}</span><span class="kt">${esc(t)}</span><span class="ked">Change</span></button>`:`<div class="krow"><span class="label">${l}</span><span class="kt">${esc(t)}</span></div>`).join('')}</div>
     <small class="ds">${canEdit?'Changing anything rebuilds the plan from today. Everything you have logged stays.':'Your plan runs for 16 weeks. Ask to change it in a chat and it can be rebuilt.'}</small></article>`}
 function planNav(cur){return `<div class="subtabs pnav" style="grid-template-columns:repeat(2,minmax(0,1fr))">${[['today','Day'],['plan','Overview']].map(([v,l])=>`<button type="button" data-pnav="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-pnav]');if(x){const v=x.dataset.pnav;if(v==='recover'){location.hash='recover';return}tView=v;if(tab()!=='training')location.hash='training';else render();window.scrollTo({top:0});return}
@@ -1897,6 +1897,8 @@ const RCC={'Breathe':'var(--k-sky)','Mind':'var(--k-violet)','Move':'var(--k-gre
 const RQC={'Walk':'var(--k-green)','Easy cycle':'var(--k-green)','Swim':'var(--k-sky)','Sea swim':'var(--k-sky)','Ice bath':'var(--k-sky)','Sauna':'var(--k-amber)','Hot tub':'var(--k-amber)','Loosen-out':'var(--k-green)','Stretch / yoga':'var(--k-violet)','Foam roll':'var(--k-pink)','Massage':'var(--k-pink)','Nap':'var(--k-violet)'};
 let CMPI=0;const CMPC=['var(--k-blue)','var(--k-green)','var(--k-pink)','var(--k-amber)','var(--k-violet)','var(--k-sky)','var(--k-clay)'];
 
+document.addEventListener('click',async e=>{if(!(e.target.closest&&e.target.closest('#kNameSave')))return;const v=($('#kNameIn').value||'').trim().slice(0,60);if(!v){toast('Add your name first');return}
+  PROFILE.answers=PROFILE.answers||{};PROFILE.answers.name=v;try{await sb.from('profiles').upsert({id:UID,data:PROFILE,updated_at:new Date().toISOString()});toast('Name saved')}catch(err){toast('Could not save. Try again.')}planSheet(false);render()});
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
