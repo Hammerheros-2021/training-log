@@ -220,7 +220,10 @@ function checkinHTML(dIso){
       <select data-bind="d.niggles.${i}.side" aria-label="Side">${SIDES.map(a=>`<option ${a===n.side?'selected':''}>${a}</option>`).join('')}</select>
       <button type="button" class="x" data-del-nig="${i}" aria-label="Remove">×</button>
       <div class="pr full"><input type="range" min="0" max="10" step="1" value="${+n.pain||0}" data-bind="d.niggles.${i}.pain" data-live="nig${i}" aria-label="Pain 0-10"><output id="nig${i}">${+n.pain||0}/10</output></div>
-      <input class="full" type="text" placeholder="What brought it on? e.g. sprints, lifting, a long shift" value="${esc(n.note||'')}" data-bind="d.niggles.${i}.note"></div>`).join('');
+      <input class="full" type="text" placeholder="What brought it on? e.g. sprints, lifting, a long shift" value="${esc(n.note||'')}" data-bind="d.niggles.${i}.note">
+      <div class="full kinjf"><label class="label">Is it stopping you?</label><select data-bind="d.niggles.${i}.kind" data-live="k${i}"><option value="Niggle" ${n.kind!=='Injury'?'selected':''}>Niggle: I can carry on</option><option value="Injury" ${n.kind==='Injury'?'selected':''}>Injury: it changes what I can do</option></select>
+      ${n.kind==='Injury'?`<div class="row2"><div class="field"><label class="label">Expected to last (weeks)</label><input type="number" inputmode="decimal" step="0.5" min="0" value="${n.weeks??''}" data-bind="d.niggles.${i}.weeks"></div><div class="field"><label class="label">Training allowed</label><select data-bind="d.niggles.${i}.load" data-live="l${i}"><option value="100" ${n.load==='100'?'selected':''}>Full, with care</option><option value="50" ${n.load==='50'||!n.load?'selected':''}>About half</option><option value="0" ${n.load==='0'?'selected':''}>None</option></select></div></div>
+      ${n.load==='0'?`<div class="row2"><div class="field"><label class="label">No training until</label><input type="date" value="${esc(n.offUntil||'')}" data-bind="d.niggles.${i}.offUntil"></div><div class="field"><label class="label">Rehab starts</label><input type="date" value="${esc(n.rehabFrom||'')}" data-bind="d.niggles.${i}.rehabFrom"></div></div>`:''}`:''}</div></div>`).join('');
   const ext=(y.extras||[]).map((x,i)=>`<div class="extra">
       <select data-bind="y.extras.${i}.kind" aria-label="Activity">${EXTRA_KINDS.map(a=>`<option ${a===x.kind?'selected':''}>${a}</option>`).join('')}</select>
       <input type="number" inputmode="numeric" placeholder="min" value="${x.dur??''}" data-bind="y.extras.${i}.dur" aria-label="Minutes">
@@ -247,7 +250,7 @@ function checkinHTML(dIso){
       <div class="tags">${FLAGS.map(r=>`<button type="button" data-flag="${r}" aria-pressed="${(f.flags||[]).includes(r)}">${r}</button>`).join('')}</div></div>
     <div class="group"><h4><span class="qn">3</span>Niggles &amp; injuries <small>pain 0-10</small></h4>${nig||'<div style="font-size:13px;color:var(--muted)">Nothing flagged. Add anything that hurts, even a little.</div>'}
       ${pv>=5?'<div class="alert red"><b>Stop.</b> Rest and get it looked at. Sharp or worsening pain is always red.</div>':pv>=3?'<div class="alert amber"><b>Modify.</b> Drop sprints, go lighter, easy running only until it settles.</div>':''}
-      <button type="button" class="add" id="addNig">+ Add a niggle</button></div>
+      <button type="button" class="add" id="addNig">+ Add a niggle or injury</button></div>
     <div class="group"><h4><span class="qn">4</span>Body <small>optional</small></h4><div class="row2">${num('d-rhr','Morning pulse (bpm)','d.rhr',1,f.rhr,'numeric')}${num('d-kg','Weight (kg)','d.weight',0.1,f.weight)}</div>
       <div style="font-size:12px;color:var(--muted)">Count your pulse for 60 seconds before getting up. A rise of 5+ above your usual often means you are run down.</div></div>
     <div class="group"><h4><span class="qn">5</span>Yesterday, ${fmtD(parse(yk),{weekday:'long',day:'numeric',month:'short'})}</h4>
@@ -664,7 +667,7 @@ function dayHeader(){
   for(let i=0;i<7;i++){const d=addD(mon,i),p=planFor(d),t=p?p.type:'R',lt=L()[iso(d)],col=lt&&lt.type==='H'&&t==='T'?'H':t;const rs=readiness(D()[iso(d)]);
     strip+=`<button type="button" data-goto="${iso(d)}" class="${iso(d)===key?'sel':''}" style="--c:var(${TVAR[col]});--rc:${rColor(rs)}" aria-label="${fmtD(d,{weekday:'long',day:'numeric',month:'long'})}"><span class="d">${DOW[i]}</span><span class="n">${d.getDate()}</span><span class="dot ${dotClass(d,p)}"></span><span class="rd"></span></button>`}
   const isToday=key===iso(todayDate());
-  return `<div class="dbar"><button type="button" id="prevD" aria-label="Previous week">‹</button><div class="dmid"><b>${isToday?'Today':fmtD(sel,{weekday:'short'})} · ${fmtD(sel,{day:'numeric',month:'short'})}</b><small>${pl&&!pl.pre?`Week ${pl.wk} of 16`:`Week of ${fmtD(mon,{day:'numeric',month:'short'})}`}</small></div>${isToday?'':'<button type="button" class="dtoday" id="goToday">Today</button>'}<button type="button" id="nextD" aria-label="Next week">›</button></div><div class="strip kswipe" title="Swipe to change week">${strip}</div>`;
+  return `<div class="dbar kswipe"><button type="button" id="prevD" aria-label="Previous week">‹</button><button type="button" class="dmid" id="stripTog" aria-expanded="${stripOpen}"><b>${isToday?'Today':fmtD(sel,{weekday:'short'})} · ${fmtD(sel,{day:'numeric',month:'short'})}</b><small>${pl&&!pl.pre?`Week ${pl.wk} of 16`:`Week of ${fmtD(mon,{day:'numeric',month:'short'})}`} ${stripOpen?'▴':'▾'}</small></button>${isToday?'':'<button type="button" class="dtoday" id="goToday">Today</button>'}<button type="button" id="nextD" aria-label="Next week">›</button></div>${stripOpen?`<div class="strip kswipe" title="Swipe to change week">${strip}</div>`:''}`;
 }
 function ensureDrafts(){const key=iso(sel);
   if(!sDraft||sDraft.date!==key){sDraft=blankLog(key);sDirty=false;scanState=null}
@@ -681,7 +684,7 @@ function viewTraining(){
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
   const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
-  return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+extrasCardHTML(key)+patternHTML()+pill;
+  return pre+(key===iso(todayDate())?injuryBanner():'')+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+extrasCardHTML(key)+patternHTML()+pill;
 }
 function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Overview']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 function viewTrainingTab(){return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+fullPlanTip()+viewPlan():viewTraining())}
@@ -761,7 +764,7 @@ function viewDashboard(){
   const balance=balTot?`<div class="stack">${bal.map(([f,c,l])=>+yd[f]?`<i style="flex:${+yd[f]};background:${c}" title="${l}"></i>`:'').join('')}</div><div class="legend">${bal.map(([f,c,l])=>`<span style="--c:${c}"><i></i>${l} ${+yd[f]||0} h</span>`).join('')}</div>`:'<div class="ds">Comes from the morning check-in, under Yesterday.</div>';
   const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'').split(' :: ')[0]):[];
   const due=!sampleMode&&planDue();
-  const su=setupChecklistHTML();return toggle+su+(su?'':todoHTML())+hero+`${todayFoodHTML(k)}<div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
+  const su=setupChecklistHTML();return toggle+su+injuryBanner()+hero+`${todayFoodHTML(k)}<div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section>
@@ -1274,7 +1277,7 @@ function recoveryHTML(k){
   const wk=(()=>{let n=0;for(let i=0;i<7;i++){const x=D()[iso(addD(parse(k),-i))];(x&&x.recovery||[]).forEach(()=>n++)}return n})();
   return `<article class="card"><div class="chead"><div style="flex:1"><h2>Recovery</h2><div class="sub">${list.length?`${list.length} logged ${k===iso(todayDate())?'today':'this day'} · ${wk} this week`:'Walks, swims, sauna, ice baths and anything that helps you recover. Tap to log.'}</div></div></div>
     ${done?`<div class="kchips" style="padding:12px 16px 0">${done}</div>`:''}
-    ${can?`<div class="rqgrid">${RECOV.map(([n,ic])=>`<button type="button" data-rpick="${esc(n)}" class="${recS.pick===n?'on':''}"><span aria-hidden="true">${ic}</span>${esc(n)}</button>`).join('')}</div>${mins}`:''}</article>`;
+    ${can?`<div class="rqgrid">${RECOV.map(([n,ic])=>`<button type="button" data-rpick="${esc(n)}" class="${recS.pick===n?'on':''}" style="--rc:${RQC[n]||'var(--k-blue)'}"><span aria-hidden="true">${ic}</span>${esc(n)}</button>`).join('')}</div>${mins}`:''}</article>`;
 }
 async function logRecovery(min){const k=iso(sel)>iso(todayDate())?iso(todayDate()):iso(sel);const kind=recS.pick;if(!kind)return;const d=D()[k]||{};const R=RECOV.find(x=>x[0]===kind);
   const now=new Date();const list=(d.recovery||[]).concat([{kind,min,at:k===iso(todayDate())?fmtT(now.getHours()*60+now.getMinutes()):''}]);
@@ -1400,8 +1403,8 @@ function viewRecover(){const k=iso(todayDate());let n=0,mins=0,feel=[];for(let i
   const cats=['Breathe','Mind','Move','Hot & cold'];
   return `<section class="rhero"><div><h2>Recover</h2><p>Recovery is where your body adapts and your head clears. A few calm minutes lower stress, improve sleep and leave you more patient with the people around you.</p></div>
     <div class="rstats"><span><b class="num">${n}</b>sessions this week</span><span><b class="num">${mins}</b>minutes</span><span><b class="num">${feel.length?avg(feel).toFixed(1):'–'}</b>feel after, out of 5</span></div></section>
-  ${typeof viewMobility==='function'?`<a class="rprog" href="#mobility"><span class="ric" aria-hidden="true">🧘</span><span class="rt"><b>Mobility follow-along</b><small>Made for today from your training and niggles</small></span><span class="rgo" aria-hidden="true">▶</span></a>`:''}
-  ${cats.map(c=>`<div class="rcat"><h3>${c}</h3><div class="rprogs">${PROGS.filter(p=>p.cat===c).map(p=>`<button type="button" class="rprog" data-prog="${p.id}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${esc(p.lens[p.def||0][0])} · ${esc(p.mind)}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></div>`).join('')}
+  ${typeof viewMobility==='function'?`<a class="rprog" href="#mobility" style="--rc:var(--k-green)"><span class="ric" aria-hidden="true">🧘</span><span class="rt"><b>Mobility follow-along</b><small>Made for today from your training and niggles</small></span><span class="rgo" aria-hidden="true">▶</span></a>`:''}
+  ${cats.map(c=>`<div class="rcat" style="--rc:${RCC[c]||'var(--k-blue)'}"><h3>${c}</h3><div class="rprogs">${PROGS.filter(p=>p.cat===c).map(p=>`<button type="button" class="rprog" data-prog="${p.id}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${esc(p.lens[p.def||0][0])} · ${esc(p.mind)}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></div>`).join('')}
   ${recoveryHTML(k).replace('<h2>Recovery</h2>','<h2>Already did something?</h2>')}
   <button type="button" class="ghost learnlink" data-learn-cat="Recovery">📘 Learn: ice baths, sauna, breathing and more ›</button>`}
 // ---- Learn ----
@@ -1598,7 +1601,7 @@ function viewLearn(){const done=(meta.learned&&meta.learned.ids)||{};
       <div class="actions" style="padding:0 16px 16px"><button type="button" class="ghost" id="lPrev" ${lv.i?'':'disabled'} style="color:var(--fg)">‹ Back</button>${quiz?`<button type="button" class="primary" id="lDone" ${lv.ans==null?'disabled':''}>Finish</button>`:`<button type="button" class="primary" id="lNext">Next ›</button>`}</div></article>`}
   const cats=[...new Set(LEARN.map(x=>x.cat))];const nd=LEARN.filter(x=>done[x.id]).length;
   return `<section class="rhero"><div><h2>Learn</h2><p>Two-minute reads on food, sleep, recovery and movement. Tap through, then answer one quick question.</p></div><div class="rstats"><span><b class="num">${nd}</b>of ${LEARN.length} done</span></div></section>
-    ${cats.map(c=>`<div class="rcat"><h3>${c}</h3><div class="rprogs">${LEARN.filter(x=>x.cat===c).map(x=>`<button type="button" class="rprog ${done[x.id]?'read':''}" data-topic="${x.id}"><span class="ric" aria-hidden="true">${x.ic}</span><span class="rt"><b>${esc(x.t)}</b><small>${x.s.length} cards · 2 min${done[x.id]?' · ✓ read':''}</small></span><span class="rgo" aria-hidden="true">›</span></button>`).join('')}</div></div>`).join('')}`}
+    ${cats.map(c=>`<div class="rcat" style="--rc:${RCC[c]||'var(--k-blue)'}"><h3>${c}</h3><div class="rprogs">${LEARN.filter(x=>x.cat===c).map(x=>`<button type="button" class="rprog ${done[x.id]?'read':''}" data-topic="${x.id}"><span class="ric" aria-hidden="true">${x.ic}</span><span class="rt"><b>${esc(x.t)}</b><small>${x.s.length} cards · 2 min${done[x.id]?' · ✓ read':''}</small></span><span class="rgo" aria-hidden="true">›</span></button>`).join('')}</div></div>`).join('')}`}
 let pView='me';
 function progSub(){return `<div class="subtabs" style="grid-template-columns:1fr 1fr"><button type="button" data-pview="me" aria-pressed="${pView==='me'}">My progress</button><button type="button" data-pview="learn" aria-pressed="${pView==='learn'}">Learn</button></div>`}
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
@@ -1793,7 +1796,7 @@ try{const mo=new MutationObserver(ms=>{for(const m of ms){if(m.type==='character
   const go=()=>{deEmojiNode(document.body);mo.observe(document.body,{childList:true,subtree:true,characterData:true})};if(document.body)go();else document.addEventListener('DOMContentLoaded',go)}catch(e){}
 
 // ================= Keel: greeting, plan summary, Plan tab navigation =================
-function greet(){const h=new Date().getHours();let n='';try{n=(PROFILE&&PROFILE.answers&&PROFILE.answers.name)||''}catch(e){}if(!n&&typeof OWNER_NAME!=='undefined')n=OWNER_NAME;return (h<12?'Good morning':h<18?'Good afternoon':'Good evening')+(n?', '+esc(n):'')}
+function greet(){const h=new Date().getHours();const n=userName().split(/\s+/)[0]||'';const nm=n?', '+esc(n):'';if(h>=23||h<5)return 'Alright, night owl'+nm;return (h<12?'Good morning':h<18?'Good afternoon':'Good evening')+nm}
 const capF=t=>t?String(t).charAt(0).toUpperCase()+String(t).slice(1):'';
 function planInfo(){let P=null;try{P=PROFILE||null}catch(e){}const a=(P&&P.answers)||{};const now=todayDate();
   const wk=Math.max(1,Math.min(16,Math.floor((now-START)/DAY/7)+1));
@@ -1802,7 +1805,7 @@ function planInfo(){let P=null;try{P=PROFILE||null}catch(e){}const a=(P&&P.answe
   const when=now<FIRST?`STARTS ${fmtD(FIRST,{day:'numeric',month:'short'}).toUpperCase()}`:now>END?'PLAN FINISHED':`WEEK ${wk} OF 16`;
   return {P,a,goal,days,fh,line:`${when} · ENDS ${fmtD(END,{day:'numeric',month:'short'}).toUpperCase()}`}}
 function planSum(full){const I=planInfo(),a=I.a,canEdit=!!(I.P&&I.P.answers);
-  const rows=[[1,'Goal',[I.goal,a.targetWeight&&`target ${a.targetWeight} kg`,a.success].filter(Boolean).join(' · ')],
+  const rows=[[0,'You',[userName()||'Add your name',a.age&&a.age+' years',a.weight&&a.weight+' kg'].filter(Boolean).join(' · ')],[1,'Goal',[I.goal,a.targetWeight&&`target ${a.targetWeight} kg`,a.success].filter(Boolean).join(' · ')],
     [2,'Moving',`${I.days.length} days a week · ${I.days.join(', ')}${a.fixed?' · '+a.fixed:''}`],
     [3,'Your day',[a.job,a.jobDesc,a.start&&'started '+fmtD(parse(a.start))].filter(Boolean).join(' · ')||'Not set yet'],
     [4,'Food',`${capF(typeof APPROACH!=='undefined'?APPROACH:'Higher protein, lower carb')} · about ${DAYT.training.kcal} kcal on active days and ${DAYT.rest.kcal} on rest days${I.fh?` · ${I.fh} h overnight fast`:''}`]];
@@ -1816,7 +1819,7 @@ function planNav(cur){return `<div class="subtabs pnav" style="grid-template-col
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-pnav]');if(x){const v=x.dataset.pnav;if(v==='recover'){location.hash='recover';return}tView=v;if(tab()!=='training')location.hash='training';else render();window.scrollTo({top:0});return}
   const pe=e.target.closest&&e.target.closest('[data-planedit]');if(pe&&typeof obRender==='function'){ob={step:+pe.dataset.planedit,a:Object.assign({},PROFILE.answers||{}),ret:true,fromApp:true};obSave();obRender();return}
   if(e.target.closest&&e.target.closest('#obCancel')){ob={step:-1,a:{}};obSave();showApp();render();return}});
-function kAvatarSet(){const a=document.getElementById('kAvatar');if(!a)return;let n='';try{n=(PROFILE&&PROFILE.answers&&PROFILE.answers.name)||''}catch(e){}a.textContent=(n||'Me').slice(0,1).toUpperCase()}
+function kAvatarSet(){const a=document.getElementById('kAvatar');if(!a)return;const w=userName().split(/\s+/).filter(Boolean);a.textContent=w.length?(w[0][0]+(w.length>1?w[w.length-1][0]:'')).toUpperCase():'Me'}
 
 // ================= Keel v3: plan sheet, area colours =================
 function planBtn(){const I=planInfo();return `<button type="button" class="kpbtn" data-plansheet><span class="kpic">${ico('calendar')}</span><span class="kpt"><b>Your goals</b><small>${esc(I.goal)} · ${esc(I.line.toLowerCase().replace(/^\w/,c=>c.toUpperCase()))}</small></span><span class="kpgo" aria-hidden="true">›</span></button>`}
@@ -1837,10 +1840,10 @@ function todayFoodHTML(k){const d=D()[k]||{date:k,food:[]};const t=foodTotals(d)
 
 // ================= Keel v5: rest days, class boards for extra sessions =================
 function restExtraHTML(key,pl){if(pl&&pl.type!=='R')return '';const bal=readiness(D()[key]);
-  const ids=bal!=null&&bal<55?['box','scan','walk']:['walk','loosen','stretch'];const picks=ids.map(id=>PROGS.find(p=>p.id===id)).filter(Boolean);
+  const dn=Math.floor(parse(key)/DAY);const pk=a=>a[dn%a.length];const ids=[pk(['box','sigh','478']),pk(['walk','loosen','stretch','yoga','scan']),pk(bal!=null&&bal<55?['nap','scan','sigh']:['stretch','yoga','walk','loosen','sauna'].slice(1).concat(['walk']))].filter((v,i,a)=>a.indexOf(v)===i);const picks=ids.map(id=>PROGS.find(p=>p.id===id)).filter(Boolean);
   const nx=[];for(let i=1;i<=14&&nx.length<4;i++){const dd=addD(parse(key),i),p=planFor(dd);if(p&&p.type!=='R'&&!p.pre)nx.push({dd,p})}
   return `<article class="card krest"><div class="chead"><div style="flex:1"><h2>${pl?'Make the most of a rest day':'Keep ticking over'}</h2><div class="sub">${pl?'Easy movement and a bit of recovery help you come back stronger.':'Nothing planned today. A walk or a few minutes of recovery still count.'}</div></div></div>
-    <div class="krlist">${picks.map(p=>`<button type="button" class="rprog" data-prog="${p.id}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${esc(p.lens[p.def||0][0])} · ${esc(p.mind)}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></article>
+    <div class="krlist">${picks.map(p=>`<button type="button" class="rprog" data-prog="${p.id}" style="--rc:${RCC[p.cat]||'var(--k-blue)'}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${esc(p.lens[p.def||0][0])} · ${esc(p.mind)}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></article>
   ${nx.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>Coming up</h2><div class="sub">Tap one to see it, or say "move" to Dictate</div></div></div><div class="kup">${nx.map(({dd,p})=>`<button type="button" class="kupi" data-goto="${iso(dd)}" style="--c:var(${TVAR[p.type]})"><span class="kud">${fmtD(dd,{weekday:'short'})}<b>${dd.getDate()}</b></span><span class="kun">${esc(TNAME[p.type])}</span></button>`).join('')}</div></article>`:''}`}
 function fullPlanTip(){return `<div class="ktip">${ico('mic')}<span><b>Need to move things around?</b> Tap Dictate and say it, for example "move Thursday's run to Saturday" or "I'm away next weekend". The rest of the plan adjusts around it.</span></div>`}
 async function xBoardScan(file){if(!sample){toast('Photo scanning is not available here');return}
@@ -1860,16 +1863,39 @@ document.addEventListener('change',e=>{const el=e.target;if(el&&el.id==='xBoard'
 // ================= Keel v6: header sign-off, coach accordion, section bands =================
 let coachOpen=false;
 function kSignSet(){const h=document.getElementById('kSign');if(!h)return;let t='';try{t=tab()}catch(e){}
+  if(t==='dashboard'&&!sampleMode){h.innerHTML=kTodoChip();return}
   if(t!=='food'||sampleMode){h.innerHTML='';return}const k=iso(sel);if(k>iso(todayDate())){h.innerHTML='';return}const d=D()[k]||{};
   h.innerHTML=d.foodDone?`<button type="button" class="kschip kdone" id="foodUndone" aria-label="Signed off. Tap to undo">${ico('check')}Signed off</button>`
     :`<button type="button" class="kschip${k===iso(todayDate())&&new Date().getHours()>=19?' kdue':''}" id="signOpen">${ico('circle')}Sign off</button>`}
-function kBands(){let t='';try{t=tab()}catch(e){}if(t!=='reports')return;const app=document.getElementById('app');if(!app||app.querySelector('.ksec'))return;
+function kBands(){CMPI=0;let t='';try{t=tab()}catch(e){}if(t!=='reports')return;const app=document.getElementById('app');if(!app||app.querySelector('.ksec'))return;
   const kids=[...app.children];let cur=null,n=0;kids.forEach(el=>{if(el.classList&&el.classList.contains('sect')){cur=document.createElement('section');cur.className='ksec'+(n++%2?' alt':'');app.insertBefore(cur,el)}if(cur)cur.appendChild(el)})}
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='coachAcc')coachOpen=e.target.open},true);
 function coachHTML(aiText,savedAI){const pts=String(aiText||'').split('\n').map(x=>x.trim()).filter(x=>x.startsWith('-')).length;
   return `<details class="kcoach" id="coachAcc" ${coachOpen||aiState.busy?'open':''}><summary><span class="kpic">${ico('sparkles')}</span><span class="kct"><b>Coach's overview</b><small>${aiState.busy?'Reading your last 4 weeks…':aiText?`${pts||'A few'} things worth knowing${savedAI&&!aiState.text?` · ${fmtD(new Date(savedAI.at))}`:''}`:'Your last 4 weeks, read for you'}</small></span><span class="kchev" aria-hidden="true">${ico('chevron-right')}</span></summary>
     <div class="kcbody">${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
     ${sample&&!aiState.busy?`<button type="button" class="kchbtn" id="aiBtn">${aiText?'Refresh overview':'Get my overview'}</button>`:''}</div></details>`}
+
+// ================= Keel v7: to-do in the header, injuries, recover colours =================
+function userName(){let n='';try{n=(PROFILE&&PROFILE.answers&&PROFILE.answers.name)||''}catch(e){}if(!n&&typeof OWNER_NAME!=='undefined')n=OWNER_NAME;return String(n).trim()}
+function todoSheet(open){let h=document.getElementById('tdHost');if(!h){h=document.createElement('div');h.id='tdHost';document.body.appendChild(h)}
+  if(!open){h.innerHTML='';document.body.classList.remove('sheet-open');return}const items=dayTodo()||[];
+  h.innerHTML=`<div class="kshwrap" id="tdWrap"><div class="ksheet" role="dialog" aria-modal="true" aria-label="To do today"><div class="kshead"><h2>To do today</h2><button type="button" class="x" id="tdX" aria-label="Close">${ico('x')}</button></div>
+    ${items.length?`<div class="todolist">${items.map(([t,ok,dsc,attr],i)=>{const tg=attr.startsWith('href')?'a':'button';return `<${tg} ${tg==='button'?'type="button"':''} class="step ${ok?'ok':''}" ${attr} data-todo data-tdclose><span class="sn">${ok?'✓':i+1}</span><span class="st"><b>${esc(t)}</b><small>${esc(dsc)}</small></span><span aria-hidden="true">›</span></${tg}>`}).join('')}</div>`:'<p>Nothing to do right now.</p>'}</div></div>`;document.body.classList.add('sheet-open')}
+function kTodoChip(){const items=(typeof dayTodo==='function'&&dayTodo())||[];const left=items.filter(x=>!x[1]).length;
+  return `<button type="button" class="kschip ${left?'':'kdone'}" id="tdOpen" aria-label="To do today, ${left} left">${ico(left?'clipboard-list':'check')}${left?`To do <span class="kbadge">${left}</span>`:'All done'}</button>`}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
+  if(c('#tdOpen')){todoSheet(true);return}if(c('#tdX')||e.target.id==='tdWrap'){todoSheet(false);return}if(c('[data-tdclose]'))todoSheet(false)},true);
+// injuries: a niggle doesn't stop you; an injury changes what you can do for a while
+function activeInjury(){const t=todayDate(),DD=D();let best=null;
+  for(let i=0;i<70;i++){const k=iso(addD(t,-i)),d=DD[k];(d&&d.niggles||[]).forEach(n=>{if(n.kind!=='Injury')return;
+    const end=n.offUntil?parse(n.offUntil):addD(parse(k),Math.round((+n.weeks||2)*7));if(end<t)return;if(!best||k>best.since)best={...n,since:k,end}})}return best}
+function injuryBanner(){const j=activeInjury();if(!j)return '';const ld=j.load==='0'?'No training':j.load==='50'?'Training at about half':'Training as normal, with care';
+  const rehab=j.rehabFrom?` Rehab starts ${fmtD(parse(j.rehabFrom),{weekday:'short',day:'numeric',month:'short'})}.`:'';
+  return `<div class="kinj"><span class="kpic">${ico('heart-pulse')}</span><div><b>Injury: ${esc(j.area)}${j.side&&j.side!=='Both'&&j.side!=='-'?' ('+esc(j.side.toLowerCase())+')':''}</b><small>${ld} until ${fmtD(j.end,{weekday:'short',day:'numeric',month:'short'})}.${rehab} ${j.load==='0'?'Swap sessions for walks, mobility and rehab.':j.load==='50'?'Keep sessions shorter and easier: roughly half the time and effort.':''}</small></div></div>`}
+// colours for recovery types
+const RCC={'Breathe':'var(--k-sky)','Mind':'var(--k-violet)','Move':'var(--k-green)','Hot & cold':'var(--k-amber)'};
+const RQC={'Walk':'var(--k-green)','Easy cycle':'var(--k-green)','Swim':'var(--k-sky)','Sea swim':'var(--k-sky)','Ice bath':'var(--k-sky)','Sauna':'var(--k-amber)','Hot tub':'var(--k-amber)','Loosen-out':'var(--k-green)','Stretch / yoga':'var(--k-violet)','Foam roll':'var(--k-pink)','Massage':'var(--k-pink)','Nap':'var(--k-violet)'};
+let CMPI=0;const CMPC=['var(--k-blue)','var(--k-green)','var(--k-pink)','var(--k-amber)','var(--k-violet)','var(--k-sky)','var(--k-clay)'];
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -1909,7 +1935,7 @@ function compareRow(q,aLab,a,bLab,b,unit,goodHigh,fmt){
   const bar=(lab,v,n,c)=>`<div class="bar" style="--c:${c}"><span>${lab}</span><div class="tr"><div class="fl" style="width:${(v/mx*100).toFixed(0)}%"></div></div><span class="pct num">${fmt(v)}${unit}</span></div>`;
   const rel=Math.abs(diff)/(Math.max(Math.abs(B),.01));
   const verdict=rel<.05?'Little difference so far.':`${aLab} ${better?'better':'worse'} by ${fmt(Math.abs(diff))}${unit}.`;
-  return `<div class="cmp"><span class="q">${q}</span>${bar(aLab,A,a.length,'var(--k-blue)')}${bar(bLab,B,b.length,'color-mix(in srgb,var(--k-blue) 40%,var(--surface))')}<span class="v"><b>${verdict}</b> Based on ${a.length} and ${b.length} days.</span></div>`;
+  return `<div class="cmp"><span class="q">${q}</span>${(()=>{const cc=CMPC[CMPI++%CMPC.length];return bar(aLab,A,a.length,cc)+bar(bLab,B,b.length,`color-mix(in srgb,${cc} 40%,var(--surface))`)})()}<span class="v"><b>${verdict}</b> Based on ${a.length} and ${b.length} days.</span></div>`;
 }
 function hyroxAnalysis(){
   const cats={},regs={};let classes=0,runM=0;
@@ -1995,10 +2021,10 @@ function timeUseChart(now){
 }
 function habitGrid(now){
   const DD=D();const rows=[['Saw sunrise',d=>has(d,'Saw sunrise')],['Read',d=>has(d,'Read')],['Learned something',d=>has(d,'Learned something')],['Breathwork',d=>has(d,'Breathwork / meditation')],['Screens off 60+ min',d=>{const s=screenGap(d);return s!=null&&s>=60}],['Family time 1 h+',d=>isNum(d.familyHrs)&&d.familyHrs>=1],['Mobility / stretch',d=>has(d,'Mobility / stretch')]];
-  const N=28;let h=`<div class="hgrid">`;
+  const N=14;let h=`<div class="hgrid2">`;
   const HCOL=['var(--k-amber)','var(--k-sky)','var(--k-violet)','var(--k-pink)','var(--k-blue)','var(--k-green)','var(--k-clay)'];rows.forEach(([lab,fn],ri)=>{let cells='',n=0,tot=0;for(let i=N-1;i>=0;i--){const d=DD[iso(addD(now,-i))];const ok=d?!!fn(d):false;if(d){tot++;if(ok)n++}cells+=`<i class="${d?(ok?'on':'off'):''}"></i>`}
-    h+=`<span class="hl">${lab}</span><span class="hc" style="--hcc:${HCOL[ri%HCOL.length]}">${cells}</span><span class="hp num">${tot?Math.round(n/tot*100)+'%':'-'}</span>`});
-  return h+`</div><div class="hint">Last 28 days, oldest on the left. Filled = done that day.</div>`;
+    h+=`<div class="hrow" style="--hcc:${HCOL[ri%HCOL.length]}"><div class="hh"><span class="hl">${lab}</span><span class="hp">${tot?`<b>${n}</b> of ${tot} days`:'Not logged yet'}</span></div><span class="hc">${cells}</span></div>`});
+  return h+`</div><div class="hint">The last 14 days, oldest on the left. A coloured square means you did it that day; an empty one means you didn't; a dotted one means no check-in.</div>`;
 }
 function nutritionPanels(now){
   const DD=D(),T=targets();const N=28;const vals=[];
@@ -2091,7 +2117,7 @@ function viewReports(){
    W('Strain','Daily strain, 0-21, from training load plus farm work, in the style of Whoop. Higher strain raises the next night\'s sleep need.',lineChart(strn,{yMin:0,yMax:21,fmtY:v=>v.toFixed(1),color:'var(--h)',h:130}))+
    (rhr.length>1?W('Morning pulse','Counted by hand before getting up. A rise of 5+ bpm above your usual is an early sign of being run down.',lineChart(rhr,{pad:2,fmtY:v=>Math.round(v),color:'var(--t)',h:110})):'')+
    W('Energy and mood','Energy, 1 flat to 5 flying.',lineChart(series('energy'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--e)',h:110})+'<div class="hint">Mood, 1 low to 5 great.</div>'+lineChart(series('mood'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--x)',h:110}))+
-   W('Stress and soreness','Stress, 1 calm to 5 very stressed.',lineChart(series('stress'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--warn)',h:110})+'<div class="hint">Soreness, 1 fresh to 5 very sore.</div>'+lineChart(series('sore'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--t)',h:110}))+
+   W('Stress and soreness','Stress, 1 calm to 5 very stressed.',lineChart(series('stress'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--warn)',h:110})+'<div class="hint">Soreness, 1 fresh to 5 very sore.</div>'+lineChart(series('sore'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--s)',h:110}))+
    W('Habits','',habitGrid(now))+
    `<div class="sect">Nutrition</div>`+W('Nutrition','',nutritionPanels(now))+
    `<div class="sect">Patterns</div>`+
@@ -2355,7 +2381,7 @@ function obHTML(){
   const s=ob.step;let body='';
   if(s===-1)return `<div class="gcard wide">${obStartHTML()}<button type="button" class="linkbtn" id="signOut">Sign out</button></div>`;
   if(s===-2)return `<div class="gcard wide">${obTalkHTML()}<button type="button" class="linkbtn" id="obHome">Back</button></div>`;
-  if(s===0)body=`<h2>About you</h2>${obIn('name','First name','text','')}<div class="row3">${obIn('age','Age','number','','inputmode="numeric" min="16" max="90"')}${obIn('weight','Weight (kg)','number','','inputmode="decimal" step="0.5"')}${obIn('height','Height (cm)','number','','inputmode="numeric"')}</div>
+  if(s===0)body=`<h2>About you</h2>${obIn('name','Your name (first and last)','text','')}<div class="row3">${obIn('age','Age','number','','inputmode="numeric" min="16" max="90"')}${obIn('weight','Weight (kg)','number','','inputmode="decimal" step="0.5"')}${obIn('height','Height (cm)','number','','inputmode="numeric"')}</div>
     <div class="field"><span class="label">Sex</span>${obSeg('sex',['Male','Female','Prefer not to say'])}</div>`;
   if(s===1)body=`<h2>Your goals</h2><div class="field"><span class="label">Main goal</span>${obSeg('mainGoal',['Feel better day to day','Sleep better','More energy','Lose weight','Build muscle / bulk up','Get lean and toned','Get stronger','Get fit for my sport','Run faster','Hyrox / fitness race','General health'])}</div>
     <div class="field"><span class="label">Anything else? (pick any)</span>${obTags('goals',['Lose body fat','Put on mass','Tone up','Get stronger','Improve endurance','Stay injury-free','More energy','Better sleep','Eat better','Improve flexibility'])}</div>

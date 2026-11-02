@@ -963,6 +963,44 @@ body:not([data-area="today"]) .subtabs button[aria-pressed="true"],body:not([dat
 .sample{background:var(--surface)!important;color:var(--text-body)!important;border-radius:var(--radius-md)!important}
 
 .dgrid>.dt .dl{color:var(--text-muted)!important}
+
+/* ================= v7 ================= */
+/* Dictate: quieter, sits back until you need it */
+.fab{background:var(--surface)!important;color:var(--text)!important;box-shadow:0 0 0 1px var(--line),0 6px 18px rgba(0,0,0,.45)!important;min-height:48px}
+.fab svg{color:var(--text)}
+/* to-do chip */
+.kbadge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:var(--radius-full);background:var(--text);color:var(--on-text);font:600 12px/1 var(--font-mono);margin-left:2px}
+.ksheet .todolist{display:flex;flex-direction:column;gap:var(--space-2)}
+/* injury banner and form */
+.kinj{display:flex;gap:var(--space-3);align-items:flex-start;background:color-mix(in srgb,var(--status-alert) 12%,var(--surface));border-radius:var(--radius-md);padding:var(--space-4);box-shadow:0 0 0 1px color-mix(in srgb,var(--status-alert) 30%,transparent)}
+.kinj .kpic{background:color-mix(in srgb,var(--status-alert) 20%,var(--surface))!important;color:var(--status-alert)!important}
+.kinj b{display:block;font:600 16px/20px var(--font-body);color:var(--text)}.kinj small{color:var(--text-body)}
+.kinjf{display:flex;flex-direction:column;gap:var(--space-2);margin-top:var(--space-2)}
+/* habits: bigger, one row each */
+.hgrid2{display:flex;flex-direction:column;gap:var(--space-4)}
+.hrow{display:flex;flex-direction:column;gap:var(--space-2)}
+.hh{display:flex;justify-content:space-between;align-items:baseline;gap:var(--space-3)}
+.hh .hl{font:600 15px/22px var(--font-body);color:var(--text)}
+.hh .hp{font:400 13px/18px var(--font-body);color:var(--text-muted)}.hh .hp b{font:400 13px/18px var(--font-mono);color:var(--hcc)}
+.hgrid2 .hc{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:4px}
+.hgrid2 .hc i{aspect-ratio:1;border-radius:4px!important;min-width:0}
+.hgrid2 .hc i.off{background:var(--line)!important}
+.hgrid2 .hc i.on{background:var(--hcc)!important}
+.hgrid2 .hc i:not(.on):not(.off){background:transparent!important;box-shadow:inset 0 0 0 1px var(--line);outline:1px dashed var(--line);outline-offset:-1px}
+/* Recover: each kind of recovery has its own colour */
+.rcat h3{display:flex;align-items:center;gap:var(--space-2)}
+.rcat h3::before{content:"";width:10px;height:10px;border-radius:var(--radius-full);background:var(--rc)}
+.rcat .ric,.rprog[style*="--rc"] .ric{color:var(--rc)!important;background:color-mix(in srgb,var(--rc) 16%,var(--surface))!important}
+.rcat .rgo,.rprog[style*="--rc"] .rgo{background:var(--rc)!important;color:var(--on-text)!important}
+.rqgrid button{color:var(--text)}
+.rqgrid button .ki{color:var(--rc)!important}
+.rqgrid button{background:color-mix(in srgb,var(--rc) 10%,var(--bg))!important;border-color:color-mix(in srgb,var(--rc) 25%,transparent)!important}
+.rqgrid button.on{background:color-mix(in srgb,var(--rc) 30%,var(--bg))!important;border-color:var(--rc)!important}
+/* coming up: two by two */
+.kup{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.kupi{flex-direction:row!important;align-items:center!important;gap:var(--space-3)!important}
+.kud{min-width:36px}
+.kun{flex:1;min-width:0}
 </style>
 </head>
 <body>
@@ -989,6 +1027,6 @@ body:not([data-area="today"]) .subtabs button[aria-pressed="true"],body:not([dat
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/app.js?v=keel6"></script>
+<script src="/app.js?v=keel7"></script>
 </body>
 </html>
