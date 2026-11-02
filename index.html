@@ -877,13 +877,51 @@ body.sheet-open{overflow:hidden}
 .ksheet .kplan>.label{display:none}
 .rgo{background:var(--area)!important;color:var(--on-text)!important;border:0!important}.rgo .ki,.rgo svg{color:var(--on-text)!important}
 body:not([data-area="today"]) .seg button[aria-pressed="true"]{background:var(--area)!important;color:var(--on-text)!important}
+.galbtn{position:relative;display:block;text-align:center;font:400 13px/18px var(--font-body);color:var(--text-muted);text-decoration:underline;min-height:44px;line-height:44px;cursor:pointer}
+/* habits grid: one colour per habit, empty days as a quiet outline */
+.hc i{border-radius:2px!important;border:0!important;background:var(--line)!important}
+.hc i.off{background:var(--line)!important}
+.hc i.on{background:var(--hcc,var(--k-blue))!important}
+.hc i:not(.on):not(.off){background:transparent!important;box-shadow:inset 0 0 0 1px var(--line)}
+
+/* ================= Tiles: clearly defined, a touch of depth =================
+   Each tile gets a faint top-lit edge and a hairline outline so it separates from the page on any screen. */
+.card,.panel,.dt,.hero,.rprog,.kpbtn,.stline,.rpill,.adjb,.todo{background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 88%,var(--text) 4%) 0%,var(--surface) 70%)!important;box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 7%,transparent),0 0 0 1px color-mix(in srgb,var(--text) 5%,transparent)!important}
+.panel>h3,.ph h3,.chead h2,.card h2{color:var(--text)}
+.chead{padding-bottom:var(--space-3)}
+/* coach overview: a highlighted tile with its own button */
+.kcoach{display:flex;flex-direction:column;gap:var(--space-3)}
+.kch{display:flex;align-items:center;gap:var(--space-3)}
+.kcoach .kpic{background:color-mix(in srgb,var(--k-amber) 18%,var(--surface));color:var(--k-amber)}
+.kchbtn{min-height:44px;padding:0 var(--space-4);border-radius:var(--radius-lg);border:0;background:var(--k-amber);color:var(--on-text);font:600 15px/22px var(--font-body);flex-shrink:0}
+/* food on Today */
+.kfood .mrings,.kmac .mrings{padding:0 var(--space-4)}
+/* rest days */
+.krest{--area:var(--k-pink)}
+.krlist{display:flex;flex-direction:column;gap:var(--space-2);padding:0 var(--space-4) var(--space-4)}
+.krest .rprog{background:var(--bg)!important;box-shadow:none!important}
+.kup{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2);padding:0 var(--space-4) var(--space-4)}
+.kupi{display:flex;flex-direction:column;gap:var(--space-1);align-items:flex-start;text-align:left;background:color-mix(in srgb,var(--c) 14%,var(--bg));border:0;border-radius:var(--radius-md);padding:var(--space-3);color:var(--text);min-height:44px;font:inherit}
+.kud{font:500 12px/16px var(--font-body);color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em}.kud b{display:block;font:400 17px/22px var(--font-mono);color:var(--text);letter-spacing:0}
+.kun{font:600 13px/18px var(--font-body);color:var(--c)}
+.ktip{display:flex;gap:var(--space-3);align-items:flex-start;background:color-mix(in srgb,var(--k-blue) 12%,var(--surface));border-radius:var(--radius-md);padding:var(--space-4);font:400 15px/22px var(--font-body);color:var(--text-body)}
+.ktip .ki{color:var(--k-blue);font-size:20px;margin-top:2px!important}.ktip b{color:var(--text)}
+.xboard{display:flex!important;align-items:center;justify-content:center;gap:var(--space-2);min-height:48px;border-radius:var(--radius-lg);background:var(--k-blue)!important;color:var(--on-text)!important;font:600 16px/20px var(--font-body);position:relative;overflow:hidden}
+.xboard input{position:absolute;inset:0;opacity:0}
+/* week strip always on show: swipe for the next week */
+.strip.kswipe{touch-action:pan-y}
+.dmid{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);border-radius:var(--radius-md);min-height:44px}
+.strip button.sel{outline:2px solid var(--area);outline-offset:-2px}
+.mrv b{font:400 17px/22px var(--font-mono)!important}.mrv small{font:400 12px/16px var(--font-body)!important;color:var(--text-muted)}
+.dgrid>.dt:last-child:nth-child(odd){grid-column:1 / -1}
+:root{--r:var(--text-muted)}
 </style>
 </head>
 <body>
 <div id="gate" class="gate"><div class="gcard"><div class="gbrand"><img src="/keel-wordmark.svg" alt="keel" class="kwm" style="height:34px"></div><p class="gsub">Loading…</p></div></div>
 <div id="appwrap" hidden>
 <div class="wrap">
-  <div class="kbar"><a class="kmark" href="#dashboard" aria-label="keel, today"><img src="/keel-wordmark.svg" alt="keel" class="kwm"></a><span class="kbr"><button type="button" class="kplanchip" data-plansheet><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Your plan</button><a class="avatar" id="kAvatar" href="#profile" aria-label="Profile and settings">·</a></span></div>
+  <div class="kbar"><a class="kmark" href="#dashboard" aria-label="keel, today"><img src="/keel-wordmark.svg" alt="keel" class="kwm"></a><span class="kbr"><button type="button" class="kplanchip" data-plansheet><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="18" height="18"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Your goal</button><a class="avatar" id="kAvatar" href="#profile" aria-label="Profile and settings">·</a></span></div>
   <header class="top">
     <nav class="tabs" aria-label="Sections">
       <a href="#dashboard" data-tab="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M7 12h10"/></svg><span>Today</span></a>

@@ -31,7 +31,8 @@ let SPEED=[
 const AREAS=['Hamstring','Groin / adductor','Quad','Calf / Achilles','Knee','Ankle','Foot','Hip / glute','Lower back','Shoulder','Neck / upper back','Other'];
 const SIDES=['Left','Right','Both'];
 const FARM=['None','Light','Moderate','Heavy','Very heavy'];
-const HABITS=['Saw sunrise','Read','Learned something','Breathwork / meditation','Mobility / stretch','Hot tub / sauna','Foam roll / massage','Nap','Walk'];
+const HABITS=['Saw sunrise','Read','Learned something','Breathwork / meditation','Walk','Mobility / stretch','Yoga / pilates','Easy cycle','Swim / sea swim','Ice bath / cold water','Hot tub / sauna','Foam roll / massage','Nap'];
+const DAYTAGS=['Work day','Day off','Relaxed day','Holiday','Travelling','Sick / run down'];
 const FLAGS=['Sick / run down'];
 let EXTRA_KINDS=['Club training','Match','Extra class','Gym','Run','Other'];
 const FASTED=()=>!PROFILE||!PROFILE.plan||PROFILE.plan.fasted!==false;
@@ -250,10 +251,11 @@ function checkinHTML(dIso){
     <div class="group"><h4><span class="qn">4</span>Body <small>optional</small></h4><div class="row2">${num('d-rhr','Morning pulse (bpm)','d.rhr',1,f.rhr,'numeric')}${num('d-kg','Weight (kg)','d.weight',0.1,f.weight)}</div>
       <div style="font-size:12px;color:var(--muted)">Count your pulse for 60 seconds before getting up. A rise of 5+ above your usual often means you are run down.</div></div>
     <div class="group"><h4><span class="qn">5</span>Yesterday, ${fmtD(parse(yk),{weekday:'long',day:'numeric',month:'short'})}</h4>
-      <div class="field"><span class="label">What does your day involve? Tap to show or hide</span><div class="tags">${WORK_PARTS.map(([k,l])=>`<button type="button" data-wp="${k}" aria-pressed="${!!wp[k]}">${l}</button>`).join('')}</div></div>
+      <div class="field"><span class="label">What did your day involve yesterday?</span><div class="tags">${DAYTAGS.map(t=>`<button type="button" data-yday="${t}" aria-pressed="${(y.dayTags||[]).includes(t)}">${t}</button>`).join('')}</div></div>
+      <div class="field"><span class="label">Track hours for <small style="text-transform:none;letter-spacing:0">(tap to show or hide)</small></span><div class="tags">${WORK_PARTS.map(([k,l])=>`<button type="button" data-wp="${k}" aria-pressed="${!!wp[k]}">${l}</button>`).join('')}</div></div>
       ${workRows}
-      <div class="field"><span class="label">Habits yesterday</span><div class="tags">${HABITS.map(r=>`<button type="button" data-habit="${r}" aria-pressed="${(y.habits||[]).includes(r)}">${r}</button>`).join('')}</div></div>
-      <div class="field"><span class="label">Other training yesterday</span><div style="font-size:12px;color:var(--muted)">Club sessions, matches, extra classes. Counts towards load.</div>${ext}<button type="button" class="add" id="addExt">+ Add a session</button></div></div>
+      <div class="field"><span class="label">Habits and recovery yesterday</span><div class="tags">${HABITS.map(r=>`<button type="button" data-habit="${r}" aria-pressed="${(y.habits||[]).includes(r)}">${r}</button>`).join('')}</div></div>
+      <div class="field"><span class="label">Anything else active yesterday?</span><div style="font-size:12px;color:var(--muted)">Club sessions, matches, classes, a long walk. It counts towards your effort.</div>${ext}<button type="button" class="add" id="addExt">+ Add a session</button></div></div>
     <div class="group"><div class="field"><label class="label" for="d-n">Notes</label><textarea id="d-n" placeholder="Late night, travel, feeling run down" data-bind="d.notes">${esc(f.notes||'')}</textarea></div></div>
     <div class="actions"><button class="primary" type="submit">Save check-in</button>${saved?'<button type="button" class="ghost" id="dCancel">Cancel</button>':''}</div>
   </form></article>`;
@@ -363,7 +365,7 @@ function mealWindow(d){if(!d)return null;let ts=(d.food||[]).filter(breaksFast).
 function fastHours(map,k){const d=map[k],p=map[iso(addD(parse(k),-1))];const w=mealWindow(d),pw=mealWindow(p);if(!w||!pw)return null;return Math.round(((w.first+1440)-pw.last)/6)/10}
 function lastCaffeineOf(d){if(!d)return null;if(d.lastCaffeine)return tmin(d.lastCaffeine);const ts=(d.food||[]).filter(i=>(+i.caffeine||0)>0).map(i=>tmin(i.at)).filter(x=>x!=null);return ts.length?Math.max(...ts):null}
 function plantsOn(d){const s=new Set();(d&&d.food||[]).forEach(i=>(i.plants||[]).forEach(p=>s.add(String(p).toLowerCase().trim())));return s}
-function plantsWeek(k){const dt=parse(k),mon=addD(dt,-((dt.getDay()+6)%7));const s=new Set();for(let i=0;i<7;i++){const kk=iso(addD(mon,i));if(kk>k)break;plantsOn(D()[kk]).forEach(p=>s.add(p))}return s}
+function plantsWeek(k){const dt=parse(k);const s=new Set();for(let i=0;i<7;i++){plantsOn(D()[iso(addD(dt,-i))]).forEach(p=>s.add(p))}return s}
 function guessMeal(){const h=new Date().getHours();return h<11?'Breakfast':h<15?'Lunch':h<17?'Snack':'Dinner'}
 function frequentFoods(){return learnedFoods()}
 const fmtN=(v,u)=>u==='µg'||(u==='g'&&v<10)?(Math.round(v*10)/10):Math.round(v);
@@ -401,12 +403,13 @@ function foodTodayHTML(dIso){
   const freq=frequentFoods();const ai=!!sample;const due=planDue();
   const kEmpty=!kitchen().length&&!sampleMode;
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Time to plan ahead'}</b><br><small>Update your food, then let Keel plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
-  ${foodActionsHTML(dIso)}<article class="card"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label} <span class="dtwhy">· ${esc(dayTypeWhy(dIso))}</span></h2><div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
+  <article class="card kmac"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label} <span class="dtwhy">· ${esc(dayTypeWhy(dIso))}</span></h2><div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
     
     ${macroRings(t,dt)}${waterHTML(dIso)}
     ${microsHTML(t,dt,dIso)}
-    <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants this week${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
+    <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants in the last 7 days${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
   </article>
+  ${foodActionsHTML(dIso)}
   ${drinksHTML(dIso)}${planMismatch(dIso)}${planVsHTML(dIso)}${pd?`<article class="card"><div class="chead"><div style="flex:1"><h2>${dIso===iso(todayDate())?'Your plan for today':'Your plan for this day'}</h2><div class="sub">${esc(pd.note||'Tap Ate this as you go. Changes go in the diary.')}</div></div></div>${planMealsHTML(dIso)}</article>`:''}
   ${eatenHTML(d)}<article class="card"><div class="form"><h3>Fasting</h3>
       <div class="row2"><div class="field"><label class="label" for="ffm">First food</label><input id="ffm" type="time" value="${esc(d.firstMeal||(win?fmtT(win.first):''))}" data-food="firstMeal"></div>
@@ -474,7 +477,7 @@ async function parseDiary(){
     const k=iso(sel);const keep=((days[k]&&days[k].food)||[]).filter(i=>i.src!=='diary');const extra={food:keep.concat(items),diary:text};
     if(out&&isNum(out.water)&&+out.water>0)extra.water=+out.water;
     await persistDay(k,extra);fState={...fState,busy:false,text:null,msg:`Logged ${items.length} items, about ${items.reduce((a,i)=>a+kcalOf(i),0)} kcal. Fix anything that's wrong; tap again after adding more.`};toast('Day logged');
-  }catch(e){fState={...fState,busy:false,msg:foodErr(e)}}
+  }catch(e){fState={...fState,busy:false,msg:foodErr(e)};toast(foodErr(e))}
   render();
 }
 async function parseFoodPhoto(file){
@@ -484,7 +487,7 @@ async function parseFoodPhoto(file){
     const items=cleanItems(out&&out.items,meal,true,'photo').map(i=>({...i,meal}));
     if(!items.length){fState={...fState,busy:false,msg:'No food recognised. Try a closer photo from above, or describe it in the diary.'};render();return}
     PR={seen:out&&out.seen?String(out.seen).slice(0,200):'',meal,items:items.map(x=>({...x,pct:100,orig:x.name}))};fState={...fState,busy:false,msg:''};render();showPR();
-  }catch(e){fState={...fState,busy:false,msg:foodErr(e)}}
+  }catch(e){fState={...fState,busy:false,msg:foodErr(e)};toast(foodErr(e))}
   render();
 }
 async function updateKitchen(){
@@ -587,7 +590,8 @@ function sessionForm(d,pl){
     <div class="field"><label class="label" for="f-ss">${esc(KEYLIFTS[1]||'Second lift')} (kg)</label><input id="f-ss" type="number" inputmode="decimal" step="1" value="${f.ss??''}" data-bind="s.ss"></div></div>`;
   if(k==='T'&&!test)spec=`<label class="toggle"><input id="f-swap" type="checkbox" ${f.swap?'checked':''} data-bind="s.swap"> Did a ${esc(TNAME.H)} instead</label>`+(f.swap?'':`<div class="field"><label class="label" for="f-pace">Average rep pace (min:sec per km)</label><input id="f-pace" type="text" inputmode="numeric" placeholder="4:35" value="${esc(f.pace||'')}" data-bind="s.pace"></div>`);
   if(test)spec=`<div class="field"><label class="label" for="f-5k">5 km time (min:sec)</label><input id="f-5k" type="text" inputmode="numeric" placeholder="21:30" value="${esc(f.fivek||'')}" data-bind="s.fivek"></div>`;
-  if(isH)spec+=hyroxScanHTML();
+  if(!isH&&!test&&k!=='R')spec+=`<label class="toggle"><input id="f-cls" type="checkbox" ${f.isClass?'checked':''} data-bind="s.isClass"> It was a class: snap the board</label>`;
+  if(isH||f.isClass)spec+=hyroxScanHTML();
   return `<form class="form" id="logForm" autocomplete="off" style="border-top:1px solid var(--line)">
     <div style="display:flex;justify-content:space-between;align-items:baseline"><h3>Log session</h3>${has?'<span class="label" style="color:var(--ok)">Saved</span>':future?'<span class="label">Upcoming</span>':''}</div>
     <div class="field"><span class="label">How did it go?</span>${seg('s','status',['done','partial','missed'],f.status,['Done','Partial','Missed'],'status')}</div>
@@ -660,7 +664,7 @@ function dayHeader(){
   for(let i=0;i<7;i++){const d=addD(mon,i),p=planFor(d),t=p?p.type:'R',lt=L()[iso(d)],col=lt&&lt.type==='H'&&t==='T'?'H':t;const rs=readiness(D()[iso(d)]);
     strip+=`<button type="button" data-goto="${iso(d)}" class="${iso(d)===key?'sel':''}" style="--c:var(${TVAR[col]});--rc:${rColor(rs)}" aria-label="${fmtD(d,{weekday:'long',day:'numeric',month:'long'})}"><span class="d">${DOW[i]}</span><span class="n">${d.getDate()}</span><span class="dot ${dotClass(d,p)}"></span><span class="rd"></span></button>`}
   const isToday=key===iso(todayDate());
-  return `<div class="dbar"><button type="button" id="prevD" aria-label="Previous day">‹</button><button type="button" class="dmid" id="stripTog" aria-expanded="${stripOpen}"><b>${isToday?'Today':fmtD(sel,{weekday:'short'})} · ${fmtD(sel,{day:'numeric',month:'short'})}</b><small>${pl?`Week ${pl.wk}`:'This week'} ${stripOpen?'▴':'▾'}</small></button>${isToday?'':'<button type="button" class="dtoday" id="goToday">Today</button>'}<button type="button" id="nextD" aria-label="Next day">›</button></div>${stripOpen?`<div class="strip">${strip}</div>`:''}`;
+  return `<div class="dbar"><button type="button" id="prevD" aria-label="Previous week">‹</button><div class="dmid"><b>${isToday?'Today':fmtD(sel,{weekday:'short'})} · ${fmtD(sel,{day:'numeric',month:'short'})}</b><small>${pl&&!pl.pre?`Week ${pl.wk} of 16`:`Week of ${fmtD(mon,{day:'numeric',month:'short'})}`}</small></div>${isToday?'':'<button type="button" class="dtoday" id="goToday">Today</button>'}<button type="button" id="nextD" aria-label="Next week">›</button></div><div class="strip kswipe" title="Swipe to change week">${strip}</div>`;
 }
 function ensureDrafts(){const key=iso(sel);
   if(!sDraft||sDraft.date!==key){sDraft=blankLog(key);sDirty=false;scanState=null}
@@ -677,15 +681,15 @@ function viewTraining(){
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
   const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
-  return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+extrasCardHTML(key)+patternHTML()+pill;
+  return pre+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+extrasCardHTML(key)+patternHTML()+pill;
 }
-function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
-function viewTrainingTab(){return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+viewPlan():viewTraining())}
+function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Full plan']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
+function viewTrainingTab(){return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+fullPlanTip()+viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+ciChip(iso(sel))+checkinHTML(iso(sel))}
-function viewFood(){return dayHeader()+(fView==='today'?signChip(iso(sel)):'')+foodHTML(iso(sel))}
+function viewFood(){return dayHeader()+foodHTML(iso(sel))+(fView==='today'?signChip(iso(sel)):'')}
 function viewPlan(){
   const LL=L(),DD=D(),td=iso(todayDate());
-  let h=`<div class="legend">${['S','E','H','T','X'].map(k=>`<span style="--c:var(${TVAR[k]})"><i></i>${TNAME[k]}</span>`).join('')}<span>Solid = done · half = partial · red ring = missed · bar = readiness</span></div><div class="pgrid"><span></span>${DOW.map(d=>`<span class="h">${d}</span>`).join('')}`;
+  let h=`<div class="legend">${['S','E','H','T','X'].map(k=>`<span style="--c:var(${TVAR[k]})"><i></i>${TNAME[k]}</span>`).join('')}<span>Solid = done · half = partial · red ring = missed · bar = balance</span></div><div class="pgrid"><span></span>${DOW.map(d=>`<span class="h">${d}</span>`).join('')}`;
   for(let w=1;w<=16;w++){const p=Math.floor((w-1)/4),mon=addD(START,(w-1)*7);
     h+=`<div class="wkl" style="--pc:${PHC[p]}"><b>W${w}</b><small>${short(mon)}</small>${DELOAD[w]?`<span class="dl">${w===12?'TEST':'DELOAD'}</span>`:''}</div>`;
     for(let i=0;i<7;i++){const d=addD(mon,i),pl=planFor(d),k=pl.type,l=LL[iso(d)],col=l&&l.type==='H'&&k==='T'?'H':k;
@@ -705,7 +709,7 @@ function spark(vals,lo,hi){const W=300,H=56,n=vals.length;const X=i=>6+i/(n-1)*(
   let path='',started=false;pts.forEach(p=>{if(!p){started=false;return}path+=(started?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1);started=true});
   const last=[...pts].reverse().find(Boolean);
   const bands=`<rect x="0" y="${Y(100)}" width="${W}" height="${Y(75)-Y(100)}" style="fill:var(--ok);opacity:.07"/><rect x="0" y="${Y(55)}" width="${W}" height="${Y(0)-Y(55)}" style="fill:var(--bad);opacity:.06"/>`;
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Balance trend">${bands}<path d="${path}" style="fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round"/>${pts.filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.5" style="fill:${rColor(p[2])}"/>`).join('')}${last?`<circle cx="${last[0]}" cy="${last[1]}" r="5" style="fill:var(--surface);stroke:var(--accent);stroke-width:2.5"/>`:''}</svg>`}
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Balance trend">${bands}<path d="${path}" style="fill:none;stroke:var(--k-green);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round"/>${pts.filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.5" style="fill:var(--k-green)"/>`).join('')}${last?`<circle cx="${last[0]}" cy="${last[1]}" r="5" style="fill:var(--surface);stroke:var(--k-green);stroke-width:2.5"/>`:''}</svg>`}
 function viewDashboard(){
   const now=sampleMode?SAMPLE.now:todayDate(),k=iso(now),DD=D(),LL=L(),d=DD[k],pl=planFor(now),yk=iso(addD(now,-1));
   const toggle=`<div class="dtop"><div class="kgreet"><h1>${greet()}</h1><small>${fmtD(now,{weekday:'long',day:'numeric',month:'long'})} · ${sampleMode?'Example data, not yours':now<FIRST?`Plan starts in ${Math.round((FIRST-now)/DAY)} days`:pl?`Week ${pl.wk} of 16 · ${PHN[pl.p]}`:'Plan complete'}</small></div><div style="display:flex;gap:8px;align-items:center"><button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'My data':'Example'}</button></div></div>
@@ -740,7 +744,7 @@ function viewDashboard(){
   const nig=(d&&d.niggles||[]).filter(n=>+n.pain>0);
   const tBody=`<a class="dt" href="#checkin" data-dtab><span class="dl">Body</span>${nig.length?nig.slice(0,3).map(n=>`<span class="nigx" style="--nc:${+n.pain>=5?'var(--bad)':+n.pain>=3?'var(--warn)':'var(--muted)'}"><b class="num">${n.pain}</b>${esc(n.side&&n.side!=='Both'?n.side[0]+' ':'')}${esc(n.area)}</span>`).join(''):`<b class="mid" style="color:var(--ok)">No niggles</b>`}${d&&isNum(d.sore)?`<span class="ds">Soreness ${d.sore}/5</span>`:''}</a>`;
   const pw=plantsWeek(k).size;
-  const tPlants=`<a class="dt" href="#food" data-dtab><span class="dl">Plants this week</span><b class="big num">${pw}<small>/ ${PLANTS_WEEK}</small></b>${miniBar('',pw,PLANTS_WEEK,pw>=PLANTS_WEEK?'var(--ok)':'var(--e)','')}</a>`;
+  const tPlants=`<a class="dt" href="#food" data-dtab><span class="dl">Plants, last 7 days</span><b class="big num">${pw}<small>/ ${PLANTS_WEEK}</small></b>${miniBar('',pw,PLANTS_WEEK,pw>=PLANTS_WEEK?'var(--ok)':'var(--e)','')}</a>`;
   const hab=[['Saw sunrise','Sunrise'],['Read','Read'],['Learned something','Learn'],['Mobility / stretch','Mobility']];
   const scr=(()=>{let n=0,t=0;for(let i=0;i<7;i++){const x=DD[iso(addD(now,-i))];const g=screenGap(x);if(g!=null){t++;if(g>=60)n++}}return t?`${n}/${t}`:'–'})();
   const tHab=`<a class="dt" href="#checkin" data-dtab><span class="dl">Habits · last 7 days</span><div class="habs">${hab.map(([h,l])=>{let n=0;for(let i=0;i<7;i++)if(has(DD[iso(addD(now,-i))],h))n++;return `<span><b class="num">${n}</b>${l}</span>`}).join('')}<span><b class="num">${scr}</b>Screens off 1 h</span></div></a>`;
@@ -757,7 +761,7 @@ function viewDashboard(){
   const balance=balTot?`<div class="stack">${bal.map(([f,c,l])=>+yd[f]?`<i style="flex:${+yd[f]};background:${c}" title="${l}"></i>`:'').join('')}</div><div class="legend">${bal.map(([f,c,l])=>`<span style="--c:${c}"><i></i>${l} ${+yd[f]||0} h</span>`).join('')}</div>`:'<div class="ds">Comes from the morning check-in, under Yesterday.</div>';
   const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'').split(' :: ')[0]):[];
   const due=!sampleMode&&planDue();
-  const su=setupChecklistHTML();return toggle+su+(su?'':todoHTML())+hero+planBtn()+`<div class="dgrid">${tSleep}${tSess}${tFuel}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
+  const su=setupChecklistHTML();return toggle+su+(su?'':todoHTML())+hero+`${todayFoodHTML(k)}<div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section>
@@ -917,7 +921,7 @@ function extrasCardHTML(k){
   const list=ex.map((x,i)=>`<div class="fitem"><div style="min-width:0"><div class="fn">${esc(x.desc||x.kind)}</div><div class="fq">${esc(x.kind)}${x.dur?` · ${x.dur} min`:''}${x.rpe?` · effort ${x.rpe}/10`:''}</div></div><span></span>${sampleMode?'':`<button type="button" class="x" data-xdel="${i}" aria-label="Remove">×</button>`}</div>`).join('');
   const last=xState.last&&xState.last.date===k?xState.last:null;
   const lastH=last?`<div class="form" style="padding-top:0"><div class="hsum" role="status">${esc(last.summary)}</div>${(last.applied||[]).map(a=>`<div class="adjb"><div><b>${fmtD(parse(a.date),{weekday:'long'})}: ${a.from!==a.to?`${esc(TNAME[a.from])} → ${esc(TNAME[a.to])}`:esc(TNAME[a.to])}</b>${a.note?`<br><span>${esc(a.note)}</span>`:''}</div><button type="button" class="ghost" data-xundo="${a.date}">Undo</button></div>`).join('')}</div>`:'';
-  const form=xState.open?`<div class="form"><div class="field"><label class="label" for="x-say">What did you do?</label><textarea id="x-say" placeholder="e.g. 5 km easy run along the beach, about 30 minutes, felt easy. Or: hotel gym, upper body and core, 45 minutes, a 6 out of 10." style="min-height:96px">${esc(xState.text)}</textarea>
+  const form=xState.open?`<div class="form"><div class="subtabs" style="grid-template-columns:1fr 1fr">${[['solo','On my own'],['class','A class']].map(([v,l])=>`<button type="button" data-xmode="${v}" aria-pressed="${(xState.mode||'solo')===v}">${l}</button>`).join('')}</div>${xState.mode==='class'&&canImg?`<label class="filebtn xboard">${ico('camera')} Snap the class board<input type="file" id="xBoard" accept="image/*"></label><div class="hint" style="font-size:12px;color:var(--muted)">Keel reads the workout from the photo. You can also say it or type it below.</div>`:''}<div class="field"><label class="label" for="x-say">What did you do?</label><textarea id="x-say" placeholder="e.g. 5 km easy run along the beach, about 30 minutes, felt easy. Or: hotel gym, upper body and core, 45 minutes, a 6 out of 10." style="min-height:96px">${esc(xState.text)}</textarea>
       <div class="hint" style="font-size:12px;color:var(--muted)">Say what it was, how long and how hard it felt. ${sample?'The next couple of days adjust if needed so you don\'t overdo it; the rest of your plan stays the same.':''}</div></div>
       ${sample?'':`<div class="row3"><div class="field"><label class="label" for="x-kind">Type</label><select id="x-kind">${EXTRA_KINDS.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div><div class="field"><label class="label" for="x-min">Minutes</label><input id="x-min" type="number" inputmode="numeric"></div><div class="field"><label class="label" for="x-rpe">Effort 1-10</label><input id="x-rpe" type="number" inputmode="numeric" min="1" max="10"></div></div>`}
       <div class="actions">${sample?speakBtn('x-say'):''}<button type="button" class="primary" id="xGo" ${xState.busy?'disabled':''}>${xState.busy?'Working…':'Add it'}</button></div>
@@ -1153,7 +1157,7 @@ function ringSVG(v,tg,col,size){const r=size/2-6,c=2*Math.PI*r,p=Math.max(0,Math
 function macroRings(t,dt){
   const one=(k,lab,col)=>{const n=NUTS.find(x=>x.k===k),tg=nutTarget(k,dt);const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);const st=status(t[k],tg);
     return `<div class="mring">${ringSVG(t[k],ref,st==='bad'&&t[k]>ref?'var(--bad)':col,74)}<div class="mrv"><b class="num">${Math.round(t[k])}</b><small>of ${Math.round(ref)}${n.u==='kcal'?'':' '+n.u}</small></div><span>${lab}</span></div>`};
-  return `<div class="mrings">${one('kcal','Calories','var(--accent)')}${one('protein','Protein','var(--s)')}${one('carbs','Net carbs','var(--e)')}${one('fat','Fat','var(--x)')}</div>`;
+  return `<div class="mrings">${one('kcal','Calories','var(--o)')}${one('protein','Protein','var(--s)')}${one('carbs','Net carbs','var(--e)')}${one('fat','Fat','var(--x)')}</div>`;
 }
 function microsHTML(t,dt,k){
   const micros=NUTS.filter(n=>!n.macro&&n.lo);const d=D()[k]||{};const late=d.foodDone||k<iso(todayDate())||new Date().getHours()>=18;
@@ -1261,7 +1265,7 @@ function eatenHTML(d){
   return `<article class="card"><div class="chead"><div style="flex:1"><h2>Eaten</h2><div class="sub">${food.length} item${food.length>1?'s':''} · ${tot} kcal</div></div></div><div class="msecs">${secs}</div></article>`;
 }
 // ---- recovery ----
-const RECOV=[['Walk','🚶','Walk'],['Easy cycle','🚴',null],['Swim','🏊',null],['Sea swim','🌊',null],['Ice bath','🧊',null],['Sauna','🔥','Hot tub / sauna'],['Hot tub','♨️','Hot tub / sauna'],['Loosen-out','🤸','Mobility / stretch'],['Stretch / yoga','🧘','Mobility / stretch'],['Foam roll','🌀','Foam roll / massage'],['Massage','💆','Foam roll / massage'],['Nap','😴','Nap']];
+const RECOV=[['Walk','🚶','Walk'],['Easy cycle','🚴','Easy cycle'],['Swim','🏊','Swim / sea swim'],['Sea swim','🌊','Swim / sea swim'],['Ice bath','🧊','Ice bath / cold water'],['Sauna','🔥','Hot tub / sauna'],['Hot tub','♨️','Hot tub / sauna'],['Loosen-out','🤸','Mobility / stretch'],['Stretch / yoga','🧘','Yoga / pilates'],['Foam roll','🌀','Foam roll / massage'],['Massage','💆','Foam roll / massage'],['Nap','😴','Nap']];
 let recS={pick:null};
 function recoveryHTML(k){
   const d=D()[k]||{};const list=d.recovery||[];const can=!sampleMode&&k<=iso(todayDate());
@@ -1389,7 +1393,7 @@ function rpTick(){if(!PL||PL.paused||PL.end)return;const left=Math.max(0,Math.ce
 function rpFinish(){clearInterval(rpTimer);PL.end=true;chime('end');say('Well done. Take a moment before you get up.');setTimeout(audBedStop,3000);keepAwake(false);PL.mins=Math.max(1,Math.round((Date.now()-PL.started)/60000));try{rpWake&&rpWake.release()}catch(e){}rpRender()}
 function rpClose(){clearInterval(rpTimer);PL=null;audBedStop();sayStop();keepAwake(false);try{rpWake&&rpWake.release()}catch(e){}const h=$('#plHost');if(h)h.innerHTML=''}
 async function rpLog(feel){const pr=PL.pr,mins=PL.mins;const k=iso(todayDate());const d=D()[k]||{};const now=new Date();
-  const habit={box:'Breathwork / meditation',sigh:'Breathwork / meditation','478':'Breathwork / meditation',scan:'Breathwork / meditation',loosen:'Mobility / stretch',stretch:'Mobility / stretch',yoga:'Mobility / stretch',sauna:'Hot tub / sauna',contrast:'Hot tub / sauna',walk:'Walk',nap:'Nap'}[pr.id];
+  const habit={box:'Breathwork / meditation',sigh:'Breathwork / meditation','478':'Breathwork / meditation',scan:'Breathwork / meditation',loosen:'Mobility / stretch',stretch:'Mobility / stretch',yoga:'Yoga / pilates',sauna:'Hot tub / sauna',contrast:'Hot tub / sauna',walk:'Walk',nap:'Nap'}[pr.id];
   const fields={recovery:(d.recovery||[]).concat([{kind:pr.name,min:mins,at:fmtT(now.getHours()*60+now.getMinutes()),feel:feel||null,prog:pr.id}])};if(habit&&HABITS.includes(habit))fields.habits=[...new Set((d.habits||[]).concat([habit]))];
   if(!sampleMode)persistDay(k,fields);rpClose();toast(`${pr.name} logged: ${mins} min`);render()}
 function viewRecover(){const k=iso(todayDate());let n=0,mins=0,feel=[];for(let i=0;i<7;i++){const x=D()[iso(addD(todayDate(),-i))];(x&&x.recovery||[]).forEach(r=>{n++;mins+=+r.min||0;if(r.feel)feel.push(+r.feel)})}
@@ -1666,7 +1670,7 @@ function foodActionsHTML(dIso){if(sampleMode||dIso>iso(todayDate()))return '';
   const meal=fState.meal||(dIso===iso(todayDate())?guessMeal():'Dinner');const fr=learnedFoods();const dt=dayTypeFor(dIso);
   const lib=LIB.filter(x=>x[1]==='any'||x[1]==='snack'||x[1]==='drinks'||x[1]==='treat'||(dt==='rest'&&x[1]==='rest')||(dt!=='rest'&&(x[1]==='training'||x[1]==='post')));
   const chip=(i,ix)=>`<button type="button" data-quick="${ix}">${esc(i.name)}</button>`;
-  return `<article class="card factions"><div class="frow">${canImg?`<label class="fbtn"><span aria-hidden="true">📷</span><b>Snap plate</b><input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}<button type="button" class="fbtn" id="fSay"><span aria-hidden="true">🎤</span><b>Say it</b></button><button type="button" class="fbtn" id="fType"><span aria-hidden="true">⌨️</span><b>Type it</b></button></div>
+  return `<article class="card factions"><div class="frow">${canImg?`<label class="fbtn"><span aria-hidden="true">📷</span><b>Snap plate</b><input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}<button type="button" class="fbtn" id="fSay"><span aria-hidden="true">🎤</span><b>Say it</b></button><button type="button" class="fbtn" id="fType"><span aria-hidden="true">⌨️</span><b>Type it</b></button></div>${canImg?`<label class="galbtn">Or choose a photo from your gallery<input type="file" id="mealFile2" accept="image/*" style="position:absolute;opacity:0;width:1px;height:1px;overflow:hidden"></label>`:''}
     <div class="mealpick">${seg('f','meal',MEALS,meal,null,'small')}</div><div class="qline"><span class="label">Quick add · ${esc(meal)}</span>${fr.length?`<div class="tags">${fr.slice(0,5).map(chip).join('')}</div>`:`<div class="hint" style="font-size:12px;color:var(--muted)">Things you eat often will appear here.</div>`}
     ${fr.length>5||lib.length?`<details class="qmore"><summary>More</summary>${fr.length>5?`<div class="tags">${fr.slice(5).map((x,i)=>chip(x,i+5)).join('')}</div>`:''}${lib.length?`<div class="label" style="margin-top:8px">From your meal guide</div><div class="tags">${lib.map(x=>`<button type="button" data-lib="${LIB.indexOf(x)}">${esc(x[0])}</button>`).join('')}</div>`:''}</details>`:''}</div>
     ${fState.busy||fState.msg?`<div class="hsum" role="status">${esc(fState.busy?'Working…':fState.msg)}</div>`:''}</article>`}
@@ -1808,17 +1812,17 @@ function planSum(full){const I=planInfo(),a=I.a,canEdit=!!(I.P&&I.P.answers);
     <div class="kprog" aria-hidden="true"><i style="width:${Math.max(2,Math.min(100,(todayDate()-START)/(END-START)*100))}%"></i></div>
     <div class="krows">${rows.map(([s,l,t])=>canEdit?`<button type="button" class="krow" data-planedit="${s}"><span class="label">${l}</span><span class="kt">${esc(t)}</span><span class="ked">Change</span></button>`:`<div class="krow"><span class="label">${l}</span><span class="kt">${esc(t)}</span></div>`).join('')}</div>
     <small class="ds">${canEdit?'Changing anything rebuilds the plan from today. Everything you have logged stays.':'Your plan runs for 16 weeks. Ask to change it in a chat and it can be rebuilt.'}</small></article>`}
-function planNav(cur){return `<div class="subtabs pnav" style="grid-template-columns:repeat(2,minmax(0,1fr))">${[['today','Day'],['plan','16 weeks']].map(([v,l])=>`<button type="button" data-pnav="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
+function planNav(cur){return `<div class="subtabs pnav" style="grid-template-columns:repeat(2,minmax(0,1fr))">${[['today','Day'],['plan','Full plan']].map(([v,l])=>`<button type="button" data-pnav="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-pnav]');if(x){const v=x.dataset.pnav;if(v==='recover'){location.hash='recover';return}tView=v;if(tab()!=='training')location.hash='training';else render();window.scrollTo({top:0});return}
   const pe=e.target.closest&&e.target.closest('[data-planedit]');if(pe&&typeof obRender==='function'){ob={step:+pe.dataset.planedit,a:Object.assign({},PROFILE.answers||{}),ret:true,fromApp:true};obSave();obRender();return}
   if(e.target.closest&&e.target.closest('#obCancel')){ob={step:-1,a:{}};obSave();showApp();render();return}});
 function kAvatarSet(){const a=document.getElementById('kAvatar');if(!a)return;let n='';try{n=(PROFILE&&PROFILE.answers&&PROFILE.answers.name)||''}catch(e){}a.textContent=(n||'Me').slice(0,1).toUpperCase()}
 
 // ================= Keel v3: plan sheet, area colours =================
-function planBtn(){const I=planInfo();return `<button type="button" class="kpbtn" data-plansheet><span class="kpic">${ico('calendar')}</span><span class="kpt"><b>Your plan</b><small>${esc(I.goal)} · ${esc(I.line.toLowerCase().replace(/^\w/,c=>c.toUpperCase()))}</small></span><span class="kpgo" aria-hidden="true">›</span></button>`}
+function planBtn(){const I=planInfo();return `<button type="button" class="kpbtn" data-plansheet><span class="kpic">${ico('calendar')}</span><span class="kpt"><b>Your goal</b><small>${esc(I.goal)} · ${esc(I.line.toLowerCase().replace(/^\w/,c=>c.toUpperCase()))}</small></span><span class="kpgo" aria-hidden="true">›</span></button>`}
 function planSheet(open){let h=document.getElementById('psHost');if(!h){h=document.createElement('div');h.id='psHost';document.body.appendChild(h)}
   if(!open){h.innerHTML='';document.body.classList.remove('sheet-open');return}
-  h.innerHTML=`<div class="kshwrap" id="psWrap"><div class="ksheet" role="dialog" aria-modal="true" aria-label="Your plan"><div class="kshead"><h2>Your plan</h2><button type="button" class="x" id="psX" aria-label="Close">${ico('x')}</button></div>${planSum(true)}</div></div>`;document.body.classList.add('sheet-open')}
+  h.innerHTML=`<div class="kshwrap" id="psWrap"><div class="ksheet" role="dialog" aria-modal="true" aria-label="Your goal"><div class="kshead"><h2>Your goal</h2><button type="button" class="x" id="psX" aria-label="Close">${ico('x')}</button></div>${planSum(true)}</div></div>`;document.body.classList.add('sheet-open')}
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
   if(c('[data-plansheet]')){planSheet(true);return}
   if(c('#psX')||e.target.id==='psWrap'){planSheet(false);return}
@@ -1827,6 +1831,32 @@ const AREA={dashboard:'today',checkin:'today',training:'plan',recover:'recover',
 function setArea(){let t='dashboard';try{t=tab()}catch(e){}document.body.dataset.area=AREA[t]||'today'}
 window.addEventListener('hashchange',setArea);
 
+// ================= Keel v4: food on Today =================
+function todayFoodHTML(k){const d=D()[k]||{date:k,food:[]};const t=foodTotals(d),dt=dayTypeFor(k);
+  return `<article class="card kfood"><div class="chead"><div style="flex:1;min-width:0"><h2>Food today</h2><div class="sub">${esc(DAYT[dt].label)} targets${t.n?` · ${t.n} item${t.n>1?'s':''} logged`:' · nothing logged yet'}</div></div><a class="linkbtn" href="#food" data-dtab>Log food ›</a></div>${macroRings(t,dt)}${microsHTML(t,dt,k)}</article>`}
+
+// ================= Keel v5: rest days, class boards for extra sessions =================
+function restExtraHTML(key,pl){if(pl&&pl.type!=='R')return '';const bal=readiness(D()[key]);
+  const ids=bal!=null&&bal<55?['box','scan','walk']:['walk','loosen','stretch'];const picks=ids.map(id=>PROGS.find(p=>p.id===id)).filter(Boolean);
+  const nx=[];for(let i=1;i<=14&&nx.length<4;i++){const dd=addD(parse(key),i),p=planFor(dd);if(p&&p.type!=='R'&&!p.pre)nx.push({dd,p})}
+  return `<article class="card krest"><div class="chead"><div style="flex:1"><h2>${pl?'Make the most of a rest day':'Keep ticking over'}</h2><div class="sub">${pl?'Easy movement and a bit of recovery help you come back stronger.':'Nothing planned today. A walk or a few minutes of recovery still count.'}</div></div></div>
+    <div class="krlist">${picks.map(p=>`<button type="button" class="rprog" data-prog="${p.id}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${esc(p.lens[p.def||0][0])} · ${esc(p.mind)}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></article>
+  ${nx.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>Coming up</h2><div class="sub">Tap one to see it, or say "move" to Dictate</div></div></div><div class="kup">${nx.map(({dd,p})=>`<button type="button" class="kupi" data-goto="${iso(dd)}" style="--c:var(${TVAR[p.type]})"><span class="kud">${fmtD(dd,{weekday:'short'})}<b>${dd.getDate()}</b></span><span class="kun">${esc(TNAME[p.type])}</span></button>`).join('')}</div></article>`:''}`}
+function fullPlanTip(){return `<div class="ktip">${ico('mic')}<span><b>Need to move things around?</b> Tap Dictate and say it, for example "move Thursday's run to Saturday" or "I'm away next weekend". The rest of the plan adjusts around it.</span></div>`}
+async function xBoardScan(file){if(!sample){toast('Photo scanning is not available here');return}
+  xState.busy=true;xState.msg='Reading the board… up to a minute.';render();
+  try{const out=await sample.json(`This is a photo of a gym, Hyrox, CrossFit, strength and conditioning or fitness class workout written on a whiteboard or screen. Read it.
+Reply with ONLY JSON: {"title":"short name of the class or format","minutes":estimated total minutes,"effort":estimated effort 1-10 for an average member,"text":"one or two plain sentences listing the work, e.g. 4 rounds: 500 m row, 20 wall balls, 15 burpees"}
+If it is not a workout, reply {"title":"","minutes":0,"effort":0,"text":""}.`,{images:file});
+    if(!out||!out.text){xState={...xState,busy:false,msg:'Could not read a workout from that photo. Try a straighter, closer photo of the board.'};render();return}
+    xState={...xState,busy:false,mode:'class',text:`${out.title?out.title+' class':'Class'}${out.minutes?`, about ${out.minutes} minutes`:''}${out.effort?`, effort about ${out.effort} out of 10`:''}. ${out.text}`.slice(0,600),msg:'Read the board. Check it, change anything, then tap Add it.'};render()}
+  catch(e){xState={...xState,busy:false,msg:foodErr(e)};render()}}
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-xmode]');if(x){const t=$('#x-say');if(t)xState.text=t.value;xState.mode=x.dataset.xmode;render()}});
+document.addEventListener('change',e=>{const el=e.target;if(el&&el.id==='xBoard'&&el.files&&el.files[0]){const t=$('#x-say');if(t)xState.text=t.value;xBoardScan(el.files[0])}});
+
+// swipe the week strip left or right to move a week, like a calendar
+(function(){let x0=null,y0=null;document.addEventListener('touchstart',e=>{const st=e.target.closest&&e.target.closest('.kswipe');if(!st){x0=null;return}x0=e.touches[0].clientX;y0=e.touches[0].clientY},{passive:true});
+  document.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0,dy=e.changedTouches[0].clientY-y0;x0=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.5){go(iso(addD(sel,dx<0?7:-7)))}},{passive:true})})();
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -1865,7 +1895,7 @@ function compareRow(q,aLab,a,bLab,b,unit,goodHigh,fmt){
   const bar=(lab,v,n,c)=>`<div class="bar" style="--c:${c}"><span>${lab}</span><div class="tr"><div class="fl" style="width:${(v/mx*100).toFixed(0)}%"></div></div><span class="pct num">${fmt(v)}${unit}</span></div>`;
   const rel=Math.abs(diff)/(Math.max(Math.abs(B),.01));
   const verdict=rel<.05?'Little difference so far.':`${aLab} ${better?'better':'worse'} by ${fmt(Math.abs(diff))}${unit}.`;
-  return `<div class="cmp"><span class="q">${q}</span>${bar(aLab,A,a.length,better?'var(--ok)':'var(--warn)')}${bar(bLab,B,b.length,'var(--r)')}<span class="v"><b>${verdict}</b> Based on ${a.length} and ${b.length} days.</span></div>`;
+  return `<div class="cmp"><span class="q">${q}</span>${bar(aLab,A,a.length,'var(--k-blue)')}${bar(bLab,B,b.length,'color-mix(in srgb,var(--k-blue) 40%,var(--surface))')}<span class="v"><b>${verdict}</b> Based on ${a.length} and ${b.length} days.</span></div>`;
 }
 function hyroxAnalysis(){
   const cats={},regs={};let classes=0,runM=0;
@@ -1952,8 +1982,8 @@ function timeUseChart(now){
 function habitGrid(now){
   const DD=D();const rows=[['Saw sunrise',d=>has(d,'Saw sunrise')],['Read',d=>has(d,'Read')],['Learned something',d=>has(d,'Learned something')],['Breathwork',d=>has(d,'Breathwork / meditation')],['Screens off 60+ min',d=>{const s=screenGap(d);return s!=null&&s>=60}],['Family time 1 h+',d=>isNum(d.familyHrs)&&d.familyHrs>=1],['Mobility / stretch',d=>has(d,'Mobility / stretch')]];
   const N=28;let h=`<div class="hgrid">`;
-  rows.forEach(([lab,fn])=>{let cells='',n=0,tot=0;for(let i=N-1;i>=0;i--){const d=DD[iso(addD(now,-i))];const ok=d?!!fn(d):false;if(d){tot++;if(ok)n++}cells+=`<i class="${d?(ok?'on':'off'):''}"></i>`}
-    h+=`<span class="hl">${lab}</span><span class="hc">${cells}</span><span class="hp num">${tot?Math.round(n/tot*100)+'%':'-'}</span>`});
+  const HCOL=['var(--k-amber)','var(--k-sky)','var(--k-violet)','var(--k-pink)','var(--k-blue)','var(--k-green)','var(--k-clay)'];rows.forEach(([lab,fn],ri)=>{let cells='',n=0,tot=0;for(let i=N-1;i>=0;i--){const d=DD[iso(addD(now,-i))];const ok=d?!!fn(d):false;if(d){tot++;if(ok)n++}cells+=`<i class="${d?(ok?'on':'off'):''}"></i>`}
+    h+=`<span class="hl">${lab}</span><span class="hc" style="--hcc:${HCOL[ri%HCOL.length]}">${cells}</span><span class="hp num">${tot?Math.round(n/tot*100)+'%':'-'}</span>`});
   return h+`</div><div class="hint">Last 28 days, oldest on the left. Filled = done that day.</div>`;
 }
 function nutritionPanels(now){
@@ -1963,7 +1993,7 @@ function nutritionPanels(now){
   const W=380,H=160,l=40,r=8,t=10,b=22,bw=(W-l-r)/N;
   const mx=Math.max(3500,...logged.map(v=>v.kcal));const top=Math.ceil(mx/500)*500;const Y=v=>H-b-v/top*(H-t-b);
   let g='';for(let i=0;i<=4;i++){const v=top*i/4;g+=`<line class="grid" x1="${l}" x2="${W-r}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${l-5}" y="${Y(v)+3}" text-anchor="end">${v}</text>`}
-  let bars='';vals.forEach((v,i)=>{const x=l+i*bw;if(v){const tg=nutTarget('kcal',v.dt);bars+=`<rect x="${x+1.5}" y="${Y(v.kcal)}" width="${bw-3}" height="${H-b-Y(v.kcal)}" rx="2" style="fill:${SC[status(v.kcal,tg)]}"/><line x1="${x+1}" x2="${x+bw-1}" y1="${Y(tg.t)}" y2="${Y(tg.t)}" style="stroke:var(--fg);stroke-width:2"/>`}if(i%7===0)bars+=`<text class="ax" x="${x+bw/2}" y="${H-6}" text-anchor="middle">${short(addD(now,-(N-1-i)))}</text>`});
+  let bars='';vals.forEach((v,i)=>{const x=l+i*bw;if(v){const tg=nutTarget('kcal',v.dt);bars+=`<rect x="${x+1.5}" y="${Y(v.kcal)}" width="${bw-3}" height="${H-b-Y(v.kcal)}" rx="2" style="fill:var(--o);opacity:${status(v.kcal,tg)==='ok'?1:.55}"/><line x1="${x+1}" x2="${x+bw-1}" y1="${Y(tg.t)}" y2="${Y(tg.t)}" style="stroke:var(--fg);stroke-width:2"/>`}if(i%7===0)bars+=`<text class="ax" x="${x+bw/2}" y="${H-6}" text-anchor="middle">${short(addD(now,-(N-1-i)))}</text>`});
   const hit=key=>logged.filter(v=>status(v[key],nutTarget(key,v.dt))==='ok').length;
   const prot=[],fasts=[];for(let i=41;i>=0;i--){const d=addD(now,-i),dd=DD[iso(d)];if(dd&&(dd.food||[]).length)prot.push({x:d/DAY,y:foodTotals(dd).protein,lab:short(d)});const fh=fastHours(DD,iso(d));if(fh!=null)fasts.push({x:d/DAY,y:fh,lab:short(d)})}
   const withMic=logged.filter(v=>v.microN>0);
@@ -1972,8 +2002,8 @@ function nutritionPanels(now){
   const f7=fasts.slice(-7).map(p=>p.y),win=[];for(let i=0;i<14;i++){const w=mealWindow(DD[iso(addD(now,-i))]);if(w)win.push(w.last-w.first)}
   const dtc={rest:0,training:0,match:0};logged.forEach(v=>dtc[v.dt]++);
   return `<div class="tests"><div><b class="num">${Math.round(hit('protein')/logged.length*100)}%</b><small>Days protein on target</small></div><div><b class="num">${Math.round(hit('carbs')/logged.length*100)}%</b><small>Days under the net-carb cap</small></div><div><b class="num" style="color:${f7.length&&avg(f7)>=T.fastH?'var(--ok)':'var(--warn)'}">${f7.length?avg(f7).toFixed(1)+'h':'-'}</b><small>Avg overnight fast, 7 days</small></div></div>
-   <div class="label">Calories per day vs that day's target (black tick) · ${dtc.training} training, ${dtc.rest} rest${dtc.match?`, ${dtc.match} match`:''} days</div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Calories per day">${g}${bars}</svg>
-   <div class="label">Days on target, last 28 days</div><div class="bars">${NUTS.filter(n=>n.macro).map(n=>{const p=Math.round(hit(n.k)/logged.length*100);return `<div class="bar" style="--c:${p>=70?'var(--ok)':p>=40?'var(--warn)':'var(--bad)'}"><span>${n.l}</span><div class="tr"><div class="fl" style="width:${p}%"></div></div><span class="pct num">${p}%</span></div>`}).join('')}</div>
+   <div class="label">Calories per day vs that day's target (white tick; paler = off target) · ${dtc.training} training, ${dtc.rest} rest${dtc.match?`, ${dtc.match} match`:''} days</div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Calories per day">${g}${bars}</svg>
+   <div class="label">Days on target, last 28 days</div><div class="bars">${NUTS.filter(n=>n.macro).map(n=>{const p=Math.round(hit(n.k)/logged.length*100);return `<div class="bar" style="--c:${({kcal:'var(--o)',protein:'var(--s)',carbs:'var(--e)',fat:'var(--x)',fibre:'var(--farm)'})[n.k]||'var(--k-blue)'}"><span>${n.l}</span><div class="tr"><div class="fl" style="width:${p}%"></div></div><span class="pct num">${p}%</span></div>`}).join('')}</div>
    <div class="label">Protein per day (g) · 175-180 target</div>${lineChart(prot,{pad:10,fmtY:v=>Math.round(v),color:'var(--s)',h:120})}
    <div class="label">Vitamins &amp; minerals, average vs target · biggest gaps first</div>${withMic.length?`<div class="bars">${gaps.map(x=>`<div class="bar" style="--c:${SC[x.st]}"><span>${x.n.l}</span><div class="tr"><div class="fl" style="width:${Math.min(100,x.pct)}%"></div></div><span class="pct num">${Math.round(x.pct)}%</span></div>`).join('')}</div>`:'<div class="hint">Use the diary or photos to get vitamin and mineral estimates.</div>'}
    <div class="label">Different plants per week · target ${PLANTS_WEEK}</div><div class="bars">${wk.map(w=>`<div class="bar" style="--c:${w.n>=PLANTS_WEEK?'var(--ok)':w.n>=20?'var(--warn)':'var(--bad)'}"><span>wk of ${w.lab}</span><div class="tr"><div class="fl" style="width:${Math.min(100,w.n/PLANTS_WEEK*100)}%"></div></div><span class="pct num">${w.n}</span></div>`).join('')}</div>
@@ -2034,9 +2064,9 @@ function viewReports(){
   const inj=injuryAnalysis(),slp=sleepTimingChart(now);
   const rhr=series('rhr'),strn=[];for(let i=41;i>=0;i--){const d=addD(now,-i),s=strain(iso(d));if(s!=null)strn.push({x:d/DAY,y:s,lab:short(d)})}
   const savedAI=!sampleMode&&meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');
-  const aiPanel=`<section class="panel"><h3>Coach's overview</h3><div class="hint">Your coach reads your last 4 weeks of check-ins, food and sessions and picks out what matters.${savedAI&&!aiState.text?` Last run ${fmtD(new Date(savedAI.at))}.`:''}</div>
+  const aiPanel=`<section class="panel kcoach"><div class="kch"><span class="kpic">${ico('sparkles')}</span><div style="flex:1;min-width:0"><h3>Coach's overview</h3><div class="hint">The last 4 weeks, in a few points${savedAI&&!aiState.text?` · last run ${fmtD(new Date(savedAI.at))}`:''}</div></div>${sample&&!aiState.busy?`<button type="button" class="kchbtn" id="aiBtn">${aiText?'Refresh':'Get it'}</button>`:''}</div>
     ${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
-    ${sample?`<button type="button" class="primary" id="aiBtn" ${aiState.busy?'disabled':''} style="flex:none">${aiState.busy?'Working…':aiText?'Refresh overview':'Get overview'}</button>`:'<div class="hint">Not available in this view.</div>'}</section>`;
+    </section>`;
   const W=(title,hint,body)=>`<section class="panel"><h3>${title}</h3>${hint?`<div class="hint">${hint}</div>`:''}${body}</section>`;
   return toggle+tiles+aiPanel+planStickHTML()+
    `<div class="sect">Load</div>`+
@@ -2155,6 +2185,7 @@ document.addEventListener('click',e=>{
     if(s.dataset.form==='dt'){const t=$('#f-say');if(t)fState.text=t.value;persistDay(iso(sel),{dayType:s.dataset.v});render();return}
     if(s.dataset.form==='f'){const t=$('#f-say');if(t)fState.text=t.value;fState.meal=s.dataset.v;render();return}
     readAll();const tgt=s.dataset.form==='s'?sDraft:s.dataset.form==='y'?yDraft:dDraft;const v=s.dataset.v;const val=isNaN(+v)?v:Number(v);tgt[s.dataset.seg]=String(tgt[s.dataset.seg])===String(val)&&s.dataset.seg!=='status'?null:val;if(s.dataset.form==='s')sDirty=true;else dDirty=true;render();return}
+  const yd=e.target.closest('[data-yday]');if(yd){readAll();toggleIn(yDraft.dayTags=yDraft.dayTags||[],yd.dataset.yday);dDirty=true;render();return}
   const hb=e.target.closest('[data-habit]');if(hb){readAll();toggleIn(yDraft.habits=yDraft.habits||[],hb.dataset.habit);dDirty=true;render();return}
   const fl=e.target.closest('[data-flag]');if(fl){readAll();toggleIn(dDraft.flags=dDraft.flags||[],fl.dataset.flag);dDirty=true;render();return}
   const dn=e.target.closest('[data-del-nig]');if(dn){readAll();dDraft.niggles.splice(+dn.dataset.delNig,1);dDirty=true;render();return}
@@ -2175,7 +2206,7 @@ document.addEventListener('click',e=>{
   if(id==='addH'){readAll();sDraft.hyrox=sDraft.hyrox||{items:[]};sDraft.hyrox.items=sDraft.hyrox.items||[];sDraft.hyrox.items.push({name:'',dose:'',category:'Other',regions:[]});sDirty=true;render();return}
   if(id==='dEditBtn'||id==='dEditBtn2'){dEdit=true;dDraft=blankDay(iso(sel));yDraft=blankDay(prevKey(iso(sel)));render();window.scrollTo({top:0});return}
   if(id==='dCancel'){dEdit=false;dDraft=null;dDirty=false;render();return}
-  if(id==='prevD'||id==='nextD'){go(iso(addD(sel,id==='prevD'?-1:1)));return}
+  if(id==='prevD'||id==='nextD'){go(iso(addD(sel,id==='prevD'?-7:7)));return}
   if(id==='goToday'){go(iso(todayDate()));return}
   if(id==='delAsk'){readAll();confirmDel=true;render();return}
   if(id==='delNo'){readAll();confirmDel=false;render();return}
@@ -2197,12 +2228,12 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',e=>{
   const el=e.target;
   if(el.id==='scanFile'&&el.files&&el.files[0]){scanBoard(el.files[0]);return}
-  if(el.id==='mealFile'&&el.files&&el.files[0]){parseFoodPhoto(el.files[0]);return}
+  if((el.id==='mealFile'||el.id==='mealFile2')&&el.files&&el.files[0]){const fl=el.files[0];toast('Photo received, reading it…');parseFoodPhoto(fl).finally(()=>{try{el.value=''}catch(e){}});return}
   if(el.dataset&&el.dataset.recalc){sleepCalcText();return}
   if(el.dataset&&el.dataset.food){const t=$('#f-say');if(t)fState.text=t.value;const k=iso(sel);const val=el.type==='time'?el.value:(el.value===''?null:Number(el.value));persistDay(k,{[el.dataset.food]:val}).then(ok=>{if(ok)toast('Saved')});return}
   if(el.dataset&&el.dataset.setting){const v=el.type==='time'?el.value:Number(el.value);if(!v)return;const st=Object.assign({},meta.settings||{},{[el.dataset.setting]:v});persistMeta('settings',st).then(ok=>{if(ok)toast('Saved')});render();return}
   if(el.dataset&&el.dataset.shop!=null){const p=clone(meta.plan);p.shopping[+el.dataset.shop].got=el.checked;persistMeta('plan',p);return}
-  if(el.id==='f-swap'||(el.dataset&&el.dataset.live)){readAll();render()}
+  if(el.id==='f-swap'||el.id==='f-cls'||(el.dataset&&el.dataset.live)){readAll();render()}
 });
 document.addEventListener('submit',e=>{e.preventDefault();if(e.target.id==='logForm')saveLog(planFor(sel));if(e.target.id==='dayForm')saveDay()});
 window.addEventListener('hashchange',()=>{confirmDel=false;render();window.scrollTo({top:0})});
