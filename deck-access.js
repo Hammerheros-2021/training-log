@@ -69,7 +69,8 @@ export const CODES = [
   "name": "Spare app 1",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -77,7 +78,8 @@ export const CODES = [
   "name": "Spare app 2",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -85,7 +87,8 @@ export const CODES = [
   "name": "Spare app 3",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -93,7 +96,8 @@ export const CODES = [
   "name": "Spare app 4",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -101,7 +105,8 @@ export const CODES = [
   "name": "Spare app 5",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -109,7 +114,8 @@ export const CODES = [
   "name": "Spare app 6",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -117,7 +123,8 @@ export const CODES = [
   "name": "Spare app 7",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -125,7 +132,8 @@ export const CODES = [
   "name": "Spare app 8",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -133,7 +141,8 @@ export const CODES = [
   "name": "Spare app 9",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  },
  {
@@ -141,7 +150,8 @@ export const CODES = [
   "name": "Spare app 10",
   "typedOnly": true,
   "decks": [
-   "app"
+   "app",
+   "coaches"
   ]
  }
 ];
