@@ -67,6 +67,7 @@ export const CODES = [
  {
   "h": "138a7d4043d837d31c215432c8f9c5de5ff5a231a1d801c40ecd342a6262fe92",
   "name": "Spare app 1",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -74,6 +75,7 @@ export const CODES = [
  {
   "h": "10f90898af89aed6f080f4296e3e3893828265ade0c1ffa9db58eee72ed3b99a",
   "name": "Spare app 2",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -81,6 +83,7 @@ export const CODES = [
  {
   "h": "51dd6e2d0f9a5676e1a43d8265c8f25a72d884d8968508c1171ac6682f477036",
   "name": "Spare app 3",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -88,6 +91,7 @@ export const CODES = [
  {
   "h": "c240b232900c1f8625b17d55d25b546fa70926840600fc9081766c49890d1025",
   "name": "Spare app 4",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -95,6 +99,7 @@ export const CODES = [
  {
   "h": "fb46974b7a60073464ee2dc87de0b763f822ec9b936fdfbb0ad99f786dbb6694",
   "name": "Spare app 5",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -102,6 +107,7 @@ export const CODES = [
  {
   "h": "11ad553da7e30d7e33469dd8d6b162ce15a768796d4806e916ede421666f1bed",
   "name": "Spare app 6",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -109,6 +115,7 @@ export const CODES = [
  {
   "h": "bbe4193673e6a3327a7f40569f6a6903a443a511b7804c42a8391bbbb48cab3f",
   "name": "Spare app 7",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -116,6 +123,7 @@ export const CODES = [
  {
   "h": "9a6d92ef4a6403af741f9bf9028f8266b2b5d9c27a89e23c627da83d3b90ab8d",
   "name": "Spare app 8",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -123,6 +131,7 @@ export const CODES = [
  {
   "h": "d7388b2c38b153e99616c02b1c7e3d783696fedaf462a8b4ce242372b66518dd",
   "name": "Spare app 9",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
@@ -130,6 +139,7 @@ export const CODES = [
  {
   "h": "6a225ebbc9ce1c9c8d5d2343e48917ca92d9df872964522837206f2aeb88ea48",
   "name": "Spare app 10",
+  "typedOnly": true,
   "decks": [
    "app"
   ]
