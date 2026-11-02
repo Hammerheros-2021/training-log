@@ -4,6 +4,7 @@ export const CODES = [
  {
   "h": "9f012726fd92b9d5de2023d7fe53d9fa89e9fc816d2cc083f0ff80ff670f4c65",
   "name": "Darren",
+  "typedOnly": true,
   "decks": [
    "app",
    "coaches"
@@ -12,6 +13,7 @@ export const CODES = [
  {
   "h": "275793b63c30bde087304303cf06ca8afb9f6829c84d6d774bbd5722c53f85d4",
   "name": "Spare both 1",
+  "typedOnly": true,
   "decks": [
    "app",
    "coaches"
@@ -20,6 +22,7 @@ export const CODES = [
  {
   "h": "64187922fae535461538563b4ed3968009a1c00802b8a70908d5da0b405bfb79",
   "name": "Spare both 2",
+  "typedOnly": true,
   "decks": [
    "app",
    "coaches"
@@ -28,6 +31,7 @@ export const CODES = [
  {
   "h": "e01a048de8d8017226bf125f92f1532db7f8b9019e7c170d7e4a284489ce687e",
   "name": "Spare both 3",
+  "typedOnly": true,
   "decks": [
    "app",
    "coaches"
@@ -36,6 +40,7 @@ export const CODES = [
  {
   "h": "c935f347eec39f72f4a3f58165554f5035de44e8601d76f2e71ab5bddac22fcb",
   "name": "Spare both 4",
+  "typedOnly": true,
   "decks": [
    "app",
    "coaches"
@@ -44,6 +49,7 @@ export const CODES = [
  {
   "h": "7ee9990347ae557a776c49ba248f305bb8f0d905fcc001c5e5a2d614c33a109c",
   "name": "Spare both 5",
+  "typedOnly": true,
   "decks": [
    "app",
    "coaches"
@@ -52,6 +58,7 @@ export const CODES = [
  {
   "h": "62ec651573c7d53c6f6cb12016ea17400f80a0f35fb3531bdfc23518df7ee66f",
   "name": "Spare both 6",
+  "typedOnly": true,
   "decks": [
    "app",
    "coaches"

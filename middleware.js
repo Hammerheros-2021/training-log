@@ -57,7 +57,7 @@ input:focus{border-color:#9095A3}button{appearance:none;border:0;border-radius:1
 <img src="/keel-wordmark.svg" alt="keel">
 <h1>${esc(d.title.replace(/^Keel: /, '').replace(/^./, (c) => c.toUpperCase()))}</h1>
 <p>This presentation is private. Enter the access code you were sent.</p>
-<form method="get" action="${d.file}"><label for="c">ACCESS CODE</label>
+<form method="post" action="${d.file}"><label for="c">ACCESS CODE</label>
 <input id="c" name="c" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KEEL-XXXXX" required>
 ${error ? '<span class="err">That code didn’t work. Check it and try again.</span>' : ''}
 <button type="submit">Open</button></form>
@@ -77,9 +77,17 @@ export default async function middleware(request) {
   const deck = Object.keys(DECKS).find((k) => DECKS[k].file === path || DECKS[k].file === path + '.html');
   if (!deck) return new Response('Not found', { status: 404, headers: { 'x-robots-tag': 'noindex' } });
 
-  const typed = url.searchParams.get('c');
+  let typed = url.searchParams.get('c');
+  const viaForm = request.method === 'POST';
+  if (viaForm) {
+    try { typed = String((await request.formData()).get('c') || ''); } catch (e) { typed = ''; }
+  }
   if (typed !== null) {
     const hit = await lookup(typed);
+    if (hit && hit.typedOnly && !viaForm && hit.decks.includes(deck)) {
+      console.log(JSON.stringify({ deck_access: 'link_refused_typed_only', who: hit.name, deck, at: new Date().toISOString() }));
+      return gate(deck, url, false);
+    }
     if (!hit || !hit.decks.includes(deck)) {
       console.log(JSON.stringify({ deck_access: 'refused', deck, at: new Date().toISOString() }));
       return gate(deck, url, true);
