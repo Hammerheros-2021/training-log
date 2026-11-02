@@ -456,6 +456,7 @@ function kitchenHTML(){
 // ---------- Claude calls ----------
 const NUT_JSON=`"kcal","protein","carbs" (NET carbs = total minus fibre),"fat","fibre" in g; "sodium","potassium","magnesium","calcium","iron","zinc","choline","vitC","caffeine" in mg; "selenium","iodine","vitA","vitD","vitK","b12","folate" in micrograms; "omega3" g EPA+DHA; "plants": array of distinct plant foods in it (vegetables, fruit, nuts, seeds, legumes, grains, herbs, coffee and tea count)`;
 const foodRules=()=>`Estimate realistic portions for ${PORTION} unless amounts are given. Use cooked weights for meat and fish.
+For any alcoholic drink, add "sd": the number of Irish standard drinks (10 g alcohol each; a 175 ml glass of wine is about 1.7, a pint of beer 2, a pub measure of spirits 1).
 For each item give ${NUT_JSON}.
 Coffees and teas ARE items (an almond cappuccino is about 44 kcal, 4 g net carbs, 125 mg caffeine; tea with almond milk about 45 mg caffeine). Plain water and the SIS electrolyte tablet (about 0 kcal, 500 mg sodium) can be items too if mentioned. Supplements count as items.
 "meal" is one of "Breakfast","Lunch","Dinner","Snack". "dish" is the dish or plate the item belongs to (e.g. "Chicken stir-fry"): items eaten together on one plate share the same dish name; a stand-alone item such as a coffee has "dish":"". "at" is the time eaten as "HH:MM" (24 h) when stated or clearly implied, else null.
@@ -1153,7 +1154,7 @@ const SUPP_INFO=[['Creatine monohydrate','3-5 g a day, any time, with water or f
 const ALC=[['Pint of lager',2,215,18],['Pint of stout',2,210,17],['Pint of cider',2,220,25],['Bottle of beer',1.5,140,11],['Glass of wine',1.7,160,4],['Gin and tonic',1,130,14],['Vodka and coke',1,150,20],['Spirit, neat',1,70,0],['Alcohol-free beer',0,60,12]];
 function alcOn(){const s=(meta.settings||{}).alcohol;if(s)return s==='on';return typeof PROFILE!=='undefined'}
 function alcLimit(){let sx='';try{sx=(PROFILE&&PROFILE.answers&&PROFILE.answers.sex)||''}catch(e){}return /female|woman/i.test(sx)?11:17}
-function alcWeek(k){let n=0;const t=parse(k),mon=addD(t,-((t.getDay()+6)%7));for(let i=0;i<7;i++){const d=D()[iso(addD(mon,i))];(d&&d.food||[]).forEach(x=>n+=+x.sd||0)}return Math.round(n*10)/10}
+function alcWeek(k){let n=0;const t=parse(k),mon=addD(t,-((t.getDay()+6)%7));for(let i=0;i<7;i++){const d=D()[iso(addD(mon,i))];(d&&d.food||[]).forEach(x=>n+=stdDrinks(x))}return Math.round(n*10)/10}
 let fx={alc:false,supAdd:false,supBusy:false,supMsg:'',gap:null};
 const supps=()=>(meta.supps&&meta.supps.list)||[];
 function suppItems(d){if(!d||!d.date)return [];return supps().filter(s=>d.date>=(s.since||'0')&&d.date<=iso(todayDate())&&!(d.suppMissed||[]).includes(s.id)).map(s=>Object.assign({name:s.name},s.nut||{}))}
@@ -1173,7 +1174,7 @@ function microsHTML(t,dt,k){
 }
 function drinksHTML(k){
   const d=D()[k]||{};const w=+d.water||0;const tgt=WATER[1]||3;const pct=Math.min(100,w/tgt*100);const today=k===iso(todayDate());const can=!sampleMode&&k<=iso(todayDate());
-  const wk=alcWeek(k),lim=alcLimit();const alcToday=(d.food||[]).filter(x=>x.src==='alcohol');
+  const wk=alcWeek(k),lim=alcLimit();const alcToday=(d.food||[]).filter(x=>stdDrinks(x)>0);
   const water=`<div class="wrow"><span class="wico" aria-hidden="true">💧</span><div class="wbar"><div class="wh"><b>Water</b><span class="num">${Math.round(w*100)/100} of ${WATER[0]}-${WATER[1]} L</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:var(--h)"></div></div></div></div>
     ${can?`<div class="wbtns">${[[.25,'+ Glass'],[.5,'+ 500 ml'],[.75,'+ Bottle']].map(([v,l])=>`<button type="button" class="ghost" data-water="${v}">${l}</button>`).join('')}${w>0?`<button type="button" class="ghost" data-water="-0.25" aria-label="Take off a glass">−</button>`:''}</div>`:''}`;
   const alc=alcOn()?`<div class="arow"><button type="button" class="alink" id="alcTog"><span aria-hidden="true">🍺</span> Alcohol: <b>${wk} standard drink${wk===1?'':'s'}</b> this week${alcToday.length?` · ${alcToday.length} today`:''} <i>${fx.alc?'▴':'▾'}</i></button>
@@ -1902,6 +1903,30 @@ let CMPI=0;const CMPC=['var(--k-blue)','var(--k-green)','var(--k-pink)','var(--k
 document.addEventListener('click',async e=>{if(!(e.target.closest&&e.target.closest('#kNameSave')))return;const v=($('#kNameIn').value||'').trim().slice(0,60);if(!v){toast('Add your name first');return}
   PROFILE.answers=PROFILE.answers||{};PROFILE.answers.name=v;try{await sb.from('profiles').upsert({id:UID,data:PROFILE,updated_at:new Date().toISOString()});toast('Name saved')}catch(err){toast('Could not save. Try again.')}planSheet(false);render()});
 const KWM_AUTH='<svg xmlns="http://www.w3.org/2000/svg" viewBox="-338 -1011 2347 1292" role="img" aria-label="keel" class="kwm"><defs><linearGradient id="kauf" gradientUnits="userSpaceOnUse" x1="-298" y1="0" x2="1968" y2="0"><stop offset="0" stop-color="#E23D9E"/><stop offset="0.5" stop-color="#5B6CFF"/><stop offset="1" stop-color="#34E3A0"/></linearGradient></defs><path d="M743.9 -731.0 A569.4 569.4 0 1 0 307.7 204.4 L1932.0 204.4" fill="none" stroke="url(#kauf)" stroke-width="73.0" stroke-linecap="round" class="kl" pathLength="1"/><path d="M459 0 277 -254H196L427 -543H572L359 -276L362 -346L616 0ZM79 0V-730H218V0Z M889.0 19Q819.0 19 766.5 -5.0Q714.0 -29 679.5 -69.5Q645.0 -110 627.5 -160.0Q610.0 -210 610.0 -262V-281Q610.0 -335 627.5 -385.5Q645.0 -436 679.5 -475.5Q714.0 -515 765.0 -538.5Q816.0 -562 883.0 -562Q971.0 -562 1030.5 -523.5Q1090.0 -485 1120.0 -422.5Q1150.0 -360 1150.0 -288V-238H669.0V-323H1063.0L1020.0 -281Q1020.0 -333 1005.0 -370.0Q990.0 -407 959.5 -427.0Q929.0 -447 883.0 -447Q837.0 -447 805.0 -426.0Q773.0 -405 756.5 -365.5Q740.0 -326 740.0 -271Q740.0 -220 756.0 -180.5Q772.0 -141 805.0 -118.5Q838.0 -96 889.0 -96Q940.0 -96 972.0 -116.5Q1004.0 -137 1013.0 -167H1141.0Q1129.0 -111 1095.0 -69.0Q1061.0 -27 1008.5 -4.0Q956.0 19 889.0 19Z M1459.0 19Q1389.0 19 1336.5 -5.0Q1284.0 -29 1249.5 -69.5Q1215.0 -110 1197.5 -160.0Q1180.0 -210 1180.0 -262V-281Q1180.0 -335 1197.5 -385.5Q1215.0 -436 1249.5 -475.5Q1284.0 -515 1335.0 -538.5Q1386.0 -562 1453.0 -562Q1541.0 -562 1600.5 -523.5Q1660.0 -485 1690.0 -422.5Q1720.0 -360 1720.0 -288V-238H1239.0V-323H1633.0L1590.0 -281Q1590.0 -333 1575.0 -370.0Q1560.0 -407 1529.5 -427.0Q1499.0 -447 1453.0 -447Q1407.0 -447 1375.0 -426.0Q1343.0 -405 1326.5 -365.5Q1310.0 -326 1310.0 -271Q1310.0 -220 1326.0 -180.5Q1342.0 -141 1375.0 -118.5Q1408.0 -96 1459.0 -96Q1510.0 -96 1542.0 -116.5Q1574.0 -137 1583.0 -167H1711.0Q1699.0 -111 1665.0 -69.0Q1631.0 -27 1578.5 -4.0Q1526.0 19 1459.0 19Z M1793.0 0V-730H1932.0V0ZM1725.0 -626V-730H1932.0V-626Z" fill="#F4F5F8"/></svg>';
+// ================= Keel v8: alcohol from any logged drink; wording for people who don't train =================
+const ALC_RX=/\b(wine|prosecco|champagne|cava|beer|lager|ale|stout|guinness|cider|pint|ipa|spirit|vodka|gin|whiske?y|rum|tequila|brandy|baileys|liqueur|cocktail|margarita|mojito|spritz|aperol|sake|soju|shandy|hard seltzer)\b/i;
+const ALC_NOT=/\b(alcohol[- ]free|non[- ]alcoholic|0\.0|zero alcohol|0%|ginger beer|root beer|wine gums?|vinegar|cooked in wine|wine sauce|red wine jus)\b/i;
+function stdDrinks(x){if(!x)return 0;if(isNum(x.sd)&&+x.sd>0)return +x.sd;const n=String((x.name||'')+' '+(x.qty||''));if(!ALC_RX.test(n)||ALC_NOT.test(n))return 0;
+  const q=String(x.qty||'').toLowerCase();const m=q.match(/(\d+(?:\.\d+)?)/);let k=m?+m[1]:1;if(/ml|cl|litre|l\b/.test(q))k=1; // volumes: treat as one serving unless counted
+  const nm=n.toLowerCase();let per=/pint/.test(nm)?2:/(beer|lager|ale|stout|guinness|cider|ipa|seltzer|shandy)/.test(nm)?(/can|bottle/.test(nm)?1.4:2):/(prosecco|champagne|cava)/.test(nm)?1.2:/wine/.test(nm)?(/bottle/.test(nm)?7:1.7):/(cocktail|margarita|mojito|spritz|aperol)/.test(nm)?1.8:1;
+  if(/bottle/.test(nm)&&/wine/.test(nm))k=1;return Math.round(Math.min(20,k*per)*10)/10}
+// Does this person train, or do physical work? Drives wording for everyone else.
+function KTRAINS(){let a={};try{a=(PROFILE&&PROFILE.answers)||{}}catch(e){return true}if(!a||!Object.keys(a).length)return true;
+  const sp=[].concat(a.sport||[]);const sporty=sp.some(x=>!/^(Walking|Nothing much yet|Cycling|Other)$/i.test(x));
+  const goal=/sport|run faster|hyrox|stronger|muscle/i.test(a.mainGoal||'');return sporty||goal}
+function KMANUAL(){let a={};try{a=(PROFILE&&PROFILE.answers)||{}}catch(e){return true}if(!a||!a.job)return true;return /physical|mixed/i.test(a.job)}
+const KWORDS=[[/Training load vs manual labour/g,'Activity through the weeks'],[/Training load this week/g,'Activity this week'],[/Training load/g,'Activity'],[/training load/g,'activity'],
+  [/Train as planned\./g,'Good day for it.'],[/Train, but cap the effort\./g,'Take it steady today.'],[/Do the session, hold effort a notch below target, skip any extras\./g,'Keep things gentle: an easy walk is plenty, and get to bed on time.'],
+  [/Swap for an easy run or the mobility routine and get to bed early\./g,'Go easy: a short walk or a stretch, and an early night.'],[/Recovery looks good\./g,'You\'re well rested.'],
+  [/Training day/g,'Active day'],[/training day/g,'active day'],[/Training today/g,'Moving today'],[/training today/g,'moving today'],[/Today's session/g,'Today\'s movement'],
+  [/Extra training/g,'Extra activity'],[/Log session/g,'Log it'],[/Your training so far/g,'So far'],[/Other training/g,'Other activity'],[/your training/g,'your activity'],[/Your training/g,'Your activity'],
+  [/ and training\b/g,' and activity'],[/^Strain$/g,'Daily effort'],[/Daily strain, 0-21, from training load plus farm work, in the style of Whoop\./g,'Daily effort, 0-21, from everything active you logged.'],[/\btraining\b(?= and sleep)/g,'activity']];
+function kWording(root){if(KTRAINS())return;const w=document.createTreeWalker(root||document.getElementById('app'),NodeFilter.SHOW_TEXT);const list=[];let n;while(n=w.nextNode())list.push(n);
+  list.forEach(t=>{let v=t.nodeValue,o=v;KWORDS.forEach(([a,b])=>v=v.replace(a,b));if(v!==o)t.nodeValue=v})}
+function kHideIrrelevant(){if(KTRAINS())return;const app=document.getElementById('app');if(!app)return;
+  app.querySelectorAll('.panel').forEach(p=>{const h=p.querySelector('h3');if(!h)return;const t=h.textContent;
+    if(/^(Activity through the weeks|Hyrox classes|5 km tests|Threshold pace|Strength|Plan completion)$/.test(t)&&!(t==='Activity through the weeks'&&KMANUAL()))p.remove()})}
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -2208,7 +2233,7 @@ function render(){
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
   $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
-  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);
+  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}
@@ -2431,6 +2456,8 @@ async function obBuild(){
   const ex=JSON.stringify({start:DEF_PLAN.start,firstDay:DEF_PLAN.firstDay,week:DEF_PLAN.week,labels:DEF_PLAN.labels,phases:DEF_PLAN.phases,threshold:DEF_PLAN.threshold,thresholdMin:DEF_PLAN.thresholdMin,easy:DEF_PLAN.easy,long:DEF_PLAN.long,deload:DEF_PLAN.deload,strength:DEF_PLAN.strength.slice(0,3),speed:DEF_PLAN.speed.slice(0,2),keyLifts:DEF_PLAN.keyLifts,classNote:DEF_PLAN.classNote,trainTime:DEF_PLAN.trainTime,fasted:true,goalLine:DEF_PLAN.goalLine});
   const prompt=`You are an experienced strength and conditioning coach and sports nutritionist. Build a personal 16-week plan for this person from their sign-up answers. Today is ${today}.
 Answers: ${JSON.stringify(a)}
+
+WHO THIS IS FOR: if they don't play a sport or train (for example they only picked walking, cycling or "nothing much yet", and their goal is feeling better, sleep, energy, weight or general health), build a gentle everyday-movement plan instead of a training plan: brisk or easy walks, easy cycles, short strength-at-home or stretch-and-core sessions, maybe a swim or class. Name the slot labels in plain words (e.g. "Brisk walk", "Easy cycle", "Stretch and core", "Longer walk"), use no jargon (no threshold, RPE, zone, intervals, deload), keep "threshold" descriptions as easy, friendly walks or cycles with thresholdMin as their minutes, and keep the summary warm and practical. Build up gently over the 16 weeks.
 
 The app has fixed session slots. Map their training onto them; rename the labels to fit them:
 S = strength / gym session; E = easy aerobic session (easy run, bike, swim); H = a class, club or team session they already do; T = quality session (threshold or intervals, or a time-trial test when thresholdMin is 0); X = speed and skills block followed by a longer easy session; R = rest.
