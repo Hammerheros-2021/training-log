@@ -548,7 +548,7 @@ async function checkPlanJob(){
   if(error)return 'wait';const m={};(data||[]).forEach(r=>m[r.key]=r.data);
   const job=m.planJob,raw=m.planRaw,plan=m.plan;if(m.plan)meta.plan=m.plan;
   if(raw&&job&&raw.jobAt===job.at&&!(plan&&plan.createdAt>raw.createdAt)){meta.planRaw=raw;await finishPlan(raw.out,raw.req);render();return 'done'}
-  if(job&&job.error){if(!job.seen){await persistMeta('planJob',Object.assign({},job,{seen:true}));pState={...pState,busy:false,msg:'The plan could not be made ('+job.error+'). Tap Plan to try again.'};render()}return 'failed'}
+  if(job&&job.error){if(!job.seen){await persistMeta('planJob',Object.assign({},job,{seen:true}));pState={...pState,busy:false,msg:/rate|limit|overload|busy|529|429/i.test(job.error)?'The AI was too busy just then. Wait a minute, then tap Plan again.':/cut short|readable/i.test(job.error)?'The plan came back incomplete. Tap Plan to try again.':'The plan could not be made ('+job.error+'). Tap Plan to try again.'};render()}return 'failed'}
   if(job&&!(plan&&plan.createdAt>job.at)&&Date.now()-new Date(job.at)<7*60000){if(!pState.busy){pState={...pState,busy:true,msg:'Still planning your next 3 days. It carries on even if you close the app.'};render()}return 'wait'}
   if(job&&!(plan&&plan.createdAt>job.at)&&pState.busy){pState={...pState,busy:false,msg:'Planning took too long. Tap Plan to try again.'};render()}
   return 'idle';

@@ -20,16 +20,29 @@ function looseJSON(t) {
   throw new Error('The reply was not readable');
 }
 
-async function ask(prompt) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 12000, messages: [{ role: 'user', content: prompt + '\n\nReply with the JSON only, no other text.' }] }),
-  });
-  const j = await r.json();
-  if (!r.ok) throw new Error((j.error && j.error.message) || `Claude request failed (${r.status})`);
-  if (j.stop_reason === 'max_tokens') throw new Error('The reply was cut short');
-  return looseJSON((j.content || []).filter(b => b.type === 'text').map(b => b.text).join(''));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// One day's plan. Retries when Claude is busy or the account's per-minute limit is hit (429 / 529 / overloaded),
+// waiting as long as Anthropic asks, so a busy minute doesn't fail the whole plan.
+async function ask(prompt, deadline) {
+  let last = '';
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: MODEL, max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\n\nReply with the JSON only, no other text.' }] }),
+    });
+    let j = {}; try { j = await r.json(); } catch (e) {}
+    if (r.ok) {
+      if (j.stop_reason === 'max_tokens') { last = 'The reply was cut short'; continue; }
+      try { return looseJSON((j.content || []).filter(b => b.type === 'text').map(b => b.text).join('')); } catch (e) { last = e.message; continue; }
+    }
+    last = (j.error && j.error.message) || `Claude request failed (${r.status})`;
+    if (![429, 500, 502, 503, 529].includes(r.status)) break;
+    const wait = Math.min(60, Math.max(4, +(r.headers.get('retry-after') || 0) || 5 * (attempt + 1))) * 1000;
+    if (Date.now() + wait > deadline) break;
+    await sleep(wait);
+  }
+  throw new Error(last || 'Claude request failed');
 }
 
 async function save(token, uid, key, data) {
@@ -52,7 +65,10 @@ export default async function handler(req, res) {
 
   const work = (async () => {
     try {
-      const outs = await Promise.all(prompts.map(p => ask(p).catch(e => ({ __err: String(e.message || e) }))));
+      // Days start a few seconds apart (not all at once) to stay inside per-minute limits, retry when busy,
+      // and stop retrying in time to save a clear error before the 5-minute cap.
+      const deadline = Date.now() + 240000;
+      const outs = await Promise.all(prompts.map((p, i) => sleep(i * 8000).then(() => ask(p, deadline)).catch(e => ({ __err: String(e.message || e) }))));
       const ok = outs.filter(o => o && !o.__err);
       if (!ok.length) { await save(token, user.id, 'planJob', { at: jobAt, error: outs[0].__err }); return; }
       const seen = new Set();

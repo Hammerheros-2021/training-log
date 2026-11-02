@@ -27,7 +27,9 @@ export default async function handler(req, res) {
   ];
 
   try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    let r, tries = 0;
+    for (;;) {
+    r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': process.env.ANTHROPIC_API_KEY,
@@ -40,6 +42,9 @@ export default async function handler(req, res) {
         messages: [{ role: 'user', content }],
       }),
     });
+    if ([429, 529, 503].includes(r.status) && tries < 3) { tries++; const ra = +(r.headers.get('retry-after') || 0); await new Promise(z => setTimeout(z, Math.min(30, Math.max(3, ra || 4 * tries)) * 1000)); continue; }
+    break;
+    }
     const j = await r.json();
     if (!r.ok) {
       const status = r.status === 429 || r.status === 529 ? 429 : 502;
