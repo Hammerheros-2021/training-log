@@ -765,7 +765,7 @@ function viewDashboard(){
   const balance=balTot?`<div class="stack">${bal.map(([f,c,l])=>+yd[f]?`<i style="flex:${+yd[f]};background:${c}" title="${l}"></i>`:'').join('')}</div><div class="legend">${bal.map(([f,c,l])=>`<span style="--c:${c}"><i></i>${l} ${+yd[f]||0} h</span>`).join('')}</div>`:'<div class="ds">Comes from the morning check-in, under Yesterday.</div>';
   const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'').split(' :: ')[0]):[];
   const due=!sampleMode&&planDue();
-  const su=setupChecklistHTML();return toggle+(su?`<details class="kmore p1setup"><summary>Getting started</summary>${su}</details>`:'')+injuryBanner()+hero+`${p1TodayLine(k)}${sampleMode?'':p1Tiles()}${todayFoodHTML(k)}<details class="kmore"><summary>More about today</summary><div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
+  const su=setupChecklistHTML();return p1Top(now)+p1ReadHTML(k)+injuryBanner()+hero+p1FoodMini(k)+`${sampleMode?'':p1Tiles()}${p1SignCard(k)}`+(su?`<details class="kmore p1setup"><summary>Getting started</summary>${su}</details>`:'')+`<details class="kmore"><summary>More about today</summary><div class="p1ex"><button type="button" class="ghost" id="sampleBtn">${sampleMode?'Back to my data':'See an example day'}</button></div><div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section></details>
@@ -1868,8 +1868,8 @@ let coachOpen=false;
 function kSignSet(){const h=document.getElementById('kSign');if(!h)return;let t='';try{t=tab()}catch(e){}
   if(t==='dashboard'&&!sampleMode){h.innerHTML=kTodoChip();return}
   if(t!=='food'||sampleMode){h.innerHTML='';return}const k=iso(sel);if(k>iso(todayDate())){h.innerHTML='';return}const d=D()[k]||{};
-  h.innerHTML=d.foodDone?`<button type="button" class="kschip kdone" id="foodUndone" aria-label="Signed off. Tap to undo">${ico('check')}Signed off</button>`
-    :`<button type="button" class="kschip${k===iso(todayDate())&&new Date().getHours()>=19?' kdue':''}" id="signOpen">${ico('circle')}Sign off</button>`}
+  h.innerHTML=d.foodDone?`<button type="button" class="kschip kdone" id="foodUndone" aria-label="Signed off. Tap to undo">${ico('moon')}</button>`
+    :`<button type="button" class="kschip${k===iso(todayDate())&&new Date().getHours()>=19?' kdue':''}" id="signOpen" aria-label="Sign off today's food">${ico('moon')}</button>`}
 function kBands(){CMPI=0;let t='';try{t=tab()}catch(e){}if(t!=='reports')return;const app=document.getElementById('app');if(!app||app.querySelector('.ksec'))return;
   const kids=[...app.children];let cur=null,n=0;kids.forEach(el=>{if(el.classList&&el.classList.contains('sect')){cur=document.createElement('details');cur.className='ksec p1fold'+(n%2?' alt':'');if(n===0)cur.open=true;n++;const sm=document.createElement('summary');sm.className='sect';sm.textContent=el.textContent;cur.appendChild(sm);app.insertBefore(cur,el);el.remove();return}if(cur)cur.appendChild(el)})}
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='coachAcc')coachOpen=e.target.open},true);
@@ -1961,13 +1961,14 @@ const P1WAKES=[[0,'No'],[1,'Once'],[2,'2 or 3 times'],[4,'On and off all night']
 const P1AWAKE=[[0,'Hardly'],[15,'Under 15 min'],[40,'About 30-45 min'],[90,'1-2 hours'],[180,'Over 2 hours']];
 function p1CiOpen(){const k=iso(todayDate()),d=D()[k]||{};const prev=Object.values(D()).filter(x=>x&&x.bed&&x.wake).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||{};
   P1.ci={k,bed:d.bed||prev.bed||'23:00',wake:d.wake||prev.wake||'07:00',latency:d.latency??0,wakes:d.wakes??0,awakeMin:d.awakeMin??0,
-    sleepQ:d.sleepQ??3,energy:d.energy??3,mood:d.mood??3,stress:d.stress??2,sore:d.sore??2,trainIntent:d.trainIntent||null,busy:false};p1CiDraw()}
+    sleepQ:d.sleepQ??3,energy:d.energy??3,mood:d.mood??3,stress:d.stress??2,sore:d.sore??2,trainIntent:d.trainIntent||null,screenOff:d.screenOff||'',busy:false};p1CiDraw()}
 function p1Seg(name,opts,cur){return `<div class="seg p1seg">${opts.map(([v,l])=>`<button type="button" data-p1="${name}" data-v="${v}" aria-pressed="${String(cur)===String(v)}">${l}</button>`).join('')}</div>`}
 function p1CiDraw(){const c=P1.ci;if(!c)return;const h=p1SleepCalc(c);const p=planFor(parse(c.k));const planned=!!(p&&p.type!=='R'&&!p.pre);
   p1Sheet(`<div class="kshead"><div><h2>Morning check-in</h2><small class="ds">${fmtD(parse(c.k),{weekday:'long',day:'numeric',month:'short'})}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
     <button type="button" class="p1say" id="p1CiSay">${ico('mic')}<span><b>Say it instead</b><small>"Bed at 11, took ages to drop off, up twice, feeling flat, legs sore"</small></span></button>
     <section class="p1blk"><h3>Last night</h3>
       <div class="row2"><div class="field"><label class="label" for="p1bed">Into bed</label><input id="p1bed" type="time" value="${esc(c.bed)}" data-p1in="bed"></div><div class="field"><label class="label" for="p1wake">Woke for good</label><input id="p1wake" type="time" value="${esc(c.wake)}" data-p1in="wake"></div></div>
+      <div class="field"><label class="label" for="p1scr">Phone away at (optional)</label><input id="p1scr" type="time" value="${esc(c.screenOff||'')}" data-p1in="screenOff"></div>
       <div class="field"><span class="label">Fell asleep</span>${p1Seg('latency',P1LAT,c.latency)}</div>
       <div class="field"><span class="label">Woke in the night</span>${p1Seg('wakes',P1WAKES,c.wakes)}</div>
       ${+c.wakes?`<div class="field"><span class="label">Awake in the night, in total</span>${p1Seg('awakeMin',P1AWAKE,c.awakeMin)}</div>`:''}
@@ -1975,10 +1976,10 @@ function p1CiDraw(){const c=P1.ci;if(!c)return;const h=p1SleepCalc(c);const p=pl
     <section class="p1blk"><h3>How you feel</h3>${P1SL.map(([key,lab,words])=>`<div class="p1sl"><div class="p1slh"><span>${lab}</span><b id="p1w-${key}">${words[(+c[key]||3)-1]}</b></div><input type="range" min="1" max="5" step="1" value="${+c[key]||3}" data-p1sl="${key}" aria-label="${lab}"><div class="p1ends"><span>${words[0]}</span><span>${words[4]}</span></div></div>`).join('')}</section>
     ${planned?`<section class="p1blk"><h3>Today: ${esc(TNAME[p.type])}</h3>${p1Seg('trainIntent',[['yes','Yes, doing it'],['no','Not today']],c.trainIntent)}</section>`:''}
     <a class="p1hurt" href="#checkin" id="p1Hurt">${ico('heart-pulse')} Something hurting? Add a niggle or injury ›</a>
-    <button type="button" class="primary p1save" id="p1CiSave" ${c.busy?'disabled':''}>${c.busy?'Saving…':'Save check-in'}</button>
+    <button type="button" class="primary p1save" id="p1CiSave" ${c.busy?'disabled':''}>${c.busy?'Saving…':'Done'}</button><small class="ds p1saved" id="p1Saved">Saves as you go</small>
     <small class="ds p1note">Keel also adds yesterday's and today's weather from your rough location, if you allow it.</small>`)}
-async function p1CiSave(){const c=P1.ci;c.busy=true;p1CiDraw();const fields={bed:c.bed,wake:c.wake,latency:+c.latency,wakes:+c.wakes,awakeMin:+c.wakes?+c.awakeMin:0,sleepQ:+c.sleepQ,energy:+c.energy,mood:+c.mood,stress:+c.stress,sore:+c.sore,sleepH:p1SleepCalc(c),savedAt:new Date().toISOString()};
-  if(c.trainIntent)fields.trainIntent=c.trainIntent;const ok=await persistDay(c.k,fields);P1.ci=null;p1Sheet(null);dDraft=null;render();if(ok!==false)toast('Checked in. Balance updated.');
+async function p1CiSave(){const c=P1.ci;c.busy=true;p1CiDraw();const fields={...p1CiFields(c),savedAt:new Date().toISOString()};p1Pend=null;clearTimeout(p1AS);
+  if(c.trainIntent)fields.trainIntent=c.trainIntent;const ok=await persistDay(c.k,fields);P1.ci=null;p1Sheet(null);dDraft=null;render();if(ok!==false)toast('Check-in saved');
   p1Weather(c.k,true).then(()=>p1Weather(iso(addD(parse(c.k),-1)),false)).then(()=>render())}
 
 // ---------- My day pop-up ----------
@@ -1999,7 +2000,7 @@ function p1DayDraw(){const s=P1.day;if(!s)return;const today=s.k===iso(todayDate
     <section class="p1blk"><h3>Say how it went</h3><textarea id="p1-say" placeholder="e.g. 9 to 1 in the car, 2 to 5 at the desk, a tough afternoon, 7 to 9 out on the farm feeding cattle in the rain">${esc(s.text)}</textarea>
       <div class="actions">${typeof speakBtn==='function'?speakBtn('p1-say'):''}<button type="button" class="ghost" id="p1DayFill" ${s.busy?'disabled':''}>${s.busy?'Working…':'Fill in the blocks'}</button></div>${s.msg?`<div class="hsum">${esc(s.msg)}</div>`:''}</section>
     <section class="p1blk"><h3>Your day in blocks</h3><small class="ds">Body is how physical it was; Head is how mentally demanding.</small>${s.blocks.map(row).join('')}<button type="button" class="add" id="p1BAdd">+ Add a block</button></section>
-    <button type="button" class="primary p1save" id="p1DaySave">Save my day</button>`)}
+    <button type="button" class="primary p1save" id="p1DaySave">Done</button><small class="ds p1saved" id="p1Saved">Saves as you go</small>`)}
 function p1Hrs(b){const a=tmin(b.from),z=tmin(b.to);if(a==null||z==null)return 0;let x=z-a;if(x<0)x+=1440;return x/60}
 async function p1DaySave(){const s=P1.day;p1ReadBlocks();const blocks=s.blocks.filter(b=>b.from&&b.to);let desk=0,car=0,manual=0,fam=0,hard=0,mind=0;
   blocks.forEach(b=>{const h=p1Hrs(b);if(/Desk|Studying/.test(b.type))desk+=h;else if(/Driving/.test(b.type))car+=h;else if(/Childcare/.test(b.type))fam+=h;else if(/Farm|Construction|On your feet|Housework/.test(b.type))manual+=h;
@@ -2179,13 +2180,9 @@ function foodTodayHTML(dIso){
   ${meals?`<article class="card p1meals">${meals}</article>`:''}
   ${pd?`<details class="kmore p1pm" ${pmDone<pm.length?'open':''}><summary>From your meal plan · ${pmDone} of ${pm.length} eaten</summary>${planMealsHTML(dIso)}</details>`:''}
   ${isToday&&due&&!kEmpty?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Make a meal plan':'Your meal plan ends today'}</b><br><small>Tap to plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
-  <details class="kmore p1fx"><summary>Drinks, plants and fasting</summary>
-    ${drinksHTML(dIso)}${planMismatch(dIso)}${planVsHTML(dIso)}
-    <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants in the last 7 days${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
-    <div class="form"><h3>Fasting</h3><div class="row2"><div class="field"><label class="label" for="ffm">First food</label><input id="ffm" type="time" value="${esc(d.firstMeal||(win?fmtT(win.first):''))}" data-food="firstMeal"></div>
-      <div class="field"><label class="label" for="flm">Last food</label><input id="flm" type="time" value="${esc(d.lastMeal||(win?fmtT(win.last):''))}" data-food="lastMeal"></div></div>
-      <div class="hint" style="font-size:12px;color:var(--muted)">${fh!=null?`Overnight fast into today: <b style="color:var(--fg)">${fh} h</b>.`:'Fasting hours appear once yesterday and today both have food times.'}</div></div>
-  </details>`}
+  <article class="card drinks">${suppHTML(dIso)}</article>
+  ${planMismatch(dIso)}${planVsHTML(dIso)}
+  <div class="plantrow p1plants"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants in the last 7 days${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>`}
 // portion up or down on a logged item: the bars move straight away, saving happens in the background
 let p1PT=null;
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-fpct]');if(!x)return;e.stopPropagation();e.preventDefault();
@@ -2236,7 +2233,7 @@ function p1Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d
   return `<section class="p1tiles"><h3 class="p1th">Add something</h3><div class="p1grid">
     ${t('ci','sun','Check in',ci?'Done today':'Sleep and how you feel',ci)}${t('food','utensils','Log food',fd?`${fd} item${fd>1?'s':''} so far`:'Snap, say or type',false)}
     ${t('day','clipboard-list','My day',dayDone?'Saved':'Work, driving, family',dayDone)}${t('move','footprints','Log a session','Walk, run, class, route',false)}
-    ${t('water','droplet','Hydration',w?`${Math.round(w*100)/100} of ${tg.lo} L`:'Tap a glass as you go',w>=tg.lo)}${t('rec','wind','Recover','Breathe or stretch',false)}</div></section>`}
+    ${t('water','coffee','Drinks',w?`${Math.round(w*100)/100} of ${tg.lo} L water`:'Water, coffee, tea',w>=tg.lo)}${t('rec','wind','Recover','Breathe or stretch',false)}</div></section>`}
 
 // ---------- routes ----------
 Object.assign(RT,{base:'map',q:'',sig:'',mapEl:null,grp:null,tiles:null,tprof:null});
@@ -2336,6 +2333,326 @@ document.addEventListener('change',e=>{if(e.target&&e.target.id==='rtkm'){RT.km=
 // Effort: every 100 m of climb counts as 1 km extra on foot, 2 km extra on a bike.
 function p1Effort(km,climb,kind){const eq=km+climb/(kind==='cycle'?50:100);const per=kind==='walk'?0.6:kind==='cycle'?3:1;const x=eq/per;
   const word=x<4?'Easy':x<8?'Moderate':x<14?'Hard':'Very hard';const mins=Math.round(eq*(kind==='walk'?12:kind==='cycle'?2.6:6.2));return {eq:Math.round(eq*10)/10,word,mins}}
+
+// ================= P1 v3: steadier screens, drinks, coach read, weather, export, patterns =================
+Object.assign(ICO,{
+  moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  'cloud-sun':'<path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="M20 12h2"/><path d="m19.07 4.93-1.41 1.41"/><path d="M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/>',
+  'file-text':'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  sheet:'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>',
+  'chef-hat':'<path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.457.316-.844.727-1.041a4 4 0 0 0-2.134-7.589 5 5 0 0 0-9.186 0 4 4 0 0 0-2.134 7.588c.411.198.727.585.727 1.041V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/>',
+  'shopping-basket':'<path d="m15 11-1 9"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="M4.5 15.5h15"/><path d="m5 11 4-7"/><path d="m9 11 1 9"/>',
+  shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
+});
+const p1LS={get(k){try{return JSON.parse(localStorage.getItem('keel_'+k)||'null')}catch(e){return null}},set(k,v){try{localStorage.setItem('keel_'+k,JSON.stringify(v))}catch(e){}}};
+const p1Now=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
+const p1Ago=m=>{const n=new Date(Date.now()-m*60000);return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
+const p1Min=t=>{const m=/^(\d{1,2}):(\d{2})/.exec(t||'');return m?+m[1]*60+ +m[2]:null};
+function p1MealFor(t){const m=p1Min(t);if(m==null)return guessMeal();return m<630?'Breakfast':m<870?'Lunch':m<1050?'Snack':m<1290?'Dinner':'Snack'}
+function p1WhenHTML(name,val){const opts=[['now','Now'],['30','30 min ago'],['60','1 h ago'],['120','2 h ago']];
+  return `<div class="p1when"><span class="label">When</span><div class="p1wopts">${opts.map(([v,l])=>`<button type="button" data-p1when="${name}" data-v="${v}" aria-pressed="${(!val&&v==='now')}">${l}</button>`).join('')}<input type="time" data-p1whent="${name}" value="${esc(val||'')}" aria-label="Pick a time"></div></div>`}
+
+// ---------- 1. no more jumping: keep scroll and open sections when the same screen redraws ----------
+var P1R={sig:''};
+function p1DKey(el,i){const s=el.querySelector('summary');return (el.dataset.ms||el.id||'')+'|'+(s?s.textContent.replace(/[\d.,·%]+/g,'').trim().slice(0,40):i)}
+function p1DState(){const m={};document.querySelectorAll('#app details').forEach((el,i)=>{m[p1DKey(el,i)]=el.open});return m}
+function p1DApply(m){if(!m)return;document.querySelectorAll('#app details').forEach((el,i)=>{const k=p1DKey(el,i);if(k in m&&el.open!==m[k])el.open=m[k]})}
+
+// ---------- 2a. supplements: search as you type ----------
+const SUPP_DB=['Seven Seas Omega-3 Fish Oil','Seven Seas Cod Liver Oil','Seven Seas Simply Timeless','Seven Seas Multivitamin','Vitamin D3 1000 IU (25 µg)','Vitamin D3 2000 IU (50 µg)','Vitamin D3 + K2','Creatine monohydrate 5 g','Magnesium glycinate','Magnesium citrate','Zinc 15 mg','Multivitamin, one a day','Centrum Advance','Berocca Performance','Vitamin C 1000 mg','Vitamin B12 1000 µg','B complex','Iron 14 mg','Folic acid 400 µg','Whey protein, 1 scoop (30 g)','Omega-3 fish oil 1000 mg','Krill oil','Probiotic','Collagen powder, 1 scoop','Electrolyte tablet (SIS Hydro)','Electrolytes (Dioralyte)','Caffeine tablet 200 mg','Beetroot juice shot','Turmeric / curcumin','Glucosamine','Ashwagandha','Calcium + vitamin D','Evening primrose oil'];
+let p1SupT=null,p1SupQ='';
+function p1SupNorm(q){return q.toLowerCase().replace(/\b7\s*c'?s\b|\bseven c'?s\b|\b7 seas\b/g,'seven seas').replace(/omega ?3/g,'omega-3')}
+async function p1SupSearch(q){const box=document.getElementById('spSug');if(!box)return;const n=p1SupNorm(q);if(n.length<2){box.innerHTML='';return}
+  const words=n.split(/\s+/).filter(Boolean);const local=SUPP_DB.filter(s=>words.every(w=>s.toLowerCase().includes(w.replace(/-/g,'-')))).slice(0,5);
+  const draw=(off)=>{const all=[...local.map(x=>({n:x,src:'Common'})),...(off||[])].filter((x,i,a)=>a.findIndex(y=>y.n.toLowerCase()===x.n.toLowerCase())===i).slice(0,8);
+    box.innerHTML=all.length?all.map(x=>`<button type="button" class="p1sug" data-supsug="${esc(x.n)}"><b>${esc(x.n)}</b><small>${esc(x.src)}</small></button>`).join(''):(off?'<div class="ds" style="padding:8px 2px">Nothing in the database. Tap Add and Keel will look it up.</div>':'')};
+  draw(null);p1SupQ=q;
+  try{const r=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(n)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,brands,quantity`);const j=await r.json();if(p1SupQ!==q)return;
+    const off=(j.products||[]).filter(p=>p.product_name).map(p=>({n:[p.brands&&String(p.brands).split(',')[0],p.product_name].filter(Boolean).join(' ').replace(/\s+/g,' ').slice(0,60),src:'Product database'+(p.quantity?' · '+p.quantity:'')}));draw(off)}catch(e){}}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='sp-name'){clearTimeout(p1SupT);const v=e.target.value;p1SupT=setTimeout(()=>p1SupSearch(v),300)}});
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-supsug]');if(!x)return;e.stopPropagation();const i=$('#sp-name');if(i)i.value=x.dataset.supsug;addSupp(x.dataset.supsug,null)},true);
+function suppHTML(k){
+  const d=D()[k]||{};const list=supps();const can=!sampleMode&&k<=iso(todayDate());const miss=d.suppMissed||[];
+  const rows=list.map(s=>{const took=!miss.includes(s.id)&&k>=(s.since||'0');return `<button type="button" class="schip ${took?'on':''}" data-supp="${s.id}" ${can?'':'disabled'}>${took?'✓':'✕'} ${esc(s.name)}${s.dose?` <small>${esc(s.dose)}</small>`:''}</button>`}).join('');
+  const add=fx.supAdd?`<div class="form" style="padding:4px 0 0;gap:10px"><div class="field"><label class="label" for="sp-name">Search, or type the name and dose</label><input id="sp-name" type="search" autocomplete="off" placeholder="e.g. Seven Seas omega-3, creatine 5 g"></div><div id="spSug" class="p1sugs"></div>
+      <div class="actions"><button type="button" class="primary" id="spSave" ${fx.supBusy?'disabled':''}>${fx.supBusy?'Looking it up…':'Add'}</button>${canImg?`<label class="filebtn camlite">📷 Photo of the label<input type="file" id="spPhoto" accept="image/*" capture="environment"></label>`:''}</div>
+      ${fx.supMsg?`<div class="hsum" role="status">${esc(fx.supMsg)}</div>`:''}</div>`:'';
+  return `<div class="srow"><div class="sh"><b>Supplements</b><span>${list.length?'Ticked = taken today. Tap one you missed.':'Add any you take so they count.'}</span></div>${rows?`<div class="schips">${rows}</div>`:''}
+    <div class="sbtns">${can?`<button type="button" class="linkbtn" id="spAdd">${fx.supAdd?'Cancel':'+ Add a supplement'}</button>`:''}<details class="sinfo"><summary>Which ones are worth it?</summary><ul class="cover">${SUPP_INFO.map(([n,t])=>`<li><b>${n}:</b> ${t}</li>`).join('')}<li>Check with a pharmacist or GP before starting any supplement, especially if you take medication.</li></ul></details></div>${add}</div>`}
+
+// ---------- 2b. log food at an earlier time ----------
+const _p1addFood=addFood;
+addFood=async function(items,k){if(fState&&fState.at)items=items.map(i=>i.at?i:{...i,at:fState.at});const r=await _p1addFood(items,k);if(fState)fState.at=null;return r};
+const _p1foodActions=foodActionsHTML;
+foodActionsHTML=function(dIso){const h=_p1foodActions(dIso);if(!h)return h;return h.replace(/(<div class="mealpick">[\s\S]*?<\/div>)/,`$1${p1WhenHTML('food',fState.at)}`)};
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p1when]');if(!x)return;e.stopPropagation();const v=x.dataset.v,t=v==='now'?null:p1Ago(+v);
+  if(x.dataset.p1when==='food'){fState.at=t;fState.meal=p1MealFor(t||p1Now());const y=scrollY;render();scrollTo(0,y)}else if(x.dataset.p1when==='cof'){P1C.at=t;p1DrinksDraw()}},true);
+document.addEventListener('change',e=>{const el=e.target;if(!el||!el.dataset||!el.dataset.p1whent)return;const t=el.value||null;
+  if(el.dataset.p1whent==='food'){fState.at=t;fState.meal=p1MealFor(t||p1Now());const y=scrollY;render();scrollTo(0,y)}else{P1C.at=t;p1DrinksDraw()}});
+
+// ---------- 2c. drinks: water, coffee & tea, alcohol in one place ----------
+const COFFEE=[['americano','Americano / black',150,0,4,0],['instant','Instant coffee',70,0,4,0],['espresso','Espresso',65,0,2,0],['flatwhite','Flat white',130,120,0,0],['latte','Latte',130,250,0,0],['cappuccino','Cappuccino',130,160,0,0],['mocha','Mocha',130,200,95,16],['decaf','Decaf coffee',5,0,4,0],['tea','Tea',45,30,2,0],['green','Green tea',30,0,2,0],['herbal','Herbal tea',0,0,2,0],['energy','Energy drink',80,0,110,27],['energy0','Energy drink, sugar-free',80,0,5,1]];
+const MILK={none:['No milk',0,0,0,0,0],whole:['Whole milk',64,3.3,4.7,3.6,120],semi:['Low-fat milk',46,3.5,4.8,1.7,124],skim:['Skimmed',35,3.5,5,.1,125],oat:['Oat',59,1,6.6,3,120],almond:['Almond',13,.4,.1,1.1,120],soya:['Soya',33,3.3,.3,1.8,120]};
+const CSIZE={s:['Small',.7,.75],m:['Medium',1,1],l:['Large',1.4,1.4]};
+let P1C={type:null,size:'m',milk:null,sugar:0,at:null};
+function p1CofItem(){const c=COFFEE.find(x=>x[0]===P1C.type);if(!c)return null;const sz=CSIZE[P1C.size];const noMilkDrink=/energy|espresso|herbal|green/.test(c[0]);
+  const milk=noMilkDrink?'none':(P1C.milk||(c[3]?'semi':'none'));const mm=MILK[milk];const ml=(c[3]||(milk!=='none'?30:0))*sz[1];
+  const it={name:`${sz[0]} ${c[1].toLowerCase()}${milk!=='none'?` with ${mm[0].toLowerCase()}`:''}${P1C.sugar?`, ${P1C.sugar} sugar`:''}`,qty:'1 cup',src:'coffee',est:true,micros:false,plants:[]};
+  NK.forEach(k=>it[k]=0);it.kcal=Math.round(c[4]+mm[1]*ml/100+16*P1C.sugar);it.protein=Math.round(mm[2]*ml/10)/10;it.carbs=Math.round((c[5]+mm[3]*ml/100+4*P1C.sugar)*10)/10;it.fat=Math.round(mm[4]*ml/10)/10;it.calcium=Math.round(mm[5]*ml/100);it.caffeine=Math.round(c[2]*(/espresso|tea|green|instant|americano|decaf|herbal/.test(c[0])&&P1C.size==='l'?1.3:sz[2]));return it}
+function p1CafToday(k){const d=D()[k]||{};const its=(d.food||[]).map((x,ix)=>({...x,ix})).filter(x=>(+x.caffeine||0)>0||x.src==='coffee');const tot=its.reduce((a,x)=>a+(+x.caffeine||0),0);const last=its.filter(x=>x.at&&(+x.caffeine||0)>=20).map(x=>x.at).sort().pop()||null;return {its,tot,last}}
+function p1DrinksDraw(){const k=iso(todayDate());const d=D()[k]||{};const w=+d.water||0;const tg=p1WaterTarget();const cf=p1CafToday(k);const it=p1CofItem();
+  const c=COFFEE.find(x=>x[0]===P1C.type);const noMilk=c&&/energy|espresso|herbal|green/.test(c[0]);const wk=alcWeek(k),lim=alcLimit();
+  p1Sheet(`<div class="kshead"><div><h2>Drinks</h2><small class="ds">Today</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <section class="p1blk"><h3>${ico('droplet')} Water</h3><div class="p1wbig"><b class="num">${Math.round(w*100)/100}</b><span>of about ${tg.lo} L</span></div>${p1Bar('hyd',w/tg.lo*100,'var(--k-sky)')}
+      <div class="p1wbtns">${[[.25,'Glass','glass-water'],[.5,'500 ml','cup-soda'],[.75,'Bottle','milk'],[1,'1 litre','droplets']].map(([v,l,ic])=>`<button type="button" data-p1w="${v}">${ico(ic)}<b>+ ${l}</b></button>`).join('')}</div>
+      ${w>0?`<button type="button" class="linkbtn" data-p1w="-0.25">Take off a glass</button>`:''}<p class="ds" style="font-size:12px;margin:4px 0 0">${tg.why.length?`A bit more today because of ${tg.why.join(' and ')}.`:'Tea, coffee and milk count too.'}</p></section>
+    <section class="p1blk"><h3>${ico('coffee')} Coffee and tea</h3>
+      <div class="p1cof">${COFFEE.map(x=>`<button type="button" data-cof="${x[0]}" aria-pressed="${P1C.type===x[0]}">${esc(x[1])}</button>`).join('')}</div>
+      ${c?`<div class="field"><span class="label">Size</span>${p1Seg('cofsize',Object.entries(CSIZE).map(([v,s])=>[v,s[0]]),P1C.size)}</div>
+        ${noMilk?'':`<div class="field"><span class="label">Milk</span><div class="p1cof p1cofm">${Object.entries(MILK).map(([v,m])=>`<button type="button" data-cofmilk="${v}" aria-pressed="${(P1C.milk||(c[3]?'semi':'none'))===v}">${m[0]}</button>`).join('')}</div></div>`}
+        ${/energy/.test(c[0])?'':`<div class="field"><span class="label">Sugar</span>${p1Seg('cofsugar',[['0','None'],['1','1 tsp'],['2','2 tsp']],String(P1C.sugar))}</div>`}
+        ${p1WhenHTML('cof',P1C.at)}
+        <div class="p1cofsum num">${it.kcal} kcal · ${it.caffeine} mg caffeine · ${it.protein}p ${it.carbs}c ${it.fat}f</div>
+        <button type="button" class="primary" id="cofLog" style="width:100%">Log ${esc(it.name.toLowerCase())}</button>`:''}
+      ${cf.its.length?`<div class="p1caf"><div class="p1cafh"><b class="num">${cf.tot} mg</b> caffeine today${cf.last?` · last at ${esc(cf.last)}`:''}</div>${cf.its.map(x=>`<div class="p1cafi"><span>${esc(x.at||'')}</span><b>${esc(x.name)}</b><button type="button" class="x" data-del-food="${x.ix}" data-p1redraw aria-label="Remove">${ico('x')}</button></div>`).join('')}
+        ${cf.last&&p1Min(cf.last)>=840?'<p class="ds" style="font-size:12px;margin:6px 0 0">Caffeine after 2 pm can still be working at bedtime. If sleep is off, try keeping coffee to the morning.</p>':''}</div>`:''}</section>
+    ${alcOn()?`<section class="p1blk"><h3>${ico('wine')} Alcohol</h3><div class="ds" style="font-size:13px;margin-bottom:8px"><b class="num">${wk}</b> standard drink${wk===1?'':'s'} this week · guide up to ${lim}</div><div class="p1cof">${ALC.map((a,i)=>`<button type="button" data-alc="${i}" data-p1redraw>${esc(a[0])}</button>`).join('')}</div></section>`:''}`);p1Anim()}
+function p1WaterOpen(){sel=todayDate();p1DrinksDraw()}
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(!document.getElementById('p1Host')||!c('#p1Host'))return;
+  if(x=c('[data-cof]')){P1C.type=P1C.type===x.dataset.cof?null:x.dataset.cof;const pr=p1LS.get('cof_'+P1C.type);if(pr){P1C.size=pr.size;P1C.milk=pr.milk;P1C.sugar=pr.sugar}p1DrinksDraw();return}
+  if(x=c('[data-cofmilk]')){P1C.milk=x.dataset.cofmilk;p1DrinksDraw();return}
+  if(x=c('[data-p1="cofsize"]')){P1C.size=x.dataset.v;p1DrinksDraw();e.stopPropagation();return}
+  if(x=c('[data-p1="cofsugar"]')){P1C.sugar=+x.dataset.v;p1DrinksDraw();e.stopPropagation();return}
+  if(c('#cofLog')){const it=p1CofItem();if(!it)return;const at=P1C.at||p1Now();it.at=at;it.meal=p1MealFor(at);const k=iso(todayDate());p1LS.set('cof_'+P1C.type,{size:P1C.size,milk:P1C.milk,sugar:P1C.sugar});
+    const cur=((days[k]||{}).food||[]).concat([it]);days[k]={...(days[k]||{date:k}),food:cur};P1C={type:null,size:'m',milk:null,sugar:0,at:null};p1DrinksDraw();render();persistDay(k,{food:cur});toast(`${it.name} logged at ${at}`);return}
+  if(c('[data-p1redraw]'))setTimeout(()=>{if(document.querySelector('#p1Host .kshead'))p1DrinksDraw()},400);
+},true);
+
+// ---------- 3. coach's read on today, from trends not one night ----------
+function p1Hard(k){const d=D()[k]||{},l=L()[k];const avgL=(()=>{let t=0,n=0;for(let i=1;i<=28;i++){const v=dayLoadAll(iso(addD(parse(k),-i)));if(v>0){t+=v;n++}}return n?t/n:0})();const ld=dayLoadAll(k);
+  return (l&&+l.rpe>=7)||(ld>0&&avgL>0&&ld>=avgL*1.3)||(d.blocks||[]).filter(b=>b.phys==='hard').reduce((a,b)=>a+p1Hrs(b),0)>=3}
+function p1LateCaf(k){const c=p1CafToday(k);return c.last&&p1Min(c.last)>=840?c.last:null}
+function p1Fmt12(t){const m=p1Min(t);if(m==null)return t;const h=Math.floor(m/60),mm=m%60;return `${h%12||12}${mm?':'+String(mm).padStart(2,'0'):''} ${h<12?'am':'pm'}`}
+function p1Streak(k){let n=0;for(let i=0;i<120;i++){const d=D()[iso(addD(parse(k),-i))];if(d&&maxPain(d)>=3)break;n++}const any=Object.keys(D()).length;return Math.min(n,any)}
+function p1ReadHTML(k){if(sampleMode)return '';const DD=D(),d=DD[k]||{};const name=(userName()||'').split(/\s+/)[0]||'';
+  const r0=readiness(d);if(r0==null)return '';const prev=[];for(let i=1;i<=7;i++){const v=readiness(DD[iso(addD(parse(k),-i))]);if(v!=null)prev.push(v)}
+  const r3=avg([r0,readiness(DD[iso(addD(parse(k),-1))]),readiness(DD[iso(addD(parse(k),-2))])].filter(v=>v!=null));const base=prev.length>=3?avg(prev):null;const tr=base!=null?r3-base:0;
+  const head=base==null?`Here's your read, ${name}.`:tr<=-6?`Hey ${name}, a little bit down on today.`:tr>=6?`Good form, ${name}. You're on the up.`:`Steady going, ${name}.`;
+  const pts=[];const yk=iso(addD(parse(k),-1)),yd=DD[yk]||{};const sh=sleepHours(d),need=sleepNeed(k);
+  if(sh!=null&&sh<need-.75){const miss=Math.round((need-sh)*2)/2;pts.push(['moon',`You missed about ${miss} h of sleep last night${(+d.wakes>=2||+d.awakeMin>=30)?', and it was broken':''}.`,screenGap(d)!=null&&screenGap(d)<45?'Your phone was out close to bed. Try putting it away 45 minutes to an hour earlier.':'Try to get to bed a bit earlier tonight.'])}
+  else if(+d.wakes>=2||+d.awakeMin>=30)pts.push(['moon','A bit of broken sleep last night.',screenGap(d)!=null&&screenGap(d)<45?'Putting the phone away earlier can help you settle.':'A cooler, darker room and the same bedtime each night can help.'])
+  const lc=p1LateCaf(yk);if(lc&&(sh!=null&&sh<need||+d.latency>=30))pts.push(['coffee',`Your last coffee yesterday was at ${p1Fmt12(lc)}.`,'Try leaving coffee until the morning, finishing by 1 or 2 pm.']);
+  const lt=p1LateCaf(k);if(lt&&k===iso(todayDate()))pts.push(['coffee',`Coffee at ${p1Fmt12(lt)} today.`,'It can still be working at bedtime, so maybe make the next one decaf.']);
+  if(p1Hard(yk)&&p1Hard(iso(addD(parse(k),-2))))pts.push(['flame','You went hard two days in a row.','You might feel a bit run down. Take it easy tonight and try to get to bed earlier.']);
+  else if(p1Hard(yk)&&r0<55)pts.push(['flame','Yesterday was a hard day.','Keep today easy and eat well.']);
+  const mind=(yd.blocks||[]).filter(b=>b.mind==='tough').reduce((a,b)=>a+p1Hrs(b),0);if(mind>=4)pts.push(['brain','Yesterday was mentally heavy.','A walk outside or ten minutes of slow breathing helps you switch off.']);
+  const sdr=(yd.food||[]).reduce((a,x)=>a+stdDrinks(x),0);if(sdr>=2)pts.push(['wine',`${sdr} standard drinks last night.`,'Drink can knock sleep quality even when the hours look fine. Water and an easy day help.']);
+  const wx=P1WX.daily&&p1WxWarn(k);if(wx)pts.push(['cloud-rain',wx.text,wx.tip]);
+  const st=p1Streak(k);if(st>=14&&pts.length<3)pts.push(['shield',`${st} days with no niggles.`,'Whatever you\'re doing is working. Keep it going.']);
+  if(!pts.length)pts.push(['sparkles','Nothing stands out.','Keep doing what you\'re doing.']);
+  return `<article class="card p1read"><div class="p1readh">${ico('sparkles')}<b>${esc(head)}</b></div><ul>${pts.slice(0,3).map(([ic,a,b])=>`<li>${ico(ic)}<span><b>${esc(a)}</b> ${esc(b)}</span></li>`).join('')}</ul><button type="button" class="linkbtn" data-p1pat>See the patterns behind this ›</button></article>`}
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-p1pat]')){pView='patterns';location.hash='reports';render();scrollTo(0,0)}});
+
+// ---------- 4. weather: chip at the top, forecast on tap, warnings for outdoor sessions ----------
+var P1WX={at:0,daily:null,busy:false};
+const OUTDOOR={E:1,T:1,X:1};
+async function p1Forecast(ask){if(P1WX.daily&&Date.now()-P1WX.at<3*3600e3)return P1WX.daily;if(P1WX.busy)return null;P1WX.busy=true;
+  try{const loc=await p1Loc(ask);if(!loc){P1WX.busy=false;return null}
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,snowfall_sum,wind_speed_10m_max&timezone=auto&forecast_days=16`);const j=await r.json();const D_=j.daily;
+    P1WX.daily=D_.time.map((t,i)=>({date:t,code:D_.weather_code[i],tmax:Math.round(D_.temperature_2m_max[i]),tmin:Math.round(D_.temperature_2m_min[i]),rain:Math.round(D_.precipitation_sum[i]*10)/10,prob:D_.precipitation_probability_max[i],snow:D_.snowfall_sum[i],wind:Math.round(D_.wind_speed_10m_max[i])}));P1WX.at=Date.now()}catch(e){}
+  P1WX.busy=false;return P1WX.daily}
+function p1Sky(c){c=+c;return c>=95?'Thunder':c>=71&&c<=86?'Snow':c>=61?'Rain':c>=51?'Drizzle':c>=45?'Fog':c>=3?'Cloudy':c>=1?'Bright spells':'Sunny'}
+function p1Bad(w){return w&&(w.snow>0.2?'snow':w.tmax<=1?'ice':w.rain>=8?'heavy rain':w.wind>=50?'strong wind':null)}
+function p1WxWarn(k){const w=(P1WX.daily||[]).find(x=>x.date===k);const p=planFor(parse(k));if(!w||!p||!OUTDOOR[p.type]||p.pre)return null;const b=p1Bad(w);if(!b)return null;
+  let alt=null;for(const o of [1,-1,2,-2]){const kk=iso(addD(parse(k),o));if(kk<iso(todayDate()))continue;const pp=planFor(parse(kk)),ww=(P1WX.daily||[]).find(x=>x.date===kk);if(ww&&!p1Bad(ww)&&(!pp||pp.type==='R'||!OUTDOOR[pp.type])){alt=kk;break}}
+  return {text:`${b[0].toUpperCase()+b.slice(1)} forecast for ${k===iso(todayDate())?'today\'s':fmtD(parse(k),{weekday:'long'})+'\'s'} ${TNAME[p.type].toLowerCase()}.`,tip:alt?`${fmtD(parse(alt),{weekday:'long'})} looks better. You could swap them, or do it indoors.`:'You could do it indoors, or keep it short.',alt}}
+function p1WxChip(k){const w=(P1WX.daily||[]).find(x=>x.date===k);if(!w){if(meta.loc&&!P1WX.busy&&!P1WX.daily)p1Forecast(false).then(()=>{if(tab()==='dashboard')render()});return `<button type="button" class="p1wxc" data-p1wx>${ico('cloud-sun')}<span>${meta.loc?'Weather':'Add weather'}</span></button>`}
+  const warn=[0,1,2,3].some(i=>p1WxWarn(iso(addD(parse(k),i))));return `<button type="button" class="p1wxc${warn?' warn':''}" data-p1wx>${ico(p1Sky(w.code)==='Sunny'||p1Sky(w.code)==='Bright spells'?'sun':/Rain|Drizzle|Thunder/.test(p1Sky(w.code))?'cloud-rain':/Snow/.test(p1Sky(w.code))?'snowflake':'cloud-sun')}<span class="num">${w.tmax}°</span>${warn?'<i></i>':''}</button>`}
+async function p1WxOpen(){p1Sheet(`<div class="kshead"><div><h2>Weather</h2><small class="ds">Next two weeks</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div><div class="ds">Getting the forecast…</div>`);
+  const dd=await p1Forecast(true);if(!document.querySelector('#p1Host .kshead'))return;
+  if(!dd){p1Sheet(`<div class="kshead"><div><h2>Weather</h2></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div><p class="ds">Keel needs your rough location for the forecast. Allow location when your phone asks, then try again.</p>`);return}
+  const warns=dd.map(w=>p1WxWarn(w.date)).filter(Boolean);
+  p1Sheet(`<div class="kshead"><div><h2>Weather</h2><small class="ds">Next two weeks, with your plan</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    ${warns.length?`<div class="p1wxw">${warns.slice(0,3).map(x=>`<div>${ico('triangle-alert')}<span><b>${esc(x.text)}</b> ${esc(x.tip)}${x.alt?` <button type="button" class="linkbtn" data-goto="${x.alt}" data-p1close>See ${fmtD(parse(x.alt),{weekday:'short'})} ›</button>`:''}</span></div>`).join('')}</div>`:''}
+    <div class="p1fc">${dd.map((w,i)=>{const p=planFor(parse(w.date));const ses=p&&p.type!=='R'&&!p.pre?TNAME[p.type]:'';const bad=p1Bad(w);
+      return `<div class="p1fcr${bad?' bad':''}"><span class="p1fcd"><b>${i===0?'Today':fmtD(parse(w.date),{weekday:'short'})}</b><small>${parse(w.date).getDate()}</small></span><span class="p1fcs">${p1Sky(w.code)}<small>${w.rain>=0.5?`${w.rain} mm`:'dry'}${w.wind>=35?` · wind ${w.wind}`:''}</small></span><span class="num p1fct">${w.tmax}°<small>${w.tmin}°</small></span><span class="p1fcp${ses&&OUTDOOR[p.type]&&bad?' warn':''}">${esc(ses)}</span></div>`}).join('')}</div>
+    <p class="ds" style="font-size:12px">Forecast by Open-Meteo. Further out than a week is a rough guide.</p>`)}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);if(c('[data-p1wx]')){p1WxOpen();return}if(c('[data-p1close]')){P1.ci=null;P1.day=null;p1Sheet(null)}},true);
+
+// ---------- 5. Today: one-line top, read, balance, food, tiles ----------
+function p1Top(now){const k=iso(now);const pl=planFor(now);
+  return `${sampleMode?'<div class="banner">Example data, not yours. Scroll to More about today to go back.</div>':''}<div class="p1top"><div class="p1tg"><b>${greet()}</b><small>${fmtD(now,{weekday:'short',day:'numeric',month:'short'})}${pl&&!pl.pre&&!sampleMode?` · week ${pl.wk}`:''}</small></div>${sampleMode?'':p1WxChip(k)}</div>`}
+function p1FoodMini(k){const d=D()[k]||{date:k,food:[]};const t=foodTotals(d),dt=dayTypeFor(k);
+  return `<details class="card p1fmini" data-ms="p1fmini" open><summary><b>Food today</b><span class="num">${Math.round(t.kcal)} of ${Math.round(p1Ref('kcal',dt))} kcal</span></summary><div class="p1fmg">${P1MAC.slice(1).map(([q,lab,col])=>{const ref=p1Ref(q,dt),v=t[q]||0;return `<div><div class="p1mbh"><span>${lab}</span><span class="num"><b>${Math.round(v)}</b>/${Math.round(ref)} g</span></div>${p1Bar('t'+q,v/ref*100,q!=='protein'&&v>ref*1.1?'var(--bad)':col)}</div>`}).join('')}</div>${microsHTML(t,dt,k)}</details>`}
+function p1SignCard(k){const d=D()[k]||{};if(sampleMode||d.foodDone||!(d.food||[]).length||new Date().getHours()<19)return '';
+  return `<div class="p1signc">${ico('moon')}<span><b>Finished eating for today?</b><small>Signing off closes your food day and starts the overnight fast.</small></span><button type="button" class="ghost" id="signOpen">Sign off</button></div>`}
+
+// ---------- 6. save as you go ----------
+let p1AS=null,p1Pend=null;
+function p1CiFields(c){const f={bed:c.bed,wake:c.wake,latency:+c.latency,wakes:+c.wakes,awakeMin:+c.wakes?+c.awakeMin:0,sleepQ:+c.sleepQ,energy:+c.energy,mood:+c.mood,stress:+c.stress,sore:+c.sore,sleepH:p1SleepCalc(c)};if(c.screenOff)f.screenOff=c.screenOff;if(c.trainIntent)f.trainIntent=c.trainIntent;return f}
+function p1DayFields(s){const blocks=s.blocks.filter(b=>b.from&&b.to);let desk=0,car=0,manual=0,fam=0,hard=0,mind=0;
+  blocks.forEach(b=>{const h=p1Hrs(b);if(/Desk|Studying/.test(b.type))desk+=h;else if(/Driving/.test(b.type))car+=h;else if(/Childcare/.test(b.type))fam+=h;else if(/Farm|Construction|On your feet|Housework/.test(b.type))manual+=h;
+    if(b.phys==='hard')hard+=h;else if(b.phys==='steady')hard+=h/2;if(b.mind==='tough')mind+=h;else if(b.mind==='steady')mind+=h/2});
+  const r=x=>Math.round(x*2)/2;const farm=hard<=0?0:hard<2?1:hard<4?2:hard<7?3:4;return {dayTags:s.tags,blocks,deskHrs:r(desk),carHrs:r(car),farmHrs:r(manual),familyHrs:r(fam),farm,mindHrs:r(mind)}}
+function p1Queue(){if(P1.ci)p1Pend={k:P1.ci.k,f:p1CiFields(P1.ci)};else if(P1.day){p1ReadBlocks();p1Pend={k:P1.day.k,f:p1DayFields(P1.day)}}else return;
+  clearTimeout(p1AS);p1AS=setTimeout(p1Flush,600);const s=document.getElementById('p1Saved');if(s)s.textContent='Saving…'}
+async function p1Flush(){clearTimeout(p1AS);const p=p1Pend;p1Pend=null;if(!p)return;await persistDay(p.k,p.f);const s=document.getElementById('p1Saved');if(s)s.textContent='Saved ✓';if(!document.querySelector('#p1Host .kshead'))render()}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
+  if((P1.ci||P1.day)&&(c('[data-p1]')||c('[data-p1tag]')||c('[data-p1bdel]')||c('#p1BAdd')))setTimeout(p1Queue,0);
+  if(c('#p1X')||e.target.id==='p1Wrap'){setTimeout(()=>{if(p1Pend)p1Flush();else if(!document.querySelector('#p1Host .kshead'))render()},0)}},true);
+document.addEventListener('input',e=>{if(e.target.closest&&e.target.closest('#p1Host')&&(P1.ci||P1.day)&&!e.target.closest('#p1-say'))p1Queue()});
+document.addEventListener('change',e=>{if(e.target.closest&&e.target.closest('#p1Host')&&(P1.ci||P1.day))p1Queue()});
+document.addEventListener('input',e=>{const el=e.target;if(el&&el.dataset&&el.dataset.p1in==='screenOff'&&P1.ci)P1.ci.screenOff=el.value},true);
+
+// ---------- 7. rest days: what's coming first, two quick picks, more in Recover ----------
+function restExtraHTML(key,pl){if(pl&&pl.type!=='R')return '';const bal=readiness(D()[key]);
+  const dn=Math.floor(parse(key)/DAY);const pk=a=>a[dn%a.length];const ids=[pk(['walk','loosen','stretch','yoga','scan']),pk(bal!=null&&bal<55?['nap','scan','sigh']:['box','sigh','478'])].filter((v,i,a)=>a.indexOf(v)===i);const picks=ids.map(id=>PROGS.find(p=>p.id===id)).filter(Boolean);
+  const nx=[];for(let i=1;i<=14&&nx.length<4;i++){const dd=addD(parse(key),i),p=planFor(dd);if(p&&p.type!=='R'&&!p.pre)nx.push({dd,p})}
+  return `${nx.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>Coming up</h2><div class="sub">Tap one to see it</div></div></div><div class="kup">${nx.map(({dd,p})=>`<button type="button" class="kupi" data-goto="${iso(dd)}" style="--c:var(${TVAR[p.type]})"><span class="kud">${fmtD(dd,{weekday:'short'})}<b>${dd.getDate()}</b></span><span class="kun">${esc(TNAME[p.type])}</span></button>`).join('')}</div></article>`:''}
+  <article class="card krest"><div class="chead"><div style="flex:1"><h2>${pl?'Rest day':'Keep ticking over'}</h2><div class="sub">A walk or a few minutes of recovery still count.</div></div><a class="linkbtn" href="#recover">More ›</a></div>
+    <div class="krlist">${picks.map(p=>`<button type="button" class="rprog" data-prog="${p.id}" style="--rc:${RCC[p.cat]||'var(--k-blue)'}"><span class="ric" aria-hidden="true">${p.ic}</span><span class="rt"><b>${esc(p.name)}</b><small>${esc(p.lens[p.def||0][0])}</small></span><span class="rgo" aria-hidden="true">▶</span></button>`).join('')}</div></article>`}
+
+// ---------- 8. cooking made easy, and ideas for the next shop ----------
+let p1Cook=null;
+function p1Steps(m){return (m.method||[]).map(s=>typeof s==='string'?{t:s,min:+((/(\d+)\s*(?:-\s*\d+\s*)?min/i.exec(s)||[])[1])||0}:{t:String(s.t||''),min:+s.min||0})}
+function p1CookDraw(){const r=p1Cook;if(!r)return;const st=p1Steps(r);
+  if(r.i<0){p1Sheet(`<div class="kshead"><div><h2>${esc(r.name)}</h2><small class="ds">${r.prep?r.prep+' min · ':''}${st.length} steps</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <section class="p1blk"><h3>Before you start</h3><p class="ds" style="margin:0 0 8px;font-size:13px">Get everything out first. Tick things off as you find them.</p>
+      ${(r.equipment||[]).length?`<span class="label">You'll need</span><div class="p1tick">${r.equipment.map((x,i)=>`<label><input type="checkbox"> ${esc(x)}</label>`).join('')}</div>`:''}
+      <span class="label">Ingredients</span><div class="p1tick">${(r.items||[]).map(x=>`<label><input type="checkbox"> <b>${esc(x.qty||'')}</b> ${esc(x.name)}</label>`).join('')}</div>
+      ${(r.before||[]).length?`<span class="label">Prep</span><ul class="cover">${r.before.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</section>
+    ${st.length?`<button type="button" class="primary" id="p1CookGo" style="width:100%">${ico('chef-hat')} Start cooking, one step at a time</button>`:`<div class="ds" id="p1CookSt">${r.busy?'Writing simple steps…':'No steps yet.'}</div>`}
+    ${r.tip?`<div class="note" style="margin:0"><b>Tip:</b> ${esc(r.tip)}</div>`:''}`);return}
+  const s=st[r.i];p1Sheet(`<div class="kshead"><div><h2>Step ${r.i+1} of ${st.length}</h2><small class="ds">${esc(r.name)}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <div class="p1stepbar"><i style="width:${(r.i+1)/st.length*100}%"></i></div><p class="p1step">${esc(s.t)}</p>
+    ${s.min?`<button type="button" class="ghost p1timer" id="p1Timer" data-min="${s.min}">${ico('timer')} <span>Start a ${s.min} min timer</span></button>`:''}
+    <div class="actions"><button type="button" class="ghost" id="p1CookBack" style="flex:1">${r.i?'Back':'Ingredients'}</button><button type="button" class="primary" id="p1CookNext" style="flex:2">${r.i<st.length-1?'Next step':'Done, enjoy it'}</button></div>`)}
+let p1TimerI=null;
+async function p1CookFetch(r,save){r.busy=true;p1CookDraw();
+  try{const out=await sample.json(`Write a very simple recipe for "${r.name}" using: ${(r.items||[]).map(x=>`${x.qty||''} ${x.name}`).join(', ')}. The cook may have almost no experience: say exactly what to do, what it should look like when it's ready, and the heat level. No jargon.
+Reply with ONLY JSON: {"prep":minutes,"servings":1,"equipment":["pan","knife"],"before":["prep jobs before cooking, e.g. chop the onion"],"method":[{"t":"step","min":0}],"tip":"one practical tip"}`,{modelTier:'quick'});
+    r.prep=+out.prep||r.prep||null;r.equipment=(out.equipment||[]).map(String).slice(0,8);r.before=(out.before||[]).map(String).slice(0,6);r.method=(out.method||[]).map(s=>({t:String(s.t||s),min:+s.min||0})).slice(0,10);r.tip=String(out.tip||'').slice(0,200);
+    if(save)await save(r)}catch(e){toast('Could not get the steps. Try again.')}r.busy=false;if(p1Cook===r)p1CookDraw()}
+recipeSheet=async function(ref){const [k,ix]=[ref.slice(0,10),+ref.slice(11)];const pd=planDay(k);const m=pd&&pd.meals[ix];if(!m)return;
+  p1Cook={...clone(m),i:-1,ref};p1CookDraw();
+  if((!m.method||!m.method.length||!m.equipment)&&sample)p1CookFetch(p1Cook,async r=>{const p=clone(meta.plan);const mm=p.days.find(d=>d.date===k).meals[ix];Object.assign(mm,{method:r.method,prep:r.prep,equipment:r.equipment,before:r.before,tip:r.tip});await persistMeta('plan',p)})};
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);const r=p1Cook;
+  if(c('#p1X')&&r){p1Cook=null;clearInterval(p1TimerI);return}
+  if(!r)return;
+  if(c('#p1CookGo')){r.i=0;p1CookDraw();return}
+  if(c('#p1CookNext')){if(r.i<p1Steps(r).length-1){r.i++;clearInterval(p1TimerI);p1CookDraw()}else{p1Cook=null;clearInterval(p1TimerI);p1Sheet(null);if(r.ref&&r.ref.length>10&&!planLogged(r.ref.slice(0,10),+r.ref.slice(11)))toast('Tap Ate on the meal to log it')}return}
+  if(c('#p1CookBack')){r.i--;clearInterval(p1TimerI);p1CookDraw();return}
+  const t=c('#p1Timer');if(t){let left=+t.dataset.min*60;clearInterval(p1TimerI);const sp=t.querySelector('span');p1TimerI=setInterval(()=>{left--;if(sp)sp.textContent=`${Math.floor(left/60)}:${String(left%60).padStart(2,'0')} left`;if(left<=0){clearInterval(p1TimerI);if(sp)sp.textContent='Time\'s up';try{navigator.vibrate&&navigator.vibrate([300,150,300])}catch(e){}}},1000);return}},true);
+// ideas for the next shop, and simple baking
+async function p1Ideas(kind){if(!sample){toast('Not available here');return}const ideas=clone(meta.ideas||{});ideas.busy=kind;P1I.busy=kind;render();
+  const k=kitchen().map(x=>x.name||x).slice(0,60).join(', ');const dt=dayTypeFor(iso(todayDate()));const ct=nutTarget('carbs',dt);const low=(()=>{const t={};NUTS.filter(n=>!n.macro&&n.lo).forEach(n=>t[n.k]=0);let n=0;for(let i=0;i<7;i++){const d=D()[iso(addD(todayDate(),-i))];if(d&&(d.food||[]).length){n++;const ft=foodTotals(d);Object.keys(t).forEach(q=>t[q]+=ft[q]||0)}}return n?NUTS.filter(x=>x.lo&&t[x.k]/n<x.lo*.6).map(x=>x.l).slice(0,5):[]})();
+  try{if(kind==='shop'){const out=await sample.json(`${ABOUT||'An adult'} eats in this style: ${typeof foodRules==='function'?foodRules():FOOD_RULES}
+Daily net carbs target about ${ct.hi||ct.t||'moderate'} g. They have in: ${k||'not much logged'}. Over the last week they've been low in: ${low.join(', ')||'nothing in particular'}.
+Suggest 6-8 things to pick up next time they're in an ordinary Irish supermarket that would make their meals easier, tastier and fill those gaps. Friendly, short reasons.
+Reply with ONLY JSON: {"items":[{"name":"","why":""}]}`,{modelTier:'quick'});P1I.shop=(out.items||[]).slice(0,8).map(x=>({name:String(x.name||''),why:String(x.why||'')}))}
+    else{const out=await sample.json(`${ABOUT||'An adult'} eats in this style: ${typeof foodRules==='function'?foodRules():FOOD_RULES} Daily net carbs about ${ct.hi||ct.t||'moderate'} g.
+Give 3 really simple healthy bakes or snacks they could make at home that fit that style (for example low-sugar brownies, protein bites, seed crackers). Beginner level, few ingredients, normal kitchen.
+Reply with ONLY JSON: {"bakes":[{"name":"","why":"one line","prep":minutes,"items":[{"qty":"","name":""}],"equipment":[""],"before":[""],"method":[{"t":"","min":0}],"per":"per piece: kcal, protein, net carbs"}]}`,{modelTier:'quick'});P1I.bake=(out.bakes||[]).slice(0,3)}
+  }catch(e){toast(foodErr(e))}P1I.busy=null;persistMeta('ideas',{shop:P1I.shop,bake:P1I.bake});render()}
+var P1I={busy:null,shop:null,bake:null};
+function p1IdeasHTML(){if(meta.ideas&&!P1I.shop&&!P1I.bake){P1I.shop=meta.ideas.shop||null;P1I.bake=meta.ideas.bake||null}
+  return `<article class="card p1ideas"><div class="chead"><div style="flex:1"><h2>Ideas</h2><div class="sub">To keep things easy and keep you going</div></div></div><div class="form">
+    <div class="row2"><button type="button" class="ghost p1btn" data-p1idea="shop" ${P1I.busy?'disabled':''}>${ico('shopping-basket')} ${P1I.busy==='shop'?'Thinking…':'Next shop'}</button><button type="button" class="ghost p1btn" data-p1idea="bake" ${P1I.busy?'disabled':''}>${ico('chef-hat')} ${P1I.busy==='bake'?'Thinking…':'Fancy baking?'}</button></div>
+    ${P1I.shop&&P1I.shop.length?`<div><span class="label">Pick up next time you're in the shop</span><ul class="p1shop">${P1I.shop.map(x=>`<li><b>${esc(x.name)}</b><small>${esc(x.why)}</small></li>`).join('')}</ul></div>`:''}
+    ${P1I.bake&&P1I.bake.length?`<div><span class="label">Simple bakes and snacks</span><div class="p1bakes">${P1I.bake.map((b,i)=>`<button type="button" class="p1bake" data-p1bake="${i}"><b>${esc(b.name)}</b><small>${esc(b.why||'')}</small><small class="num">${b.prep?b.prep+' min · ':''}${esc(b.per||'')}</small></button>`).join('')}</div></div>`:''}</div></article>`}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p1idea]')){p1Ideas(x.dataset.p1idea);return}
+  if(x=c('[data-p1bake]')){const b=P1I.bake[+x.dataset.p1bake];if(!b)return;p1Cook={...clone(b),i:-1};p1CookDraw();if(!(b.method||[]).length&&sample)p1CookFetch(p1Cook)}},true);
+const _p1planMeals=planMealsHTML;planMealsHTML=function(k,compact){return _p1planMeals(k,compact).replace(/<button type="button" class="ghost" data-recipe="([^"]+)">Recipe<\/button>/g,'<button type="button" class="ghost" data-recipe="$1">Recipe and steps</button>')};
+
+// ---------- 9. Progress: patterns and export ----------
+function progSub(){return p1Nav('data-pview',pView,[['me','trending-up','Progress','Your trends','var(--k-blue)'],['patterns','link','Patterns','What links up','var(--k-pink)'],['export','download','Export','PDF or Excel','var(--k-green)'],['learn','book-open','Learn','Short reads','var(--k-amber)']]).replace('class="p1nav"','class="p1nav p1nav4"')}
+function p1Series(n){const DD=D(),LL=L();const end=sampleMode?SAMPLE.now:todayDate();const out=[];
+  for(let i=n-1;i>=0;i--){const k=iso(addD(end,-i)),d=DD[k]||{},l=LL[k];const nk=iso(addD(end,-i+1));const ft=foodTotals(d);const pt=nutTarget('protein',dayTypeFor(k));
+    out.push({k,d,bal:readiness(d),next:readiness(DD[nk]),nextSore:isNum((DD[nk]||{}).sore)?+DD[nk].sore:null,sleep:sleepHours(d),nextSleep:sleepHours(DD[nk]),load:dayLoadAll(k),hard:p1Hard(k),
+      mind:(d.blocks||[]).filter(b=>b.mind==='tough').reduce((a,b)=>a+p1Hrs(b),0)||(+d.mindHrs||0),lateCaf:!!p1LateCaf(k),drinks:(d.food||[]).reduce((a,x)=>a+stdDrinks(x),0),food:(d.food||[]).length,protOk:(d.food||[]).length?ft.protein>=(pt.t||pt.lo||0)*.9:null,pain:maxPain(d),screen:screenGap(d)})}return out}
+function p1Cmp(rows,test,val,min){const a=rows.filter(r=>test(r)===true&&val(r)!=null).map(val),b=rows.filter(r=>test(r)===false&&val(r)!=null).map(val);if(a.length<min||b.length<min)return null;return {a:avg(a),b:avg(b),na:a.length,nb:b.length}}
+function p1Patterns(){const rows=p1Series(56);const have=rows.filter(r=>r.bal!=null).length;const out=[];
+  const add=(c,fmt,thr)=>{if(c&&Math.abs(c.a-c.b)>=thr)out.push({...fmt(c),w:Math.abs(c.a-c.b)/thr})};
+  add(p1Cmp(rows,r=>r.hard,r=>r.next,4),c=>({ic:'flame',col:'var(--k-pink)',t:`After a hard day, your balance next morning is ${Math.round(Math.abs(c.a-c.b))} points ${c.a<c.b?'lower':'higher'}.`,s:`${c.na} hard days compared with ${c.nb} others.`}),5);
+  add(p1Cmp(rows,r=>r.lateCaf,r=>r.nextSleep,3),c=>({ic:'coffee',col:'var(--k-amber)',t:`When you have coffee after 2 pm you sleep ${Math.round(Math.abs(c.a-c.b)*60)} minutes ${c.a<c.b?'less':'more'}.`,s:`${c.na} late-coffee days compared with ${c.nb} others.`}),.25);
+  add(p1Cmp(rows,r=>r.drinks>=2,r=>r.next,3),c=>({ic:'wine',col:'var(--k-violet)',t:`After a night with a few drinks, your balance is ${Math.round(Math.abs(c.a-c.b))} points ${c.a<c.b?'lower':'higher'} next day.`,s:`${c.na} nights compared with ${c.nb}.`}),5);
+  add(p1Cmp(rows,r=>r.mind>=4,r=>r.nextSleep,3),c=>({ic:'brain',col:'var(--k-sky)',t:`On mentally heavy work days you sleep ${Math.round(Math.abs(c.a-c.b)*60)} minutes ${c.a<c.b?'less':'more'} that night.`,s:`${c.na} heavy days compared with ${c.nb}.`}),.25);
+  add(p1Cmp(rows,r=>r.sleep==null?null:r.sleep>=7,r=>r.bal,4),c=>({ic:'moon',col:'var(--k-blue)',t:`With 7 hours or more of sleep, your balance is ${Math.round(Math.abs(c.a-c.b))} points ${c.a>c.b?'higher':'lower'}.`,s:`${c.na} good nights compared with ${c.nb} short ones.`}),5);
+  add(p1Cmp(rows,r=>r.protOk,r=>r.nextSore,3),c=>({ic:'beef',col:'var(--k-green)',t:`On days you hit your protein, you're ${c.a<c.b?'less':'more'} sore the next morning.`,s:`Soreness ${c.a.toFixed(1)} vs ${c.b.toFixed(1)} out of 5.`}),.4);
+  add(p1Cmp(rows,r=>r.screen==null?null:r.screen>=60,r=>r.sleep,3),c=>({ic:'moon',col:'var(--k-violet)',t:`When your phone is away an hour before bed you sleep ${Math.round(Math.abs(c.a-c.b)*60)} minutes ${c.a>c.b?'more':'less'}.`,s:`${c.na} nights compared with ${c.nb}.`}),.25);
+  out.sort((a,b)=>b.w-a.w);return {have,list:out,rows}}
+function p1PatternsView(){const {have,list,rows}=p1Patterns();const k=iso(sampleMode?SAMPLE.now:todayDate());const st=p1Streak(k);
+  const injDays=rows.filter(r=>r.pain>=3).length;const last28=rows.slice(-28);const ld=avg(last28.map(r=>r.load).filter(v=>v>0))||0;
+  const toggle=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">${sampleMode?`<span class="sample">Example data, not yours</span>`:'<span class="label">From your last 8 weeks</span>'}<button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'Show my data':'See an example'}</button></div>`;
+  return toggle+`<article class="card p1streak"><div class="p1stk">${ico('shield')}<div><b class="num">${st}</b><span>days with no niggles</span></div></div><p>${st>=21?'That\'s a strong run. Steady sleep, sensible load and fuelling well all play a part. Keep doing what you\'re doing.':st>=7?'Building nicely. Keep the hard days hard and the easy days easy.':'Every day without a niggle counts. Look after the basics: sleep, protein, and easy days after hard ones.'}${injDays?` You had ${injDays} sore or niggly day${injDays>1?'s':''} in the last 8 weeks.`:''}</p></article>
+  ${have<14?`<article class="card"><div class="form"><b>Patterns need about two weeks of check-ins.</b><span class="ds">You have ${have} so far. Keep checking in, logging food and your day, and Keel will start linking sleep, work, training, coffee and drink to how you feel.</span></div></article>`:''}
+  ${list.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>What links up for you</h2><div class="sub">Strongest first. These are patterns, not proof.</div></div></div><ul class="p1pats">${list.map(p=>`<li style="--pc:${p.col}">${ico(p.ic)}<span><b>${esc(p.t)}</b><small>${esc(p.s)}</small></span></li>`).join('')}</ul></article>`:have>=14?'<article class="card"><div class="form"><span class="ds">Nothing strong stands out yet. That usually means things are fairly steady.</span></div></article>':''}
+  ${patternHTML()}`}
+// export
+var P1X={from:null,to:null,groups:{sleep:1,train:1,food:1,work:1,weather:1,body:1},busy:false};
+const P1XG=[['sleep','Sleep and check-in'],['train','Training'],['food','Food and drinks'],['work','Work and day'],['weather','Weather'],['body','Niggles']];
+function p1ExportView(){const t=iso(todayDate());if(!P1X.to)P1X.to=t;if(!P1X.from)P1X.from=iso(addD(todayDate(),-29));
+  const pre=[[7,'7 days'],[30,'30 days'],[90,'90 days'],[0,'Everything']];
+  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Export your data</h2><div class="sub">Pick the dates and what to include</div></div></div><div class="form">
+    <div class="p1kms">${pre.map(([n,l])=>`<button type="button" data-p1xr="${n}">${l}</button>`).join('')}</div>
+    <div class="row2"><div class="field"><label class="label" for="p1xf">From</label><input id="p1xf" type="date" value="${P1X.from}" max="${t}"></div><div class="field"><label class="label" for="p1xt">To</label><input id="p1xt" type="date" value="${P1X.to}" max="${t}"></div></div>
+    <div class="p1xg">${P1XG.map(([g,l])=>`<label><input type="checkbox" data-p1xg="${g}" ${P1X.groups[g]?'checked':''}> ${l}</label>`).join('')}</div>
+    <div class="row2"><button type="button" class="primary p1btn" id="p1XX" ${P1X.busy?'disabled':''}>${ico('sheet')} Excel</button><button type="button" class="ghost p1btn" id="p1XP">${ico('file-text')} PDF report</button></div>
+    <p class="ds" style="font-size:12px;margin:0">Excel gives one sheet per group, one row per day. The PDF opens a report you can save or share from your phone's print menu.</p></div></article>`}
+function p1Rows(){const DD=D(),LL=L();const out=[];let a=parse(P1X.from),b=parse(P1X.to);if(a>b)[a,b]=[b,a];
+  for(let x=a;x<=b;x=addD(x,1)){const k=iso(x),d=DD[k]||{},l=LL[k],p=planFor(x);const ft=foodTotals(d);const caf=p1CafToday(k);out.push({k,d,l,p,ft,caf})}return out}
+function p1Tables(){const rows=p1Rows();const T={};const r1=v=>v==null||v===''?'':(typeof v==='number'?Math.round(v*10)/10:v);
+  if(P1X.groups.sleep)T['Sleep and check-in']=[['Date','Into bed','Woke','Sleep (h)','Time to sleep (min)','Night wakings','Awake (min)','Phone away','Sleep quality (1-5)','Energy','Mood','Stress','Soreness','Balance']].concat(rows.map(({k,d})=>[k,d.bed||'',d.wake||'',r1(sleepHours(d)),r1(d.latency),r1(d.wakes),r1(d.awakeMin),d.screenOff||'',r1(d.sleepQ),r1(d.energy),r1(d.mood),r1(d.stress),r1(d.sore),r1(readiness(d))]));
+  if(P1X.groups.train)T['Training']=[['Date','Planned','Status','How hard (1-10)','Minutes','Extra sessions','Load']].concat(rows.map(({k,d,l,p})=>[k,p&&p.type!=='R'&&!p.pre?TNAME[p.type]:'Rest',l?l.status||'':'',r1(l&&l.rpe),r1(l&&(l.mins||l.dur)),(d.extras||[]).map(x=>x.desc||x.kind).join('; '),r1(dayLoadAll(k))]));
+  if(P1X.groups.food)T['Food and drinks']=[['Date','Items','Calories','Protein (g)','Net carbs (g)','Fat (g)','Fibre (g)','Water (L)','Caffeine (mg)','Last caffeine','Standard drinks','Signed off']].concat(rows.map(({k,d,ft,caf})=>[k,(d.food||[]).length,r1(ft.kcal),r1(ft.protein),r1(ft.carbs),r1(ft.fat),r1(ft.fibre),r1(d.water),r1(caf.tot),caf.last||'',r1((d.food||[]).reduce((a,x)=>a+stdDrinks(x),0)),d.foodDone?'Yes':'']));
+  if(P1X.groups.work)T['Work and day']=[['Date','Desk (h)','Driving (h)','Physical work (h)','Family (h)','Mentally tough (h)','Tags','Blocks']].concat(rows.map(({k,d})=>[k,r1(d.deskHrs),r1(d.carHrs),r1(d.farmHrs),r1(d.familyHrs),r1(d.mindHrs),(d.dayTags||[]).join(', '),(d.blocks||[]).map(b=>`${b.from}-${b.to} ${b.type} (body ${b.phys}, head ${b.mind})`).join('; ')]));
+  if(P1X.groups.weather)T['Weather']=[['Date','Sky','High (°C)','Low (°C)','Rain (mm)','Wind (km/h)','Daylight (h)']].concat(rows.map(({k,d})=>{const w=d.weather||{};return [k,w.code!=null?p1Sky(w.code):'',r1(w.tmax),r1(w.tmin),r1(w.rain),r1(w.wind),r1(w.dayH)]}));
+  if(P1X.groups.body)T['Niggles']=[['Date','Area','Side','Pain (0-10)','Note']].concat(rows.flatMap(({k,d})=>(d.niggles||[]).filter(n=>+n.pain>0).map(n=>[k,n.area||'',n.side||'',r1(+n.pain),n.note||''])));
+  return T}
+function p1LoadX(){if(window.XLSX)return Promise.resolve(window.XLSX);return new Promise((res,rej)=>{const s=document.createElement('script');s.src='/p1/vendor/xlsx.mini.min.js';s.onload=()=>res(window.XLSX);s.onerror=rej;document.head.appendChild(s)})}
+async function p1ExportX(){const T=p1Tables();if(!Object.keys(T).length){toast('Pick at least one thing to include');return}P1X.busy=true;render();
+  try{const X=await p1LoadX();const wb=X.utils.book_new();Object.entries(T).forEach(([n,rows])=>{const ws=X.utils.aoa_to_sheet(rows);ws['!cols']=rows[0].map((h,i)=>({wch:Math.max(10,String(h).length+2,i===rows[0].length-1?24:0)}));X.utils.book_append_sheet(wb,ws,n.slice(0,31))});
+    X.writeFile(wb,`Keel ${P1X.from} to ${P1X.to}.xlsx`)}catch(e){toast('Could not make the Excel file. Try again.')}P1X.busy=false;render()}
+function p1Spark(vals,col,lo,hi){const v=vals.map(x=>x==null?null:+x);const W=640,H=90;const n=v.length;if(n<2)return '';const mn=lo!=null?lo:Math.min(...v.filter(x=>x!=null)),mx=hi!=null?hi:Math.max(...v.filter(x=>x!=null));const rg=(mx-mn)||1;
+  let d='',pen=false;v.forEach((x,i)=>{if(x==null){pen=false;return}const X=(i/(n-1)*W).toFixed(1),Y=(H-6-(x-mn)/rg*(H-12)).toFixed(1);d+=(pen?'L':'M')+X+','+Y;pen=true});return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="${col}" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg>`}
+function p1ExportPDF(){const T=p1Tables();const rows=p1Rows();const name=userName()||'';const A=a=>{const v=a.filter(x=>x!=null&&!isNaN(x));return v.length?Math.round(avg(v)*10)/10:'–'};
+  const sum=[['Average sleep',A(rows.map(r=>sleepHours(r.d))),'h'],['Average balance',A(rows.map(r=>readiness(r.d))),''],['Sessions done',rows.filter(r=>r.l&&r.l.status==='done').length+rows.reduce((a,r)=>a+(r.d.extras||[]).length,0),''],['Average calories',A(rows.filter(r=>(r.d.food||[]).length).map(r=>r.ft.kcal)),''],['Average protein',A(rows.filter(r=>(r.d.food||[]).length).map(r=>r.ft.protein)),'g'],['Days with niggles',rows.filter(r=>maxPain(r.d)>=3).length,'']];
+  const pats=p1Patterns().list.slice(0,4);
+  const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Keel report ${P1X.from} to ${P1X.to}</title><style>
+    body{font:13px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;color:#15171E;margin:24px}h1{font-size:22px;margin:0}h2{font-size:15px;margin:22px 0 6px;border-bottom:2px solid #5B6CFF;padding-bottom:3px}.sub{color:#666;margin:2px 0 14px}
+    .sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.sum div{border:1px solid #ddd;border-radius:8px;padding:8px}.sum b{display:block;font-size:20px}.sum span{color:#666;font-size:11px}
+    table{border-collapse:collapse;width:100%;font-size:10px;margin-top:4px}th,td{border:1px solid #ddd;padding:3px 4px;text-align:left;vertical-align:top}th{background:#F1F2F6}tr{page-break-inside:avoid}.ch{margin:6px 0}.ch small{color:#666}
+    .bar{height:4px;background:linear-gradient(90deg,#E23D9E,#5B6CFF 50%,#34E3A0);margin:10px 0 0}@media print{.np{display:none}body{margin:10mm}}</style></head><body>
+    <button class="np" onclick="print()" style="float:right;padding:8px 14px;border-radius:8px;border:1px solid #333;background:#fff">Save as PDF / print</button>
+    <h1>Keel report${name?' · '+esc(name):''}</h1><div class="sub">${fmtD(parse(P1X.from),{day:'numeric',month:'short',year:'numeric'})} to ${fmtD(parse(P1X.to),{day:'numeric',month:'short',year:'numeric'})} · ${rows.length} days</div><div class="bar"></div>
+    <h2>Summary</h2><div class="sum">${sum.map(([l,v,u])=>`<div><b>${v}${u&&v!=='–'?' '+u:''}</b><span>${l}</span></div>`).join('')}</div>
+    <h2>Trends</h2><div class="ch"><small>Sleep (hours)</small>${p1Spark(rows.map(r=>sleepHours(r.d)),'#5B6CFF')}</div><div class="ch"><small>Balance (0-100)</small>${p1Spark(rows.map(r=>readiness(r.d)),'#E23D9E',0,100)}</div><div class="ch"><small>Training and work load</small>${p1Spark(rows.map(r=>dayLoadAll(r.k)),'#14B87A',0)}</div>
+    ${pats.length?`<h2>Patterns</h2><ul>${pats.map(p=>`<li><b>${esc(p.t)}</b> <small>${esc(p.s)}</small></li>`).join('')}</ul>`:''}
+    ${Object.entries(T).map(([n,r])=>r.length>1?`<h2>${esc(n)}</h2><table><thead><tr>${r[0].map(h=>`<th>${esc(String(h))}</th>`).join('')}</tr></thead><tbody>${r.slice(1).map(x=>`<tr>${x.map(c=>`<td>${esc(String(c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'').join('')}
+    <p class="sub" style="margin-top:20px">Made with Keel. Patterns are links in your own data, not medical advice.</p><script>setTimeout(()=>{try{print()}catch(e){}},600)<\/script></body></html>`;
+  const w=window.open('','_blank');if(!w){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=`Keel report ${P1X.from} to ${P1X.to}.html`;a.click();return}w.document.open();w.document.write(html);w.document.close()}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p1xr]')){const n=+x.dataset.p1xr;P1X.to=iso(todayDate());P1X.from=n?iso(addD(todayDate(),-(n-1))):(Object.keys(D()).sort()[0]||P1X.to);render();return}
+  if(c('#p1XX')){p1ExportX();return}if(c('#p1XP')){p1ExportPDF();return}},true);
+document.addEventListener('change',e=>{const el=e.target;if(!el)return;if(el.id==='p1xf')P1X.from=el.value;else if(el.id==='p1xt')P1X.to=el.value;else if(el.dataset&&el.dataset.p1xg)P1X.groups[el.dataset.p1xg]=el.checked?1:0});
+
+// ---------- 10. routes: OpenRouteService round trips when a key is set on the server ----------
+async function p1OrsLoop(seed,target){const {data:{session}}=await sb.auth.getSession();const r=await fetch('/api/route',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+(session&&session.access_token||'')},body:JSON.stringify({start:RT.start,m:target,kind:RT.kind,seed})});
+  if(!r.ok)throw new Error('route '+r.status);const j=await r.json();const coords=j.coords.map(c=>[c[0],c[1]]);
+  const prof=[];let acc=0;j.coords.forEach((c,i)=>{if(i)acc+=p1Dist(j.coords[i-1],c);if(c[2]!=null&&(i%Math.max(1,Math.floor(j.coords.length/95))===0||i===j.coords.length-1))prof.push({d:acc,e:c[2]})});
+  const es=prof.map(p=>p.e);return {coords,m:j.m,climb:j.ascent!=null?Math.round(j.ascent):null,lo:es.length?Math.round(Math.min(...es)):null,hi:es.length?Math.round(Math.max(...es)):null,prof:prof.length>2?prof:null,rep:p1Repeat(coords)}}
+const _p1FindLoops=p1FindLoops;
+p1FindLoops=async function(){if(!window.__p1route||!RT.start)return _p1FindLoops();
+  RT.busy=true;RT.msg='Finding loops near you…';RT.loops=[];RT.pick=0;p1RouteDraw();const target=RT.km*1000;const seeds=[1,2,3,4,5,6].map(s=>s+Math.floor(Math.random()*90));
+  const got=(await Promise.all(seeds.map(s=>p1OrsLoop(s,target).catch(()=>null)))).filter(Boolean);
+  if(!got.length){RT.busy=false;return _p1FindLoops()}
+  const score=x=>Math.abs(x.m-target)/target*2+x.rep*3+(x.climb==null?0:RT.hills==='flat'?x.climb/(x.m/1000)/15:RT.hills==='hilly'?-x.climb/(x.m/1000)/15:0);got.sort((a,b)=>score(a)-score(b));const pick=[];
+  for(const x of got){x.cells=p1Cells(x.coords);if(pick.every(y=>{let s=0;x.cells.forEach(c=>{if(y.cells.has(c))s++});return s/Math.min(x.cells.size,y.cells.size)<0.6}))pick.push(x);if(pick.length===3)break}
+  RT.loops=pick;RT.busy=false;RT.sig='';RT.msg='';p1RouteDraw();setTimeout(()=>{const w=document.querySelector('.p1mapwrap');if(w)w.scrollIntoView({behavior:'smooth',block:'start'})},120)};
+function foodHTML(dIso){return foodSub()+(fView==='plan'?planHTML()+p1IdeasHTML():fView==='kitchen'?kitchenHTML():foodTodayHTML(dIso))}
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -2639,11 +2956,11 @@ document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[da
 let tView='today';
 function tab(){const h=location.hash.slice(1);if(h==='profile')return 'profile';if(h==='plan'){tView='plan';return 'training'}return TABS.includes(h)?h:'dashboard'}
 function render(){
-  const t=tab();document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===({checkin:'dashboard',recover:'dashboard',mobility:'dashboard',profile:'dashboard'}[t]||t)?'page':'false'));
+  const t=tab();const p1sig=t+'|'+tView+'|'+fView+'|'+pView+'|'+iso(sel)+'|'+sampleMode;const p1same=p1sig===P1R.sig;const p1y=window.scrollY;const p1ds=p1same?p1DState():null;document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===({checkin:'dashboard',recover:'dashboard',mobility:'dashboard',profile:'dashboard'}[t]||t)?'page':'false'));
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
-  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
-  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();
+  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():pView==='patterns'?p1PatternsView():pView==='export'?p1ExportView():viewReports());
+  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y)}P1R.sig=p1sig;
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}
@@ -3386,7 +3703,7 @@ document.addEventListener('click',async e=>{
   if(id==='fbLoad'){loadFeedback();return}
 });
 (async()=>{
-  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
+  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
   sb.auth.onAuthStateChange((ev,s)=>{SESSION=s;if(ev==='PASSWORD_RECOVERY'){showGate(`<div class="gcard"><h1>Set a new password</h1><form id="pwForm" class="form" style="padding:0"><div class="field"><label class="label" for="np">New password</label><input id="np" type="password" minlength="8" required></div><button class="primary" type="submit">Save password</button></form></div>`)}});
   document.addEventListener('submit',async e=>{if(e.target.id==='pwForm'){e.preventDefault();const {error}=await sb.auth.updateUser({password:$('#np').value});if(error)toast(error.message,4000);else{toast('Password saved');location.hash='';location.reload()}}},true);

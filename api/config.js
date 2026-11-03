@@ -2,5 +2,5 @@
 // row-level security in supabase/schema.sql decides what each user can read and write.
 export default function handler(req, res) {
   res.setHeader('cache-control', 'no-store');
-  res.status(200).json({ url: process.env.SUPABASE_URL || '', anonKey: process.env.SUPABASE_ANON_KEY || '', voice: !!process.env.OPENAI_API_KEY, tts: !!(process.env.OPENAI_API_KEY || process.env.AZURE_SPEECH_KEY), irish: !!(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION), plan: true });
+  res.status(200).json({ url: process.env.SUPABASE_URL || '', anonKey: process.env.SUPABASE_ANON_KEY || '', voice: !!process.env.OPENAI_API_KEY, tts: !!(process.env.OPENAI_API_KEY || process.env.AZURE_SPEECH_KEY), irish: !!(process.env.AZURE_SPEECH_KEY && process.env.AZURE_SPEECH_REGION), plan: true, route: !!process.env.ORS_KEY });
 }
