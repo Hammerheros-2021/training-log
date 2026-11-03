@@ -1272,6 +1272,16 @@ details.p1fold:not([open]){padding-top:var(--space-2);padding-bottom:var(--space
 @media (max-width:370px){.p1wxc .p1hd{display:inline}}
 #tdOpen{position:relative;width:40px;padding:0!important;justify-content:center}#tdOpen .kbadge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;font-size:11px;line-height:18px;padding:0 4px}
 .kbr .avatar,.kplanchip{width:38px!important;height:38px!important;min-height:38px!important}
+/* ===P1v6=== */
+.p1fact{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) 48px;gap:8px;padding:12px 16px 4px}
+.p1fa{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:14px;border:1px solid var(--line);background:color-mix(in srgb,var(--k-green) 8%,var(--surface));color:var(--text);font:600 14px/1 var(--font-body);cursor:pointer;padding:0 6px;overflow:hidden}
+.p1fa .ki{color:var(--k-green)}.p1fa .ki svg{width:18px;height:18px}.p1fa input{position:absolute;opacity:0;width:1px;height:1px;overflow:hidden}
+.p1fai{background:var(--surface)}.p1fai .ki{color:var(--text-muted)}
+.p1xadd{display:inline-flex!important;align-items:center;gap:4px;min-height:34px!important;padding:0 12px!important;font-size:13px!important;flex:none;align-self:center}.p1xadd .ki svg{width:14px;height:14px}
+.p1pnote{display:block;margin-top:4px;color:var(--text-muted)}.p1pnote .linkbtn{padding:0;min-height:0;font-size:inherit}
+.p1evl{display:flex;flex-direction:column;gap:8px;padding:0 16px 14px}.p1evi{display:flex;align-items:center;gap:12px;text-align:left;padding:10px 12px;border-radius:var(--radius-md);border:1px solid var(--line);border-left:3px solid var(--k-amber);background:var(--surface);color:var(--text);font:inherit}
+.p1evd{display:flex;flex-direction:column;align-items:center;width:38px}.p1evd b{font:600 20px/22px var(--font-display)}.p1evd small,.p1evt small{font-size:11px;color:var(--text-muted)}.p1evt{flex:1;display:flex;flex-direction:column;min-width:0}.p1evn{font-size:12px;font-weight:600;color:var(--k-amber)}
+.p1sick .row2 .primary{background:var(--k-pink);border-color:var(--k-pink);color:#fff}
 </style>
 </head>
 <body class="kloading">
@@ -1297,6 +1307,6 @@ details.p1fold:not([open]){padding-top:var(--space-2);padding-bottom:var(--space
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p1/app.js?v=p1f"></script>
+<script src="/p1/app.js?v=p1g"></script>
 </body>
 </html>

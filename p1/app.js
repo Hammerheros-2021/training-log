@@ -454,7 +454,7 @@ function kitchenHTML(){
     ${grouped?`<div class="kwrap">${grouped}</div>`:''}</article>`;
 }
 // ---------- Claude calls ----------
-const NUT_JSON=`"kcal","protein","carbs" (NET carbs = total minus fibre),"fat","fibre" in g; "sodium","potassium","magnesium","calcium","iron","zinc","choline","vitC","caffeine" in mg; "selenium","iodine","vitA","vitD","vitK","b12","folate" in micrograms; "omega3" g EPA+DHA; "plants": array of distinct plant foods in it (vegetables, fruit, nuts, seeds, legumes, grains, herbs, coffee and tea count)`;
+const NUT_JSON=`"kcal","protein","carbs" (NET carbs = total minus fibre),"fat","fibre" in g; "sodium","potassium","magnesium","calcium","iron","zinc","choline","vitC","caffeine" in mg; "selenium","iodine","vitA","vitD","vitK","b12","folate" in micrograms; "omega3" g EPA+DHA; "plants": array of distinct whole plant foods eaten in a real portion (about a heaped tablespoon or more: a handful of veg or salad, a piece of fruit, a small handful of nuts or seeds, a few spoons of beans or grains). Do NOT count plants only present in sauces, stocks, dressings, marinades or flavourings, nor oils, sugar, flour, juice, herbs, spices, coffee, tea or ultra-processed foods`;
 const foodRules=()=>`Estimate realistic portions for ${PORTION} unless amounts are given. Use cooked weights for meat and fish.
 For any alcoholic drink, add "sd": the number of Irish standard drinks (10 g alcohol each; a 175 ml glass of wine is about 1.7, a pint of beer 2, a pub measure of spirits 1).
 For each item give ${NUT_JSON}.
@@ -684,11 +684,11 @@ function viewTraining(){
   const due=key===iso(todayDate())&&planDue();const pd=planDay(key);
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
   const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Your meal plan ends today'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
-  const none=!pl?(sel<FIRST?`<div class="p1pre">${ico('calendar')}<span>Plan starts <b>${fmtD(FIRST,{weekday:'short',day:'numeric',month:'short'})}</b> · ${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go</span><button type="button" class="linkbtn" data-goto="${iso(FIRST)}">Day one ›</button></div>`:`<div class="p1pre">${ico('check')}<span>Plan complete</span></div>`):'';
+  const none='';
   return pre+(key===iso(todayDate())?injuryBanner():'')+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+(((!pl||pl.type==='R'||pl.pre)&&((D()[key]||{}).extras||[]).length&&tView==='today'&&!sampleMode)?'':extrasCardHTML(key))+patternHTML()+pill;
 }
 function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Overview']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
-function viewTrainingTab(){if(tView==='route')return planNav(tView)+routeHTML();return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+fullPlanTip()+viewPlan():viewTraining())}
+function viewTrainingTab(){if(tView==='route')return planNav(tView)+routeHTML();return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+p1EvCard()+fullPlanTip()+viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+ciChip(iso(sel))+checkinHTML(iso(sel))}
 function viewFood(){return dayHeader()+foodHTML(iso(sel))}
 function viewPlan(){
@@ -770,7 +770,7 @@ function viewDashboard(){
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section></details>
    ${due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--accent);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Your meal plan ends today'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:''}
-   ${ov.length?`<a class="panel" href="#reports" style="text-decoration:none;color:inherit"><div class="ph"><h3>Coach's notes</h3><span class="ds">${fmtD(new Date(meta.overview.at))}</span></div>${ov.map(x=>`<p class="ovl">${esc(x)}</p>`).join('')}</a>`:''}`;
+   ${false&&ov.length?`<a class="panel" href="#reports" style="text-decoration:none;color:inherit"><div class="ph"><h3>Coach's notes</h3><span class="ds">${fmtD(new Date(meta.overview.at))}</span></div>${ov.map(x=>`<p class="ovl">${esc(x)}</p>`).join('')}</a>`:''}`;
 }
 // ================= dictate anything =================
 const MIC='<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z" fill="currentColor"/></svg>';
@@ -2179,10 +2179,9 @@ function foodTodayHTML(dIso){
     ${p1FoodBars(t,dt,'d')}${microsHTML(t,dt,dIso)}</article>
   ${foodActionsHTML(dIso)}
   ${meals?`<article class="card p1meals">${meals}</article>`:''}
-  ${pd?`<details class="kmore p1pm" ${pmDone<pm.length?'open':''}><summary>From your meal plan · ${pmDone} of ${pm.length} eaten</summary>${planMealsHTML(dIso)}</details>`:''}
+  ${pd?`<details class="kmore p1pm" data-ms="p1pm"><summary>Today's meal plan · ${pmDone} of ${pm.length} eaten</summary>${planMealsHTML(dIso)}</details>`:''}
   ${isToday&&due&&!kEmpty?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Make a meal plan':'Your meal plan ends today'}</b><br><small>Tap to plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
   <article class="card drinks">${suppHTML(dIso)}</article>
-  ${planMismatch(dIso)}${planVsHTML(dIso)}
   <div class="plantrow p1plants"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants in the last 7 days${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>`}
 // portion up or down on a logged item: the bars move straight away, saving happens in the background
 let p1PT=null;
@@ -2816,6 +2815,115 @@ function p1Overview(k){if(sampleMode)return '';const savedAI=meta.overview;const
   const d=D()[k]||{};const stale=!savedAI||iso(new Date(savedAI.at))!==k;
   if(sample&&stale&&!aiState.busy&&readiness(d)!=null&&P1OV.tried!==k){P1OV.tried=k;setTimeout(()=>{if(tab()==='dashboard')runAI()},800)}
   return coachHTML(aiText,savedAI)}
+
+// ================= P1 v6: steady sheets, sickness days, lighter Plan page, training-aware targets, big events, strict plants =================
+Object.assign(ICO,{keyboard:'<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',image:'<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',trophy:'<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>'});
+
+// sheets keep their scroll position when a choice redraws them
+function p1Sheet(html){let h=document.getElementById('p1Host');if(!h){h=document.createElement('div');h.id='p1Host';document.body.appendChild(h)}
+  if(!html){h.innerHTML='';document.body.classList.remove('sheet-open');return}
+  const ps=h.querySelector('.ksheet'),pw=h.querySelector('.kshwrap');const prevT=ps&&ps.querySelector('h2')?ps.querySelector('h2').textContent:null;const st=ps?ps.scrollTop:0,wt=pw?pw.scrollTop:0;
+  h.innerHTML=`<div class="kshwrap" id="p1Wrap"><div class="ksheet p1sheet" role="dialog" aria-modal="true">${html}</div></div>`;document.body.classList.add('sheet-open');
+  const ns=h.querySelector('.ksheet'),nw=h.querySelector('.kshwrap');const newT=ns&&ns.querySelector('h2')?ns.querySelector('h2').textContent:null;
+  if(prevT!=null&&prevT===newT){if(ns)ns.scrollTop=st;if(nw)nw.scrollTop=wt}}
+
+// sickness: carries on day to day until you say you're better, so the app knows how long it lasted
+const _p1CiOpen6=p1CiOpen;
+p1CiOpen=function(){_p1CiOpen6();const c=P1.ci;const d=D()[c.k]||{};const yd=D()[iso(addD(parse(c.k),-1))]||{};const ys=yd.sick;
+  if(!d.sick&&ys&&ys.types&&ys.types.length&&!ys.better){c.sickAsk={types:ys.types.slice(),since:ys.since||yd.date||iso(addD(parse(c.k),-1)),sev:ys.sev,meds:(ys.meds||[]).slice()};c.sickOpen=true}
+  else if(c.sick&&c.sick.types&&c.sick.types.length&&!c.sick.since)c.sick.since=c.k;p1CiDraw()};
+function p1SickDays(k){const d=D()[k]||{};const s=d.sick;if(!s||!s.types||!s.types.length)return 0;const since=s.since||k;return Math.round((parse(k)-parse(since))/DAY)+1}
+const _p1CiDraw6=p1CiDraw;
+p1CiDraw=function(){_p1CiDraw6();const c=P1.ci;if(!c)return;const sec=document.getElementById('p1Sick');if(!sec)return;
+  if(c.sickAsk){const a=c.sickAsk;sec.innerHTML=`<h3>${ico('thermometer')} Still feeling unwell?</h3><p class="ds" style="margin:0 0 8px;font-size:13px">${esc(a.types.join(', '))} since ${fmtD(parse(a.since),{weekday:'long'})}</p><div class="row2"><button type="button" class="primary" data-p1still="yes">Yes, still</button><button type="button" class="ghost" data-p1still="no">No, I'm better</button></div>`;return}
+  const s=c.sick||{};if(s.types&&s.types.length){const n=Math.round((parse(c.k)-parse(s.since||c.k))/DAY)+1;const clr=sec.querySelector('[data-p1sickclear]');if(clr)clr.textContent='I\'m better now';const h3=sec.querySelector('h3');if(h3)h3.insertAdjacentHTML('afterend',`<p class="ds" style="margin:-4px 0 8px;font-size:13px">Day ${n}${n>1?` · since ${fmtD(parse(s.since),{weekday:'long'})}`:''}</p>`)}
+  else if(s.better){sec.innerHTML=`<h3>${ico('thermometer')} Feeling unwell?</h3><p class="ds" style="margin:0 0 8px;font-size:13px">Marked better today. Good to hear.</p><button type="button" class="ghost" data-p1sickopen style="width:100%">Not better after all</button>`}};
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;const ci=P1.ci;if(!ci)return;
+  if(x=c('[data-p1still]')){const a=ci.sickAsk;ci.sickAsk=null;if(x.dataset.p1still==='yes'){ci.sick={types:a.types,sev:a.sev||'mild',meds:a.meds,since:a.since};ci.sickOpen=true}else{ci.sick={types:[],better:true,since:a.since,meds:[]};ci.sickOpen=true}p1CiDraw();setTimeout(p1Queue,0);return}
+  if(c('[data-p1sickclear]')){setTimeout(()=>{const s=ci.sick;const old=(D()[ci.k]||{}).sick;ci.sick={types:[],better:true,since:(old&&old.since)||ci.k,meds:[]};ci.sickOpen=true;p1CiDraw();p1Queue()},0)}
+  if(c('[data-p1sick]')){setTimeout(()=>{if(ci.sick&&ci.sick.types.length){if(!ci.sick.since)ci.sick.since=((D()[ci.k]||{}).sick||{}).since||ci.k;ci.sick.better=false}},0)}
+  if(c('[data-p1sickopen]')){setTimeout(()=>{if(ci.sick&&ci.sick.better){ci.sick.better=false;ci.sick.types=[];p1CiDraw()}},0)}},true);
+function p1CiFields(c){const f={bed:c.bed,wake:c.wake,latency:+c.latency,wakes:+c.wakes,awakeMin:+c.wakes?+c.awakeMin:0,sleepQ:+c.sleepQ,energy:+c.energy,mood:+c.mood,stress:+c.stress,sore:+c.sore,sleepH:p1SleepCalc(c)};if(c.screenOff)f.screenOff=c.screenOff;if(c.trainIntent)f.trainIntent=c.trainIntent;
+  const s=c.sick;f.sick=s&&s.types&&s.types.length?{types:s.types.slice(),sev:s.sev||'mild',meds:(s.meds||[]).slice(),since:s.since||c.k}:s&&s.better?{types:[],better:true,since:s.since||c.k}:null;return f}
+const _p1Read6=p1ReadHTML;
+p1ReadHTML=function(k){const h=_p1Read6(k);const n=p1SickDays(k);if(n>0)return h.replace(/(<span class="p1rpts">)/,`$1Day ${n} · `);
+  const ev=p1NextEvent(k);if(ev&&ev.days<=10&&h.includes('class="p1rpts"'))return h.replace(/(<span class="p1rpts">)/,`$1<span>${ico('trophy')}${esc(ev.e.name)} ${ev.days===0?'is today':ev.days===1?'is tomorrow':`in ${ev.days} days`}</span>`);return h};
+
+// Plan page: one card for extra sessions, small add button, plan-start note inside it
+const _p1Extras=extrasCardHTML;
+extrasCardHTML=function(k){let h=_p1Extras(k);if(!h)return h;const p=planFor(parse(k));
+  h=h.replace(/<div class="form" style="padding-top:[^"]*"><button type="button" class="primary" id="xOpen">\+ Add a session[^<]*<\/button><\/div>/,'');
+  if(!xState.open&&!sampleMode&&k<=iso(todayDate()))h=h.replace(/(<div class="chead"><div style="flex:1">[\s\S]*?<\/div><\/div>)(<\/div>)/,`$1<button type="button" class="ghost p1xadd" id="xOpen">${ico('plus')} Add</button>$2`);
+  let note='';if(!p){const hasPlan=planFor(FIRST)||planFor(todayDate());note=!hasPlan?`No training plan yet. <button type="button" class="linkbtn" data-plansheet>Make one ›</button>`:parse(k)<FIRST?`Plan starts ${fmtD(FIRST,{weekday:'short',day:'numeric',month:'short'})}.`:`Your plan has finished. <button type="button" class="linkbtn" data-plansheet>Set a new goal ›</button>`}
+  if(note)h=h.replace(/(<div class="sub">[\s\S]*?)(<\/div>)/,`$1<span class="p1pnote">${note}</span>$2`);return h};
+
+// targets follow how hard the day is: light days sit between rest and training, very hard days and events get more fuel
+function p1DT(){const r=DAYT.rest,t=DAYT.training;DAYT.light={label:'Light training day',kcal:Math.round((r.kcal+t.kcal)/2/10)*10,protein:Math.round((r.protein+t.protein)/2),carbs:Math.round((r.carbs+t.carbs)/2),fat:Math.round((r.fat+t.fat)/2)};if(DAYT.match&&!/event/i.test(DAYT.match.label))DAYT.match.label='Match or event day'}
+function p1Intensity(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));const ex=(d.extras||[]).filter(x=>x&&(x.dur||x.rpe||x.desc));
+  const easyRx=/walk|easy|yoga|stretch|mobility|pilates|recovery|swim easy|cycle easy|stroll/i;
+  if(l&&(l.status==='done'||l.status==='partial')){const r=+l.rpe||0,du=+l.dur||0;if(r&&r<=4)return 'light';if(r>=8&&du>=90)return 'very';return 'normal'}
+  if(ex.length){const mx=Math.max(...ex.map(x=>+x.rpe||0));const du=ex.reduce((a,x)=>a+(+x.dur||0),0);if((mx&&mx<=4)||ex.every(x=>easyRx.test((x.kind||'')+' '+(x.desc||''))&&!(+x.rpe>5)))return 'light';if(mx>=8&&du>=90)return 'very';return 'normal'}
+  if(p&&p.type==='E')return 'light';return 'normal'}
+const _p1dayType=dayTypeFor;
+dayTypeFor=function(k){p1DT();const ev=p1EventOn(k);if(ev)return 'match';const b=_p1dayType(k);if(b!=='training')return b;const i=p1Intensity(k);return i==='light'?'light':i==='very'?'match':'training'};
+const _p1why=dayTypeWhy;
+dayTypeWhy=function(k){const ev=p1EventOn(k);if(ev)return ev.name;const dt=dayTypeFor(k);if(dt==='light')return 'easy session, so a bit less than a full training day';if(dt==='match'&&_p1dayType(k)==='training')return 'long, hard session, so extra fuel';return _p1why(k)};
+
+// big events: build-up, the day before, the day itself, and after
+const EVKIND=['Hyrox','Football or GAA match','Running race','Cycling event','Swim or triathlon','Other'];
+const evList=()=>((meta.events&&meta.events.list)||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+function p1EventOn(k){return evList().find(e=>e.date===k)||null}
+function p1NextEvent(k){const e=evList().find(e=>e.date>=k);return e?{e,days:Math.round((parse(e.date)-parse(k))/DAY)}:null}
+let P1E=null;
+function p1EvCard(){const t=iso(todayDate());const up=evList().filter(e=>e.date>=t);
+  return `<article class="card p1ev"><div class="chead"><div style="flex:1"><h2>Big days</h2><div class="sub">${up.length?'Your events, with a plan for each':'A race, a Hyrox, a big match? Add it and Keel plans around it.'}</div></div><button type="button" class="ghost p1xadd" data-p1evnew>${ico('plus')} Add</button></div>
+    ${up.length?`<div class="p1evl">${up.map(e=>{const n=Math.round((parse(e.date)-todayDate())/DAY);return `<button type="button" class="p1evi" data-p1ev="${e.id}"><span class="p1evd"><b>${parse(e.date).getDate()}</b><small>${fmtD(parse(e.date),{month:'short'})}</small></span><span class="p1evt"><b>${esc(e.name)}</b><small>${esc(e.kind)}${e.time?' · '+esc(e.time):''}${e.where?' · '+esc(e.where):''}</small></span><span class="p1evn">${n===0?'Today':n===1?'Tomorrow':n+' days'}</span></button>`}).join('')}</div>`:''}</article>`}
+function p1EvForm(){const e=P1E;p1Sheet(`<div class="kshead"><div><h2>${e.id?'Edit event':'Add a big day'}</h2><small class="ds">Keel builds your lead-in and food around it</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  <div class="form" style="padding:0;gap:12px"><div class="field"><label class="label" for="evn">What is it?</label><input id="evn" data-ev="name" value="${esc(e.name||'')}" placeholder="e.g. Hyrox Dublin, county semi-final"></div>
+  <div class="field"><span class="label">Type</span><div class="p1cof">${EVKIND.map(x=>`<button type="button" data-evkind="${x}" aria-pressed="${e.kind===x}">${x}</button>`).join('')}</div></div>
+  <div class="row2"><div class="field"><label class="label" for="evd">Date</label><input id="evd" type="date" data-ev="date" value="${esc(e.date||'')}" min="${iso(todayDate())}"></div><div class="field"><label class="label" for="evt">Start time</label><input id="evt" type="time" data-ev="time" value="${esc(e.time||'')}"></div></div>
+  <div class="field"><label class="label" for="evw">Where</label><input id="evw" data-ev="where" value="${esc(e.where||'')}" placeholder="Town or venue"></div>
+  <div class="field"><span class="label">Travelling there?</span>${p1Seg('evtravel',[['no','No, it\'s local'],['day','Same-day trip'],['stay','Staying over']],e.travel||'no')}</div>
+  ${e.travel&&e.travel!=='no'?`<div class="field"><label class="label" for="evtm">Travel time (hours)</label><input id="evtm" type="number" step="0.5" inputmode="decimal" data-ev="travelH" value="${esc(e.travelH||'')}"></div>`:''}
+  <div class="field"><span class="label">During the event</span>${p1Seg('evgels',[['no','Real food and water only'],['yes','Gels and sports drinks are fine']],e.gels?'yes':'no')}</div>
+  <div class="field"><label class="label" for="evx">Anything else? (optional)</label><textarea id="evx" data-ev="notes" placeholder="e.g. my heat is at 10:40, I don't eat much before racing">${esc(e.notes||'')}</textarea></div>
+  <button type="button" class="primary" data-p1evsave ${e.busy?'disabled':''}>${e.busy?'Making your plan… up to a minute':'Save and make my plan'}</button>${e.id?'<button type="button" class="ghost" data-p1evdel style="color:var(--status-alert)">Delete this event</button>':''}</div>`)}
+function p1EvView(id){const e=evList().find(x=>x.id===id);if(!e)return;const p=e.plan||{};const sec=(t,arr)=>arr&&arr.length?`<section class="p1blk"><h3>${t}</h3><ul class="cover">${arr.map(x=>`<li>${typeof x==='string'?esc(x):`<b>${esc(x.time||x.when||'')}</b> ${esc(x.what||x.t||'')}`}</li>`).join('')}</ul></section>`:'';
+  p1Sheet(`<div class="kshead"><div><h2>${esc(e.name)}</h2><small class="ds">${fmtD(parse(e.date),{weekday:'long',day:'numeric',month:'long'})}${e.time?' · '+esc(e.time):''}${e.where?' · '+esc(e.where):''}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    ${p.summary?`<p style="margin:0 0 4px">${esc(p.summary)}</p>`:''}${sec('Lead-in',p.buildup)}${sec('The day before',p.dayBefore)}${sec('On the day',p.eventDay)}${sec('During',p.during)}${sec('After',p.after)}${sec('Pack',p.pack)}
+    ${!e.plan?`<div class="ds">${e.busy?'Making your plan…':'No plan yet.'}</div>`:''}<div class="row2"><button type="button" class="ghost" data-p1evedit="${e.id}">Edit details</button><button type="button" class="ghost" data-p1evremake="${e.id}">Remake plan</button></div>`)}
+async function p1EvPlan(e){if(!sample)return e;const pl=planFor(parse(e.date));const prompt=`Make a practical plan for a big event for ${ABOUT||'an adult'}.
+Event: ${e.name} (${e.kind}) on ${e.date}${e.time?` starting ${e.time}`:''}${e.where?` at ${e.where}`:''}. Travel: ${e.travel==='day'?`same-day trip, about ${e.travelH||'?'} h each way`:e.travel==='stay'?`staying over, about ${e.travelH||'?'} h travel`:'local'}. ${e.gels?'Gels and sports drinks are fine during it.':'They prefer real food and water, no gels or sports drinks; suggest whole-food options.'} Their usual eating: ${typeof foodRules==='function'?foodRules():FOOD_RULES} ${e.notes?'Notes: '+e.notes:''}
+Their current training plan is ${pl?'running':'not set'}; keep the lead-in to sensible general guidance (easing off in the last days, a short sharpener, sleep, no new foods on the day). Plain words, short lines, Irish context.
+Reply with ONLY JSON: {"summary":"one or two lines","buildup":["3-5 short lines for the week or two before"],"dayBefore":["3-5 lines on food, drink, sleep, kit"],"eventDay":[{"time":"07:00","what":"breakfast: ..."}],"during":["1-4 lines"],"after":["2-4 lines on recovery food and drink and the next day"],"pack":["kit and food to bring"]}`;
+  const out=await sample.json(prompt,{modelTier:'quick'});e.plan={summary:String(out.summary||''),buildup:(out.buildup||[]).map(String).slice(0,6),dayBefore:(out.dayBefore||[]).map(String).slice(0,6),eventDay:(out.eventDay||[]).slice(0,10).map(x=>({time:String(x.time||''),what:String(x.what||'')})),during:(out.during||[]).map(String).slice(0,5),after:(out.after||[]).map(String).slice(0,5),pack:(out.pack||[]).map(String).slice(0,12)};return e}
+async function p1EvSave(remake){const e=P1E;if(!e.name||!e.date){toast('Add a name and date');return}e.busy=true;if(!remake)p1EvForm();else p1EvView(e.id);
+  if(!e.id)e.id='e'+Date.now().toString(36);if(!e.kind)e.kind='Other';const keep={...e};delete keep.busy;
+  try{await p1EvPlan(keep)}catch(err){toast('Saved. The plan couldn\'t be made just now: tap Remake plan later.')}
+  const list=((meta.events&&meta.events.list)||[]).filter(x=>x.id!==keep.id).concat([keep]);await persistMeta('events',{list});P1E=null;render();p1EvView(keep.id)}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(c('[data-p1evnew]')){P1E={kind:'',travel:'no',gels:false};p1EvForm();return}
+  if(x=c('[data-p1ev]')){p1EvView(x.dataset.p1ev);return}
+  if(x=c('[data-p1evedit]')){P1E={...evList().find(y=>y.id===x.dataset.p1evedit)};p1EvForm();return}
+  if(x=c('[data-p1evremake]')){P1E={...evList().find(y=>y.id===x.dataset.p1evremake)};p1EvSave(true);return}
+  if(!P1E)return;
+  if(x=c('[data-evkind]')){P1E.kind=x.dataset.evkind;p1EvForm();return}
+  if(x=c('[data-p1="evtravel"]')){P1E.travel=x.dataset.v;p1EvForm();return}
+  if(x=c('[data-p1="evgels"]')){P1E.gels=x.dataset.v==='yes';p1EvForm();return}
+  if(c('[data-p1evsave]')){p1EvSave(false);return}
+  if(c('[data-p1evdel]')){const id=P1E.id;persistMeta('events',{list:((meta.events&&meta.events.list)||[]).filter(y=>y.id!==id)}).then(()=>{P1E=null;p1Sheet(null);render();toast('Event deleted')});return}
+  if(c('#p1X'))P1E=null},true);
+document.addEventListener('input',e=>{const t=e.target;if(P1E&&t&&t.dataset&&t.dataset.ev)P1E[t.dataset.ev]=t.value});
+
+// food: slimmer Snap / Say / Type row
+const _p1FA6=foodActionsHTML;
+foodActionsHTML=function(dIso){const h=_p1FA6(dIso);if(!h)return h;
+  const row=`<div class="p1fact">${canImg?`<label class="p1fa">${ico('camera')}<span>Snap</span><input type="file" id="mealFile" accept="image/*" capture="environment" aria-label="Take a photo of your meal"></label>`:''}<button type="button" class="p1fa" id="fSay">${ico('mic')}<span>Say</span></button><button type="button" class="p1fa" id="fType">${ico('keyboard')}<span>Type</span></button>${canImg?`<label class="p1fa p1fai" aria-label="Choose a photo from your gallery">${ico('image')}<input type="file" id="mealFile2" accept="image/*"></label>`:''}</div>`;
+  return h.replace(/<div class="frow">[\s\S]*?<\/div>(<label class="galbtn">[\s\S]*?<\/label>)?/,row)};
+
+// plants: count proper portions of whole plants only
+const P1NOTPLANT=/^(salt|sugar|brown sugar|honey|maple syrup|syrup|sweetener|stevia|flour|plain flour|cornflour|corn starch|starch|yeast|baking powder|vinegar|balsamic vinegar|soy sauce|tamari|ketchup|tomato ketchup|tomato sauce|tomato puree|tomato paste|stock|stock cube|gravy|mustard|mayonnaise|oil|olive oil|rapeseed oil|sunflower oil|coconut oil|sesame oil|vegetable oil|cocoa|cocoa powder|chocolate|dark chocolate|vanilla|coffee|tea|green tea|black tea|herbal tea|black pepper|pepper \(spice\)|paprika|smoked paprika|cumin|turmeric|cinnamon|nutmeg|chilli flakes|chili flakes|chilli powder|chili powder|curry powder|garam masala|mixed herbs|herbs|dried herbs|oregano|basil|thyme|rosemary|parsley|coriander|dill|mint|bay leaf|bay leaves|sage|chives|garlic powder|onion powder|ginger powder|ground ginger|spices|seasoning|sauce|pesto|hummus dip|jam|marmalade|peanut butter|crisps|chips|fries|beer|wine|cider|lager|stout|gin|whiskey|vodka|rum|juice|orange juice|apple juice|squash|cordial|cola)$/i;
+function plantsOn(d){const s=new Set();(d&&d.food||[]).forEach(i=>{if(i.src==='coffee'||i.src==='alcohol'||(i.pct&&i.pct<50))return;(i.plants||[]).forEach(p=>{const n=String(p).toLowerCase().trim();if(n&&!P1NOTPLANT.test(n))s.add(n)})});return s}
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
