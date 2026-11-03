@@ -379,7 +379,7 @@ function nutBar(n,val,tg){const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);
 const plan=()=>sampleMode?null:meta.plan||null;
 const kitchen=()=>(meta.kitchen&&meta.kitchen.items)||[];
 function planDay(k){const p=plan();return p&&(p.days||[]).find(x=>x.date===k)||null}
-function planDue(){const p=plan();const t=todayDate();if(!p||!p.days||!p.days.length)return 'none';const last=p.days[p.days.length-1].date;const age=(t-new Date(p.createdAt))/DAY;if(last<=iso(addD(t,1))||age>=2)return 'due';return null}
+function planDue(){const p=plan();const t=todayDate();if(!p||!p.days||!p.days.length)return 'none';const last=p.days[p.days.length-1].date;const age=(t-new Date(p.createdAt))/DAY;if(last<=iso(t))return 'due';return null}
 const slotMeal=s=>/break|post-train|fasted/i.test(s)?'Breakfast':/lunch|top-up|pre-game|recovery/i.test(s)?(/pre-game breakfast/i.test(s)?'Breakfast':/lunch/i.test(s)?'Lunch':'Snack'):/dinner/i.test(s)?'Dinner':'Snack';
 function planLogged(k,idx){const d=days[k];return !!(d&&(d.food||[]).some(i=>i.planRef===k+':'+idx))}
 function planMealsHTML(k,compact){
@@ -405,7 +405,7 @@ function foodTodayHTML(dIso){
   const lib=LIB.filter(x=>x[1]==='any'||x[1]==='snack'||x[1]==='drinks'||x[1]==='treat'||(dt==='rest'&&x[1]==='rest')||(dt!=='rest'&&(x[1]==='training'||x[1]==='post'))||(dt==='match'&&x[1]==='match'));
   const freq=frequentFoods();const ai=!!sample;const due=planDue();
   const kEmpty=!kitchen().length&&!sampleMode;
-  return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Time to plan ahead'}</b><br><small>Update your food, then let Keel plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
+  return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Your meal plan ends today'}</b><br><small>Update your food, then let Keel plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
   <article class="card kmac"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label} <span class="dtwhy">· ${esc(dayTypeWhy(dIso))}</span></h2>${(D()[dIso]||{}).trainIntent==='extra'&&!((D()[dIso]||{}).extras||[]).length&&!sampleMode?'<button type="button" class="linkbtn" data-intentclear style="min-height:32px;padding:0">Didn\'t train? Switch back to a rest day</button>':''}<div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
     
     ${macroRings(t,dt)}${waterHTML(dIso)}
@@ -683,7 +683,7 @@ function viewTraining(){
   if(pl&&pl.pre)pre=`<div class="banner">Your plan starts ${fmtD(FIRST)}, so this session is for reference only.</div>`;
   const due=key===iso(todayDate())&&planDue();const pd=planDay(key);
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
-  const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
+  const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Your meal plan ends today'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
   const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
   return pre+(key===iso(todayDate())?injuryBanner():'')+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+extrasCardHTML(key)+patternHTML()+pill;
 }
@@ -769,7 +769,7 @@ function viewDashboard(){
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section></details>
-   ${due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--accent);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Time to plan your food ahead'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:''}
+   ${due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--accent);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Your meal plan ends today'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:''}
    ${ov.length?`<a class="panel" href="#reports" style="text-decoration:none;color:inherit"><div class="ph"><h3>Coach's notes</h3><span class="ds">${fmtD(new Date(meta.overview.at))}</span></div>${ov.map(x=>`<p class="ovl">${esc(x)}</p>`).join('')}</a>`:''}`;
 }
 // ================= dictate anything =================
@@ -2129,6 +2129,214 @@ document.addEventListener('input',e=>{const el=e.target;if(!el)return;
   if(el.dataset&&el.dataset.p1sl&&P1.ci){const k=el.dataset.p1sl,v=+el.value;P1.ci[k]=v;const words=P1SL.find(s=>s[0]===k)[2];const w=document.getElementById('p1w-'+k);if(w)w.textContent=words[v-1];return}
   if(el.dataset&&el.dataset.p1in&&P1.ci){P1.ci[el.dataset.p1in]=el.value;const h=p1SleepCalc(P1.ci);const b=document.querySelector('.p1sleep b');if(b)b.textContent=(h!=null?h:'–')+' h'}});
 
+// ================= P1 v2: food clean-up, hydration, tile menus, better routes =================
+Object.assign(ICO,{
+  map:'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>',
+  navigation:'<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+  download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+  locate:'<line x1="2" x2="5" y1="12" y2="12"/><line x1="19" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="5"/><line x1="12" x2="12" y1="19" y2="22"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/>',
+  search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  mountain:'<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
+  minus:'<path d="M5 12h14"/>'
+});
+
+// ---------- animated bars: each bar grows from where it was last time ----------
+const P1W={};
+function p1Bar(id,pct,col){const from=P1W[id]!=null?P1W[id]:0;return `<div class="p1tr"><i data-bid="${id}" data-w="${Math.max(0,Math.min(100,pct)).toFixed(1)}" style="width:${from}%;background:${col}"></i></div>`}
+function p1Anim(){const els=[...document.querySelectorAll('[data-bid]')];if(!els.length)return;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>els.forEach(el=>{el.style.width=el.dataset.w+'%';P1W[el.dataset.bid]=+el.dataset.w})))}
+const P1MAC=[['kcal','Calories','var(--o)'],['protein','Protein','var(--s)'],['carbs','Net carbs','var(--e)'],['fat','Fat','var(--x)']];
+function p1Ref(k,dt){const tg=nutTarget(k,dt);return tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1)}
+function p1FoodBars(t,dt,prefix){
+  return `<div class="p1mbs">${P1MAC.map(([k,lab,col])=>{const ref=p1Ref(k,dt),v=t[k]||0,n=NUTS.find(x=>x.k===k);const over=k!=='protein'&&v>ref*1.1;
+    return `<div class="p1mb"><div class="p1mbh"><span>${lab}</span><span class="num"><b>${Math.round(v)}</b> of ${Math.round(ref)}${n.u==='kcal'?'':' '+n.u}</span></div>${p1Bar(prefix+k,v/ref*100,over?'var(--bad)':col)}</div>`}).join('')}</div>`}
+
+// ---------- tile menus for Food and Plan ----------
+function p1Nav(attr,cur,items){return `<nav class="p1nav">${items.map(([v,ic,l,sub,col])=>`<button type="button" ${attr}="${v}" aria-pressed="${cur===v}" style="--nc:${col}"><span class="p1ni">${ico(ic)}</span><b>${l}</b><small>${sub}</small></button>`).join('')}</nav>`}
+function foodSub(){const due=planDue();const k=kitchen().length;
+  return p1Nav('data-fview',fView,[['today','utensils','Log','What you ate','var(--k-green)'],['plan','calendar','Meal plan',due==='none'?'Not made yet':due?'Ends today':'Next 3 days','var(--k-amber)'],['kitchen','carrot','My food',k?`${k} item${k===1?'':'s'}`:'Add first','var(--k-pink)']])}
+function planNav(cur){return p1Nav('data-pnav',cur,[['today','footprints','Day','Today\'s session','var(--k-blue)'],['plan','calendar','Overview','Your weeks','var(--k-violet)'],['route','map','Routes','Plan a loop','var(--k-green)']])}
+
+// ---------- Food: today ----------
+function p1FoodRow(i){const pc=i.pct||100;const tag=i.src==='plan'?' <span class="est">plan</span>':i.src==='alcohol'?' <span class="est">drink</span>':i.est?' <span class="est">est.</span>':'';
+  return `<div class="p1fi"><div class="p1fit"><div class="fn">${esc(i.name)}${tag}</div><b class="num">${kcalOf(i)} kcal</b>${sampleMode?'':`<button type="button" class="x" data-del-food="${i.ix}" aria-label="Remove ${esc(i.name)}">${ico('x')}</button>`}</div>
+    <div class="p1fib"><span class="fq num">${esc(i.qty||'')}${i.at?' · '+esc(i.at):''}<br>${Math.round(+i.protein||0)}p · ${Math.round(+i.carbs||0)}c · ${Math.round(+i.fat||0)}f</span>${sampleMode?'':`<div class="p1por" role="group" aria-label="Portion"><button type="button" data-fpct="${i.ix}:-25" aria-label="Less">${ico('minus')}</button><span class="num">${pc}%</span><button type="button" data-fpct="${i.ix}:25" aria-label="More">${ico('plus')}</button></div>`}</div></div>`}
+function p1MealHTML(m,its){const mt={};['kcal','protein','carbs','fat'].forEach(k=>mt[k]=its.reduce((a,i)=>a+(k==='kcal'?kcalOf(i):(+i[k]||0)),0));const e=(mt.protein*4+mt.carbs*4+mt.fat*9)||1;
+  return `<section class="p1meal"><div class="p1mh"><span class="mico" aria-hidden="true">${MICO[m]}</span><b>${m}</b><span class="num">${Math.round(mt.kcal)} kcal</span></div>
+    <div class="p1split" aria-hidden="true"><i style="width:${mt.protein*400/e}%;background:var(--s)"></i><i style="width:${mt.carbs*400/e}%;background:var(--e)"></i><i style="width:${mt.fat*900/e}%;background:var(--x)"></i></div>
+    <div class="p1mm num"><span style="--c:var(--s)">${Math.round(mt.protein)} g protein</span><span style="--c:var(--e)">${Math.round(mt.carbs)} g carbs</span><span style="--c:var(--x)">${Math.round(mt.fat)} g fat</span></div>
+    ${its.map(p1FoodRow).join('')}</section>`}
+function foodTodayHTML(dIso){
+  const DD=D(),d=DD[dIso]||{date:dIso,food:[]};const t=foodTotals(d),dt=dayTypeFor(dIso),win=mealWindow(d),fh=fastHours(DD,dIso);const pd=planDay(dIso);const due=planDue();const isToday=dIso===iso(todayDate());
+  const kEmpty=!kitchen().length&&!sampleMode;const pw=plantsWeek(dIso),pt=plantsOn(d);
+  const food=(d.food||[]).map((i,ix)=>({...i,ix}));
+  const meals=MEALS.map(m=>{const its=food.filter(i=>i.meal===m);return its.length?p1MealHTML(m,its):''}).join('');
+  const pm=pd?(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot||'')):[];const pmDone=pd?(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot||'')&&planLogged(dIso,ix)).length:0;
+  return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Meal plans are built from it.</span><em>Add my food ›</em></button>`:''}
+  <article class="card p1ftot"><div class="chead"><div style="flex:1;min-width:0"><h2>${isToday?'Today so far':'This day'}</h2><div class="sub">${DAYT[dt].label} targets · ${t.n?`${t.n} item${t.n>1?'s':''}`:'nothing logged yet'}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
+    ${p1FoodBars(t,dt,'d')}${microsHTML(t,dt,dIso)}</article>
+  ${foodActionsHTML(dIso)}
+  ${meals?`<article class="card p1meals">${meals}</article>`:''}
+  ${pd?`<details class="kmore p1pm" ${pmDone<pm.length?'open':''}><summary>From your meal plan · ${pmDone} of ${pm.length} eaten</summary>${planMealsHTML(dIso)}</details>`:''}
+  ${isToday&&due&&!kEmpty?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Make a meal plan':'Your meal plan ends today'}</b><br><small>Tap to plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
+  <details class="kmore p1fx"><summary>Drinks, plants and fasting</summary>
+    ${drinksHTML(dIso)}${planMismatch(dIso)}${planVsHTML(dIso)}
+    <div class="plantrow"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants in the last 7 days${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>
+    <div class="form"><h3>Fasting</h3><div class="row2"><div class="field"><label class="label" for="ffm">First food</label><input id="ffm" type="time" value="${esc(d.firstMeal||(win?fmtT(win.first):''))}" data-food="firstMeal"></div>
+      <div class="field"><label class="label" for="flm">Last food</label><input id="flm" type="time" value="${esc(d.lastMeal||(win?fmtT(win.last):''))}" data-food="lastMeal"></div></div>
+      <div class="hint" style="font-size:12px;color:var(--muted)">${fh!=null?`Overnight fast into today: <b style="color:var(--fg)">${fh} h</b>.`:'Fasting hours appear once yesterday and today both have food times.'}</div></div>
+  </details>`}
+// portion up or down on a logged item: the bars move straight away, saving happens in the background
+let p1PT=null;
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-fpct]');if(!x)return;e.stopPropagation();e.preventDefault();
+  const [ix,dl]=x.dataset.fpct.split(':').map(Number);const k=iso(sel);const cur=clone(days[k]||{food:[]});const it=(cur.food||[])[ix];if(!it)return;
+  if(!it.base){it.base={};NK.forEach(q=>{if(isNum(it[q]))it.base[q]=+it[q]});it.base.kcal=kcalOf(it);it.pct=100}
+  const np=Math.max(25,Math.min(300,(it.pct||100)+dl));if(np===it.pct)return;it.pct=np;
+  NK.forEach(q=>{if(it.base[q]!=null)it[q]=q==='kcal'?Math.round(it.base[q]*np/100):Math.round(it.base[q]*np/10)/10});
+  days[k]=cur;const y=window.scrollY;render();window.scrollTo(0,y);clearTimeout(p1PT);p1PT=setTimeout(()=>persistDay(k,{food:days[k].food}),700)},true);
+
+// ---------- photo check: live bars and a slider per item ----------
+function p1PRTotals(){const t={};P1MAC.forEach(([k])=>t[k]=0);(PR?PR.items:[]).forEach(x=>{if(x.off)return;const f=x.pct/100;P1MAC.forEach(([k])=>t[k]+=(k==='kcal'?kcalOf(x):(+x[k]||0))*f)});return t}
+function p1PRBars(){const k=iso(sel),dt=dayTypeFor(k),so=foodTotals(D()[k]||{}),pl=p1PRTotals();
+  return `<div class="p1mbs">${P1MAC.map(([q,lab,col])=>{const ref=p1Ref(q,dt);const a=Math.min(100,(so[q]||0)/ref*100),b=Math.min(100-a,pl[q]/ref*100);
+    return `<div class="p1mb"><div class="p1mbh"><span>${lab}</span><span class="num"><b id="prv-${q}">+${Math.round(pl[q])}</b> · day <span id="prd-${q}">${Math.round((so[q]||0)+pl[q])}</span> of ${Math.round(ref)}</span></div><div class="p1tr p1stack"><i class="p1so" style="width:${a}%;background:${col}"></i><i id="prb-${q}" style="width:${b}%;background:${col}"></i></div></div>`}).join('')}</div>`}
+function photoReviewHTML(){if(!PR)return '';
+  return `<div class="cfwrap" id="prWrap"><div class="cfsheet prsheet" role="dialog" aria-label="Check your plate"><h2>Here's what I see</h2>${PR.seen?`<p class="prseen">${esc(PR.seen)}</p>`:''}
+    <div class="p1prtot"><small class="label">This plate, on top of today so far</small>${p1PRBars()}</div>
+    <div class="prall"><span>Ate all of it?</span><div class="segmini">${[50,75,100].map(p=>`<button type="button" data-prall="${p}" aria-pressed="${PR.items.every(x=>x.pct===p)}">${p===100?'All':p+'%'}</button>`).join('')}</div></div>
+    <div class="pritems">${PR.items.map((x,i)=>`<div class="pritem ${x.off?'off':''}"><div class="prtop"><input type="text" value="${esc(x.name)}" data-prname="${i}" aria-label="Food name"><span class="num" id="prk-${i}">${Math.round(kcalOf(x)*x.pct/100)} kcal</span><button type="button" class="x" data-proff="${i}" aria-label="${x.off?'Add back':'Didn\'t eat this'}">${x.off?'+':'×'}</button></div>
+      ${x.off?'':`<div class="p1prsl"><input type="range" min="0" max="150" step="5" value="${x.pct}" data-prsl="${i}" aria-label="How much of ${esc(x.name)}"><b class="num" id="prp-${i}">${x.pct}%</b></div>`}</div>`).join('')}</div>
+    <p class="ds" style="margin:0;font-size:12px">A photo estimate can be 20-30% out. Slide each one to what you actually ate.</p>
+    <div class="actions"><button type="button" class="ghost" id="prNo" style="flex:1;color:var(--fg)">Cancel</button><button type="button" class="donebtn" id="prYes" ${PR.busy?'disabled':''}>${PR.busy?'Working…':'Log it'}</button></div></div></div>`}
+function p1PRLive(){if(!PR)return;const k=iso(sel),dt=dayTypeFor(k),so=foodTotals(D()[k]||{}),pl=p1PRTotals();
+  PR.items.forEach((x,i)=>{const a=document.getElementById('prk-'+i),b=document.getElementById('prp-'+i);if(a)a.textContent=Math.round(kcalOf(x)*x.pct/100)+' kcal';if(b)b.textContent=x.pct+'%'});
+  P1MAC.forEach(([q])=>{const ref=p1Ref(q,dt);const a=Math.min(100,(so[q]||0)/ref*100);const v=document.getElementById('prv-'+q),dd=document.getElementById('prd-'+q),bb=document.getElementById('prb-'+q);
+    if(v)v.textContent='+'+Math.round(pl[q]);if(dd)dd.textContent=Math.round((so[q]||0)+pl[q]);if(bb)bb.style.width=Math.min(100-a,pl[q]/ref*100)+'%'})}
+document.addEventListener('input',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.prsl!=null&&PR){PR.items[+t.dataset.prsl].pct=+t.value;p1PRLive()}});
+
+// ---------- hydration ----------
+function p1WaterTarget(){const k=iso(todayDate()),d=D()[k]||{};let lo=WATER[0];const why=[];
+  if(d.weather&&d.weather.tmax>=20){lo+=.5;why.push('a warm day')}
+  if((d.blocks||[]).some(b=>b.phys==='hard')){lo+=.5;why.push('hard physical work')}
+  const p=planFor(parse(k));if((p&&p.type!=='R'&&!p.pre)||(d.extras||[]).length){lo+=.5;why.push('training')}
+  return {lo:Math.min(lo,5),why}}
+function p1WaterOpen(){const k=iso(todayDate());const d=D()[k]||{};const w=+d.water||0;const tg=p1WaterTarget();
+  p1Sheet(`<div class="kshead"><div><h2>Hydration</h2><small class="ds">Today</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <div class="p1wbig"><b class="num">${Math.round(w*100)/100}</b><span>of about ${tg.lo} L</span></div>${p1Bar('hyd',w/tg.lo*100,'var(--k-sky)')}
+    <div class="p1wbtns">${[[.25,'Glass','glass-water'],[.5,'500 ml','cup-soda'],[.75,'Bottle','milk'],[1,'1 litre','droplets']].map(([v,l,ic])=>`<button type="button" data-p1w="${v}">${ico(ic)}<b>+ ${l}</b></button>`).join('')}</div>
+    ${w>0?`<button type="button" class="ghost" data-p1w="-0.25" style="width:100%">Take off a glass</button>`:''}
+    <p class="ds" style="font-size:13px;margin:0">${tg.why.length?`A bit more today because of ${tg.why.join(' and ')}. `:''}Tea, coffee and milk count too.</p>`);p1Anim()}
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p1tile="water"]')){p1WaterOpen();return}
+  if(x=c('[data-p1w]')){const k=iso(todayDate());const d=D()[k]||{};const w=Math.max(0,Math.round(((+d.water||0)+(+x.dataset.p1w))*100)/100);days[k]={...(days[k]||{date:k}),water:w};p1WaterOpen();render();persistDay(k,{water:w});return}
+},true);
+function p1Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);const yd=D()[iso(addD(todayDate(),-1))]||{};const dayDone=!!((yd.blocks||[]).length||(d.blocks||[]).length);
+  const w=+d.water||0,tg=p1WaterTarget();const fd=(d.food||[]).length;
+  const t=(id,icon,name,sub,done)=>`<button type="button" class="p1tile${done?' done':''}" data-p1tile="${id}"><span class="p1ti">${ico(done?'check':icon)}</span><b>${name}</b><small>${sub}</small></button>`;
+  return `<section class="p1tiles"><h3 class="p1th">Add something</h3><div class="p1grid">
+    ${t('ci','sun','Check in',ci?'Done today':'Sleep and how you feel',ci)}${t('food','utensils','Log food',fd?`${fd} item${fd>1?'s':''} so far`:'Snap, say or type',false)}
+    ${t('day','clipboard-list','My day',dayDone?'Saved':'Work, driving, family',dayDone)}${t('move','footprints','Log a session','Walk, run, class, route',false)}
+    ${t('water','droplet','Hydration',w?`${Math.round(w*100)/100} of ${tg.lo} L`:'Tap a glass as you go',w>=tg.lo)}${t('rec','wind','Recover','Breathe or stretch',false)}</div></section>`}
+
+// ---------- routes ----------
+Object.assign(RT,{base:'map',q:'',sig:'',mapEl:null,grp:null,tiles:null,tprof:null});
+const P1BASE={map:['https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png','abcd',20],hills:['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png','abc',17]};
+const LOOPC=['#5B6CFF','#14B87A','#E8913A'];
+async function p1Climb(coords){const s=p1Sample(coords,Math.max(50,p1Len(coords)/95));
+  const r=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${s.map(p=>p[0].toFixed(4)).join(',')}&longitude=${s.map(p=>p[1].toFixed(4)).join(',')}`);const j=await r.json();const e=j.elevation||[];if(!e.length)throw new Error('no heights');
+  let up=0,acc=0;const prof=[{d:0,e:e[0]}];for(let i=1;i<e.length;i++){const dd=e[i]-e[i-1];if(dd>1)up+=dd;acc+=p1Dist(s[i-1],s[i]);prof.push({d:acc,e:e[i]})}
+  return {climb:Math.round(up),lo:Math.round(Math.min(...e)),hi:Math.round(Math.max(...e)),prof}}
+// Cut out dead-end detours: where the path comes back to a point it passed a short while ago, drop the bit in between.
+function p1Despur(c){let a=c.slice();for(let pass=0;pass<3;pass++){const tot=p1Len(a);const cum=[0];for(let i=1;i<a.length;i++)cum.push(cum[i-1]+p1Dist(a[i-1],a[i]));
+    const out=[];let i=0,changed=false;while(i<a.length){out.push(a[i]);let jump=-1;
+      for(let j=a.length-2;j>i+2;j--){const gap=cum[j]-cum[i];if(gap>tot*0.3)continue;if(gap<50)break;if(p1Dist(a[i],a[j])<15){jump=j;break}}
+      if(jump>0){i=jump+1;changed=true}else i++}
+    a=out;if(!changed)break}return a}
+function p1Circle(start,base,r,n){const ctr=p1Dest(start,base,r);const pts=[start];for(let i=1;i<n;i++)pts.push(p1Dest(ctr,(base+180+i*360/n)%360,r));pts.push(start);return pts}
+function p1Cells(c){return new Set(p1Sample(c,60).map(p=>Math.round(p[0]*1500)+':'+Math.round(p[1]*1500)))}
+async function p1OneLoop(base,target){let r=target/(2*Math.PI*1.25),best=null;
+  for(let tries=0;tries<3;tries++){const raw=await p1Route(p1Circle(RT.start,base,r,4),RT.kind);const coords=p1Despur(raw.coords);const m=p1Len(coords);const cand={coords,m};
+    if(!best||Math.abs(m-target)<Math.abs(best.m-target))best=cand;if(Math.abs(m-target)/target<0.07)break;r*=Math.min(1.8,Math.max(.55,target/m))}
+  best.rep=p1Repeat(best.coords);return best}
+async function p1FindLoops(){if(!RT.start){RT.msg='Set a start first: use your location, search a place, or tap the map.';p1RouteDraw();return}
+  RT.busy=true;RT.msg='Finding loops near you…';RT.loops=[];RT.pick=0;p1RouteDraw();const target=RT.km*1000;const all=[];const off=Math.random()*60;
+  const bases=[0,60,120,180,240,300].map(b=>(b+off)%360);
+  for(let i=0;i<bases.length;i+=3){const got=await Promise.all(bases.slice(i,i+3).map(b=>p1OneLoop(b,target).catch(()=>null)));got.forEach(g=>{if(g)all.push(g)});RT.msg=`Checked ${Math.min(i+3,bases.length)} of ${bases.length} directions…`;p1RouteDraw()}
+  const ok=all.filter(x=>Math.abs(x.m-target)/target<0.25);const pool=(ok.length?ok:all);
+  await Promise.all(pool.map(async x=>{try{Object.assign(x,await p1Climb(x.coords))}catch(e){x.climb=null}}));
+  const score=x=>Math.abs(x.m-target)/target*2+x.rep*3+(x.climb==null?0:RT.hills==='flat'?x.climb/(x.m/1000)/15:RT.hills==='hilly'?-x.climb/(x.m/1000)/15:0);
+  pool.sort((a,b)=>score(a)-score(b));const pick=[];
+  for(const x of pool){x.cells=p1Cells(x.coords);if(pick.every(y=>{let s=0;x.cells.forEach(c=>{if(y.cells.has(c))s++});return s/Math.min(x.cells.size,y.cells.size)<0.6}))pick.push(x);if(pick.length===3)break}
+  RT.loops=pick;RT.busy=false;RT.sig='';setTimeout(()=>{const w=document.querySelector('.p1mapwrap');if(w)w.scrollIntoView({behavior:'smooth',block:'start'})},120);RT.msg=pick.length?'':'Couldn\'t find a loop from there. Try a start on a road or track, or another distance.';p1RouteDraw()}
+async function p1TraceAdd(ll){RT.trace.push(ll);if(RT.trace.length<2){p1RouteDraw();return}RT.busy=true;RT.msg='Measuring…';p1RouteDraw();
+  try{const rt=await p1Route(RT.trace,RT.kind);RT.tgeo=rt.coords;RT.tkm=Math.round(rt.m/100)/10;try{const c=await p1Climb(rt.coords);RT.tclimb=c.climb;RT.tprof=c.prof}catch(e){RT.tclimb=null;RT.tprof=null}RT.msg=''}catch(e){RT.msg='Could not follow paths there. Tap a bit closer to a road or track.'}RT.busy=false;p1RouteDraw()}
+function p1Profile(prof,col){if(!prof||prof.length<3)return '';const W=320,H=72;const tot=prof.at(-1).d||1;const es=prof.map(p=>p.e);const lo=Math.min(...es),hi=Math.max(...es);const rng=Math.max(25,hi-lo);
+  const x=v=>(v/tot*W).toFixed(1),y=v=>(H-4-(v-lo)/rng*(H-14)).toFixed(1);const line=prof.map((p,i)=>`${i?'L':'M'}${x(p.d)},${y(p.e)}`).join('');
+  return `<div class="p1prof"><div class="p1profh"><span>Height along the way</span><span class="num">${Math.round(lo)}-${Math.round(hi)} m</span></div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}" aria-hidden="true"><path d="${line}L${W},${H}L0,${H}Z" fill="${col}" fill-opacity=".2"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><div class="p1profx num"><span>Start</span><span>${(tot/1000).toFixed(1)} km</span></div></div>`}
+function p1GLink(c,kind){const s=p1Sample(c,Math.max(150,p1Len(c)/9));const wp=s.slice(1,-1).slice(0,8);const f=p=>p[0].toFixed(5)+','+p[1].toFixed(5);
+  return `https://www.google.com/maps/dir/?api=1&origin=${f(c[0])}&destination=${f(c.at(-1))}&waypoints=${wp.map(f).join('%7C')}&travelmode=${kind==='cycle'?'bicycling':'walking'}`}
+function p1Gpx(c,name){const pts=c.map(p=>`<trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"></trkpt>`).join('');
+  const x=`<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Keel" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>${name}</name><trkseg>${pts}</trkseg></trk></gpx>`;
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([x],{type:'application/gpx+xml'}));a.download=name.replace(/\W+/g,'-')+'.gpx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+function routeHTML(){const L0=RT.loops[RT.pick];const eff=L0?p1Effort(L0.m/1000,L0.climb||0,RT.kind):null;const te=RT.tgeo?p1Effort(RT.tkm,RT.tclimb||0,RT.kind):null;
+  const chips=RT.kind==='cycle'?[10,20,30,50]:RT.kind==='walk'?[2,3,5,8]:[3,5,8,10];const lc=LOOPC[RT.pick%3];
+  return `<article class="card p1route"><div class="chead"><div style="flex:1"><h2>${RT.mode==='loop'?'Plan a loop':'Trace a route you did'}</h2><div class="sub">${RT.mode==='loop'?'Keel suggests loops that start and finish at the same spot.':'Tap along the way you went. Keel follows the roads and tracks.'}</div></div></div>
+    <div class="form" style="padding-top:0">${p1Seg('rtmode',[['loop','Suggest a loop'],['trace','Trace my route']],RT.mode)}
+    <div class="field"><span class="label">Start from</span><div class="p1start"><button type="button" class="ghost" id="rtLoc">${ico('locate')} Here</button><input id="rtq" type="search" placeholder="A place, e.g. Glencar Lake" value="${esc(RT.q)}" enterkeyhint="search"><button type="button" class="ghost" id="rtFind" aria-label="Search">${ico('search')}</button></div>
+      <div class="hint" style="font-size:12px;color:var(--muted)">${RT.start?'Start set. Tap the map to move it.':'Or tap the map, for example where you\'d park.'}</div></div>
+    </div>
+    <div class="p1mapwrap"><div id="p1map" class="p1map" aria-label="Map"></div><div class="p1mapctl"><div class="segmini">${[['map','Map'],['hills','Hills']].map(([v,l])=>`<button type="button" data-rtbase="${v}" aria-pressed="${RT.base===v}">${l}</button>`).join('')}</div></div></div>
+    <div class="form">    ${p1Seg('rtkind',[['walk','Walk'],['run','Run'],['cycle','Cycle']],RT.kind)}
+    ${RT.mode==='loop'?`<div class="field"><span class="label">Distance</span><div class="p1kms">${chips.map(v=>`<button type="button" data-rtkm="${v}" aria-pressed="${+RT.km===v}">${v} km</button>`).join('')}<input id="rtkm" type="number" inputmode="decimal" step="0.5" min="1" max="${RT.kind==='cycle'?120:42}" value="${RT.km}" aria-label="Distance in km"></div></div>
+      <div class="field"><span class="label">Hills</span>${p1Seg('rthills',[['flat','Keep it flat'],['any','Don\'t mind'],['hilly','Hills please']],RT.hills)}</div>`:''}
+    ${RT.mode==='loop'?`<button type="button" class="primary" id="rtGo" ${RT.busy?'disabled':''}>${RT.busy?'Finding loops…':RT.loops.length?'Find different loops':'Find loops'}</button>`:`<button type="button" class="ghost" id="rtUndo" ${RT.trace.length?'':'disabled'}>Undo last point</button>`}
+    ${RT.msg?`<div class="hsum" role="status">${esc(RT.msg)}</div>`:''}</div>
+    ${RT.mode==='loop'&&RT.loops.length?`<div class="p1loops">${RT.loops.map((x,i)=>{const e=p1Effort(x.m/1000,x.climb||0,RT.kind);return `<button type="button" class="p1loop" data-rtpick="${i}" aria-pressed="${RT.pick===i}" style="--lc:${LOOPC[i]}"><b>Loop ${i+1}</b><span class="num">${(x.m/1000).toFixed(1)} km</span><span>${x.climb!=null?`${x.climb} m up`:'climb unknown'}</span><span>${e.word}</span></button>`}).join('')}</div>
+      ${eff?`<div class="form"><div class="p1rstat"><div><b class="num">${(L0.m/1000).toFixed(1)}</b><small>km</small></div><div><b class="num">${L0.climb!=null?L0.climb:'–'}</b><small>m climb</small></div><div><b class="num">~${eff.mins}</b><small>min</small></div><div><b>${eff.word}</b><small>effort</small></div></div>
+        <div class="hint" style="font-size:12px;color:var(--muted)">Effort counts every 100 m of climb as an extra ${RT.kind==='cycle'?'2 km':'1 km'} on the flat, so this is like ${eff.eq} km flat.</div>
+        ${p1Profile(L0.prof,lc)}
+        <button type="button" class="primary" id="rtSave">Plan this for today</button>
+        <div class="row2"><a class="ghost p1btn" href="${p1GLink(L0.coords,RT.kind)}" target="_blank" rel="noopener">${ico('navigation')} Google Maps</a><button type="button" class="ghost p1btn" id="rtGpx">${ico('download')} GPX for a watch</button></div></div>`:''}`:''}
+    ${RT.mode==='trace'&&RT.tgeo?`<div class="form"><div class="p1rstat"><div><b class="num">${RT.tkm}</b><small>km</small></div><div><b class="num">${RT.tclimb!=null?RT.tclimb:'–'}</b><small>m climb</small></div><div><b>${te.word}</b><small>effort</small></div></div>${p1Profile(RT.tprof,'#E23D9E')}
+      <div class="row2"><div class="field"><label class="label" for="rtmin">Minutes it took</label><input id="rtmin" type="number" inputmode="numeric" value="${esc(RT.tmin)}"></div><div class="field"><label class="label" for="rtrpe">How hard (1-10)</label><input id="rtrpe" type="number" inputmode="numeric" min="1" max="10"></div></div><button type="button" class="primary" id="rtLog">Log this ${RT.kind}</button></div>`:''}
+    <div class="ds p1attr">Maps &copy; OpenStreetMap contributors, CARTO, OpenTopoMap. Routes by OSRM. Heights by Open-Meteo. Places by Nominatim.</div></article>`}
+function p1SetBase(L){const b=P1BASE[RT.base]||P1BASE.map;if(RT.tiles)RT.map.removeLayer(RT.tiles);RT.tiles=L.tileLayer(b[0],{subdomains:b[1],maxZoom:b[2],detectRetina:true}).addTo(RT.map)}
+function p1Pin(L,ll,html,cls){return L.marker(ll,{icon:L.divIcon({className:'p1di',html:`<span class="${cls}">${html}</span>`,iconSize:null}),keyboard:false})}
+function p1Along(c,every){const out=[];let acc=0,next=every;for(let i=1;i<c.length;i++){const d=p1Dist(c[i-1],c[i]);while(acc+d>=next){const f=(next-acc)/d;out.push({p:[c[i-1][0]+(c[i][0]-c[i-1][0])*f,c[i-1][1]+(c[i][1]-c[i-1][1])*f],b:p1Brg(c[i-1],c[i]),at:next});next+=every}acc+=d}return out}
+function p1Brg(a,b){const r=Math.PI/180;const y=Math.sin((b[1]-a[1])*r)*Math.cos(b[0]*r),x=Math.cos(a[0]*r)*Math.sin(b[0]*r)-Math.sin(a[0]*r)*Math.cos(b[0]*r)*Math.cos((b[1]-a[1])*r);return (Math.atan2(y,x)/r+360)%360}
+function p1DrawLayers(L){const m=RT.map,g=RT.grp;g.clearLayers();let bb=null;
+  if(RT.mode==='loop'){RT.loops.forEach((x,i)=>{if(i===RT.pick)return;const pl=L.polyline(x.coords,{color:LOOPC[i],weight:4,opacity:.45,dashArray:'6 8'}).addTo(g);pl.on('click',ev=>{L.DomEvent.stopPropagation(ev);RT.pick=i;p1RouteDraw()})});
+    const x=RT.loops[RT.pick];if(x){L.polyline(x.coords,{color:'#fff',weight:9,opacity:.95}).addTo(g);const pl=L.polyline(x.coords,{color:LOOPC[RT.pick],weight:5}).addTo(g);bb=pl.getBounds();
+      const len=x.m;const step=RT.kind==='cycle'?(len>30000?10000:5000):1000;p1Along(x.coords,step).forEach(k=>{if(len-k.at>step*.4)p1Pin(L,k.p,Math.round(k.at/1000),'p1km').addTo(g)});
+      p1Along(x.coords,step/2).filter((a,i)=>i%2===0&&len-a.at>step*.3).slice(0,12).forEach(a=>p1Pin(L,a.p,'<i style="transform:rotate('+Math.round(a.b)+'deg)">▲</i>','p1arr').addTo(g))}}
+  if(RT.mode==='trace'){RT.trace.forEach((p,i)=>L.circleMarker(p,{radius:i?5:7,color:'#fff',weight:2,fillColor:'#E23D9E',fillOpacity:1}).addTo(g));if(RT.tgeo){L.polyline(RT.tgeo,{color:'#fff',weight:9,opacity:.95}).addTo(g);const pl=L.polyline(RT.tgeo,{color:'#E23D9E',weight:5}).addTo(g);bb=pl.getBounds()}}
+  if(RT.start&&RT.mode==='loop')p1Pin(L,RT.start,'Start','p1pin').addTo(g);
+  const sig=[RT.mode,RT.pick,RT.loops.length,RT.loops.map(x=>Math.round(x.m)).join(','),RT.tgeo?RT.tgeo.length:0,RT.start?RT.start.join(','):''].join('|');
+  if(sig!==RT.sig){RT.sig=sig;setTimeout(()=>{try{m.invalidateSize();if(bb)m.fitBounds(bb,{padding:[28,28],animate:false});else if(RT.start)m.setView(RT.start,Math.max(m.getZoom(),14),{animate:false})}catch(e){}},40)}
+  else setTimeout(()=>{try{m.invalidateSize()}catch(e){}},40)}
+function p1MapAfter(){const ph=document.getElementById('p1map');if(!ph)return;
+  p1LoadLeaflet().then(L=>{const now=document.getElementById('p1map');if(!now)return;
+    if(!RT.mapEl){RT.mapEl=document.createElement('div');RT.mapEl.className='p1map';RT.mapEl.id='p1map';RT.mapEl.setAttribute('aria-label','Map')}
+    if(now!==RT.mapEl)now.replaceWith(RT.mapEl);
+    if(!RT.map){const c=RT.start||(meta.loc?[meta.loc.lat,meta.loc.lon]:[54.3,-8.2]);const m=L.map(RT.mapEl,{zoomControl:false,attributionControl:false}).setView(c,RT.start?14:11,{animate:false});RT.map=m;
+      L.control.zoom({position:'bottomright'}).addTo(m);RT.grp=L.layerGroup().addTo(m);p1SetBase(L);
+      m.on('click',ev=>{const ll=[ev.latlng.lat,ev.latlng.lng];if(RT.mode==='loop'){RT.start=ll;RT.loops=[];RT.msg='';p1RouteDraw()}else p1TraceAdd(ll)})}
+    p1DrawLayers(L)}).catch(()=>{ph.innerHTML='<div class="ds" style="padding:16px">The map could not load. Check your connection.</div>'})}
+async function p1Geo(q){const c=RT.start||(meta.loc?[meta.loc.lat,meta.loc.lon]:null);const vb=c?`&viewbox=${c[1]-1},${c[0]+1},${c[1]+1},${c[0]-1}`:'';
+  const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1${vb}&q=${encodeURIComponent(q)}`);const j=await r.json();if(!j.length)throw new Error('none');return [+j[0].lat,+j[0].lon,j[0].display_name]}
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-rtkm]')){RT.km=+x.dataset.rtkm;p1RouteDraw();return}
+  if(x=c('[data-rtbase]')){RT.base=x.dataset.rtbase;if(RT.map&&window.L)p1SetBase(window.L);document.querySelectorAll('[data-rtbase]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.rtbase===RT.base));return}
+  if(c('#rtFind')){const q=(($('#rtq')||{}).value||'').trim();RT.q=q;if(!q)return;RT.msg='Looking that up…';p1RouteDraw();
+    try{const g=await p1Geo(q);RT.start=[g[0],g[1]];RT.loops=[];RT.msg='Start set: '+String(g[2]).split(',').slice(0,2).join(',');if(RT.mode==='trace'){RT.trace=[RT.start];RT.tgeo=null}}catch(err){RT.msg='Couldn\'t find that place. Try a nearby town, or tap the map.'}p1RouteDraw();return}
+  if(c('#rtGpx')){const L0=RT.loops[RT.pick];if(L0)p1Gpx(L0.coords,`Keel ${RT.kind} ${(L0.m/1000).toFixed(1)} km`);return}
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target&&e.target.id==='rtq'){e.preventDefault();const b=$('#rtFind');if(b)b.click()}});
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='rtkm'){RT.km=Math.max(1,+e.target.value||5)}});
+// Effort: every 100 m of climb counts as 1 km extra on foot, 2 km extra on a bike.
+function p1Effort(km,climb,kind){const eq=km+climb/(kind==='cycle'?50:100);const per=kind==='walk'?0.6:kind==='cycle'?3:1;const x=eq/per;
+  const word=x<4?'Easy':x<8?'Moderate':x<14?'Hard':'Very hard';const mins=Math.round(eq*(kind==='walk'?12:kind==='cycle'?2.6:6.2));return {eq:Math.round(eq*10)/10,word,mins}}
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -2435,7 +2643,7 @@ function render(){
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
   $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():viewReports());
-  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();
+  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}
