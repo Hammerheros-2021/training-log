@@ -765,7 +765,7 @@ function viewDashboard(){
   const balance=balTot?`<div class="stack">${bal.map(([f,c,l])=>+yd[f]?`<i style="flex:${+yd[f]};background:${c}" title="${l}"></i>`:'').join('')}</div><div class="legend">${bal.map(([f,c,l])=>`<span style="--c:${c}"><i></i>${l} ${+yd[f]||0} h</span>`).join('')}</div>`:'<div class="ds">Comes from the morning check-in, under Yesterday.</div>';
   const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'').split(' :: ')[0]):[];
   const due=!sampleMode&&planDue();
-  const su=setupChecklistHTML();return p1Top()+p1ReadHTML(k)+injuryBanner()+hero+p1FoodMini(k)+`${sampleMode?'':p1Tiles()}${p1SignCard(k)}`+(su?`<details class="kmore p1setup"><summary>Getting started</summary>${su}</details>`:'')+`<details class="kmore"><summary>More about today</summary><div class="p1ex"><button type="button" class="ghost" id="sampleBtn">${sampleMode?'Back to my data':'See an example day'}</button></div><div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
+  const su=setupChecklistHTML();return p1Top()+p1ReadHTML(k)+injuryBanner()+hero+p1FoodMini(k)+`${sampleMode?'':p1Tiles()}${p1SignCard(k)}${p1Overview(k)}`+(su?`<details class="kmore p1setup"><summary>Getting started</summary>${su}</details>`:'')+`<details class="kmore"><summary>More about today</summary><div class="p1ex"><button type="button" class="ghost" id="sampleBtn">${sampleMode?'Back to my data':'See an example day'}</button></div><div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section></details>
@@ -1166,7 +1166,7 @@ function macroRings(t,dt){
 }
 function microsHTML(t,dt,k){
   const micros=NUTS.filter(n=>!n.macro&&n.lo);const d=D()[k]||{};const late=d.foodDone||k<iso(todayDate())||new Date().getHours()>=18;
-  const gaps=t.microN>=2?micros.map(n=>{const tg=nutTarget(n.k,dt);return {n,pct:tg.lo?t[n.k]/tg.lo:1}}).filter(x=>x.pct<.6).sort((a,b)=>a.pct-b.pct).slice(0,4):[];
+  const gaps=t.microN>=2?micros.map(n=>{const tg=nutTarget(n.k,dt);return {n,pct:tg.lo?t[n.k]/tg.lo:1}}).filter(x=>x.pct<.6&&!(x.n.k==='vitD'&&(p1Sun(k)||0)>=3)).sort((a,b)=>a.pct-b.pct).slice(0,4):[];
   const fib=NUTS.find(x=>x.k==='fibre');const ftg=nutTarget('fibre',dt);if(t.microN>=2&&ftg.lo&&t.fibre<ftg.lo*.6&&gaps.length<4)gaps.push({n:fib,pct:t.fibre/ftg.lo});
   const all=NUTS.filter(n=>!n.macro);const ok=all.filter(n=>status(t[n.k],nutTarget(n.k,dt))==='ok').length;
   return `${gaps.length?`<button type="button" class="gapbar" id="gapTog" aria-expanded="${gapOpen}"><span aria-hidden="true" style="flex:none;color:var(--s)">ⓘ</span><b>${late?'Worth topping up':'Low so far'}: ${gaps.length}</b><span>${esc(gaps.map(g=>g.n.l).join(', '))}</span>${gapOpen?'▴':'▾'}</button>`:''}${gaps.length&&gapOpen?`<div class="gapbox"><div class="gh"><b>${late?'Worth topping up':'Running low so far today'}</b><small>Tap one to see which foods have it</small></div><div class="gchips">${gaps.map(g=>`<button type="button" class="gchip ${fx.gap===g.n.k?'on':''}" data-gap="${g.n.k}">${esc(g.n.l)} <i>${Math.round(g.pct*100)}%</i></button>`).join('')}</div>${fx.gap&&NUT_FOODS[fx.gap]&&gaps.some(g=>g.n.k===fx.gap)?`<div class="gfood"><b>Good sources of ${esc(NUTS.find(x=>x.k===fx.gap).l.toLowerCase())}:</b> ${esc(NUT_FOODS[fx.gap])}.</div>`:''}</div>`:''}
@@ -2662,7 +2662,7 @@ function dayHeader(){const key=iso(sel);const mon=addD(sel,-((sel.getDay()+6)%7)
     strip+=`<button type="button" data-goto="${iso(d)}" class="${iso(d)===key?'sel':''}" style="--c:var(${TVAR[col]});--rc:${rColor(rs)}" aria-label="${fmtD(d,{weekday:'long',day:'numeric',month:'long'})}"><span class="d">${DOW[i]}</span><span class="n">${d.getDate()}</span><span class="dot ${dotClass(d,p)}"></span><span class="rd"></span></button>`}
   return `<div class="p1strip"><button type="button" class="p1hn" id="prevD" aria-label="Previous week">‹</button><div class="strip kswipe" title="Swipe to change week">${strip}</div><button type="button" class="p1hn" id="nextD" aria-label="Next week">›</button></div>`}
 function p1Hdr(){const t=tab();const now=sampleMode?SAMPLE.now:todayDate();
-  if(t==='dashboard')return `<span class="p1hd">${fmtD(now,{day:'numeric',month:'short'})}</span>${sampleMode?'':p1WxChip(iso(now))}`;
+  if(t==='dashboard')return sampleMode?`<span class="p1hd">${fmtD(now,{day:'numeric',month:'short'})}</span>`:p1WxChip(iso(now)).replace(/(<button[^>]*>)/,`$1<span class="p1hd">${fmtD(now,{day:'numeric',month:'short'})}</span>`);
   if((t==='food'&&fView==='today')||(t==='training'&&tView==='today')){const isT=iso(sel)===iso(todayDate());
     return `<button type="button" class="p1hm" id="stripTog" aria-expanded="${stripOpen}">${ico('calendar')}${isT?'Today':fmtD(sel,{weekday:'short'})} ${fmtD(sel,{day:'numeric',month:'short'})} <small>${stripOpen?'▴':'▾'}</small></button>${isT?'':'<button type="button" class="p1hn p1ht" id="goToday" aria-label="Back to today">↺</button>'}`}
   return `<span class="p1hd">${fmtD(now,{weekday:'short',day:'numeric',month:'short'})}</span>`}
@@ -2705,6 +2705,117 @@ function p1NutInfo(k){const n=NUTS.find(x=>x.k===k);if(!n)return;const dk=iso(se
     ${NUT_FOODS[k]?`<section class="p1blk"><h3>Foods that have it</h3><p style="margin:0">${esc(NUT_FOODS[k][0].toUpperCase()+NUT_FOODS[k].slice(1))}.</p></section>`:''}
     <p class="ds" style="font-size:12px;margin:0">Vitamins and minerals come mainly from food. Supplements only fill a gap.</p>`)}
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-nutinfo]');if(x){e.preventDefault();p1NutInfo(x.dataset.nutinfo)}});
+
+// ================= P1 v5: coffee shots and milks, sun and vitamin D, sickness, coach's overview on Today =================
+// weather words: codes 80-82 are rain showers, not snow
+function p1Sky(c){c=+c;return c>=95?'Thunder':(c>=71&&c<=77)||c===85||c===86?'Snow':c>=80?'Showers':c>=61?'Rain':c>=51?'Drizzle':c>=45?'Fog':c>=3?'Cloudy':c>=1?'Bright spells':'Sunny'}
+function p1WxWord(w){if(!w)return '';return `${p1Sky(w.code)} · ${w.tmin}° to ${w.tmax}°${w.rain>=0.5?` · ${w.rain} mm rain`:''}${w.dayH?` · ${w.dayH} h daylight`:''}`}
+// location follows you when you travel: refresh quietly if permission is already given
+async function p1Loc(ask){const m=meta.loc;const fresh=m&&isNum(m.lat)&&m.at&&(Date.now()-new Date(m.at))<6*3600e3;if(fresh)return m;
+  let granted=false;try{if(navigator.permissions){const s=await navigator.permissions.query({name:'geolocation'});granted=s.state==='granted'}}catch(e){}
+  if(!navigator.geolocation||(!ask&&!granted))return m&&isNum(m.lat)?m:null;
+  return new Promise(res=>navigator.geolocation.getCurrentPosition(async p=>{const loc={lat:Math.round(p.coords.latitude*100)/100,lon:Math.round(p.coords.longitude*100)/100,at:new Date().toISOString()};
+    const moved=!m||Math.abs(m.lat-loc.lat)>0.3||Math.abs(m.lon-loc.lon)>0.3;try{await persistMeta('loc',loc)}catch(e){}if(moved){P1WX.daily=null;P1WX.at=0}res(loc)},()=>res(m&&isNum(m.lat)?m:null),{timeout:12000,maximumAge:3600000}))}
+async function p1Forecast(ask){if(P1WX.daily&&Date.now()-P1WX.at<3*3600e3)return P1WX.daily;if(P1WX.busy)return null;P1WX.busy=true;
+  try{const loc=await p1Loc(ask);if(!loc){P1WX.busy=false;return null}
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,snowfall_sum,wind_speed_10m_max,uv_index_max&timezone=auto&forecast_days=16`);const j=await r.json();const D_=j.daily;
+    P1WX.daily=D_.time.map((t,i)=>({date:t,code:D_.weather_code[i],tmax:Math.round(D_.temperature_2m_max[i]),tmin:Math.round(D_.temperature_2m_min[i]),rain:Math.round(D_.precipitation_sum[i]*10)/10,prob:D_.precipitation_probability_max[i],snow:D_.snowfall_sum[i],wind:Math.round(D_.wind_speed_10m_max[i]),uv:D_.uv_index_max?Math.round(D_.uv_index_max[i]):null}));P1WX.at=Date.now();P1WX.lat=loc.lat}catch(e){}
+  P1WX.busy=false;return P1WX.daily}
+
+// vitamin D: when the UV is strong enough, sunshine covers it
+function p1Sun(k){if(!P1WX.daily){if(meta.loc&&!P1WX.busy&&!P1WX.tried){P1WX.tried=true;p1Forecast(false).then(()=>render())}return null}const w=P1WX.daily.find(x=>x.date===k);return w&&w.uv!=null?w.uv:null}
+const _p1nutBar=nutBar;
+nutBar=function(n,val,tg){const uv=n.k==='vitD'?p1Sun(iso(sel)):null;if(uv!=null&&uv>=3)return `<button type="button" class="mac p1nut" data-nutinfo="vitD"><div class="mh"><span>${n.l} <i aria-hidden="true">›</i></span><span class="num"><b>☀ Sun</b> · UV ${uv} today</span></div><div class="tr"><div class="fl" style="width:100%;background:var(--ok)"></div></div></button>`;return _p1nutBar(n,val,tg)};
+const _p1NutInfo=p1NutInfo;
+p1NutInfo=function(k){_p1NutInfo(k);if(k!=='vitD')return;const uv=p1Sun(iso(sel));const host=document.querySelector('#p1Host .p1blk');if(!host)return;
+  host.insertAdjacentHTML('afterend',`<section class="p1blk p1sun"><h3>${ico('sun')} Sunshine</h3><p style="margin:0">${uv==null?'Allow location and Keel will check the UV where you are.':uv>=3?`UV is ${uv} where you are today. 10-20 minutes of sun on your arms and face around midday makes plenty, a bit longer for darker skin. Don't burn.`:`UV is only ${uv} where you are today, too low to make much vitamin D. Food and, over the winter, a supplement fill the gap.`}</p></section>`)};
+
+// coffee and tea: shots, cup size, proper milks, and your own milk
+COFFEE.length=0;COFFEE.push(...[['espresso','Espresso',65,0,1,0,'shot',1],['americano','Americano',65,0,2,0,'shot',2],['flatwhite','Flat white',65,120,0,0,'shot',2],['latte','Latte',65,250,0,0,'shot',1],['cappuccino','Cappuccino',65,160,0,0,'shot',1],['mocha','Mocha',65,200,95,16,'shot',1],['filter','Filter coffee',110,0,4,0,'',0],['instant','Instant coffee',60,0,3,0,'tsp',1],['decaf','Decaf coffee',4,0,3,0,'',0],['tea','Tea',45,0,2,0,'',0],['green','Green tea',30,0,2,0,'',0],['herbal','Herbal tea',0,0,2,0,'',0],['energy','Energy drink',80,0,110,27,'',0],['energy0','Energy drink, sugar-free',80,0,5,1,'',0]]);
+Object.keys(MILK).forEach(k=>delete MILK[k]);Object.assign(MILK,{none:['No milk',0,0,0,0,0],whole:['Whole',64,3.3,4.7,3.6,120],semi:['Low-fat',46,3.5,4.8,1.7,124],skim:['Skimmed',35,3.5,5,.1,125],lfree:['Lactose-free',46,3.4,4.8,1.6,120],
+  almond:['Almond, unsweetened',13,.4,.1,1.1,120],almondb:['Almond barista',30,.5,2.6,1.9,120],oat:['Oat',46,1,6.7,1.5,120],oatb:['Oat barista',61,1.1,7.1,3,120],soya:['Soya, unsweetened',33,3.3,.3,1.8,120],soyab:['Soya barista',41,3.1,2.6,2.1,120],coco:['Coconut',20,.1,2.7,.9,120]});
+Object.assign(CSIZE,{s:['Small',.7,1],m:['Medium',1,1],l:['Large',1.4,1]});
+P1C.shots=null;
+function p1Milks(){const own=((meta.milks&&meta.milks.list)||[]).map(m=>['own:'+m.id,[m.name,+m.kcal||0,+m.p||0,+m.c||0,+m.f||0,+m.ca||0]]);return Object.entries(MILK).concat(own)}
+function p1MilkOf(id){if(!id)return null;return (p1Milks().find(x=>x[0]===id)||[])[1]||null}
+function p1CofItem(){const c=COFFEE.find(x=>x[0]===P1C.type);if(!c)return null;const sz=CSIZE[P1C.size]||CSIZE.m;const noMilk=/energy|herbal|green/.test(c[0]);
+  const milkId=noMilk?'none':(P1C.milk||(c[3]?'semi':'none'));const mm=p1MilkOf(milkId)||MILK.none;const ml=(c[3]?c[3]*sz[1]:(milkId!=='none'?(c[0]==='espresso'?15:30):0));
+  const shots=c[6]?(P1C.shots||c[7]):1;const caf=Math.round(c[6]?c[2]*shots:c[2]*(c[0]==='filter'||c[0]==='tea'?sz[1]:1));
+  const shotW=c[6]==='shot'?(shots===1?'single':shots===2?'double':'triple'):c[6]==='tsp'?`${shots} tsp`:'';
+  const it={name:`${c[3]?sz[0]+' ':''}${shotW&&c[6]==='shot'?shotW+' ':''}${c[1].toLowerCase()}${c[6]==='tsp'?` (${shotW})`:''}${milkId!=='none'?` with ${mm[0].toLowerCase()}${/milk/i.test(mm[0])?'':' milk'}`:''}${P1C.sugar?`, ${P1C.sugar} sugar`:''}`.replace(/^./,x=>x.toUpperCase()),qty:'1 cup',src:'coffee',est:true,micros:false,plants:[]};
+  NK.forEach(k=>it[k]=0);it.kcal=Math.round(c[4]+mm[1]*ml/100+16*P1C.sugar);it.protein=Math.round(mm[2]*ml/10)/10;it.carbs=Math.round((c[5]+mm[3]*ml/100+4*P1C.sugar)*10)/10;it.fat=Math.round(mm[4]*ml/10)/10;it.calcium=Math.round(mm[5]*ml/100);it.caffeine=caf;return it}
+const _p1DD=p1DrinksDraw;
+p1DrinksDraw=function(){_p1DD();const c=COFFEE.find(x=>x[0]===P1C.type);const sec=[...document.querySelectorAll('#p1Host .p1blk')].find(s=>/Coffee and tea/.test(s.textContent));if(!sec||!c)return;
+  // shots row
+  const sizeF=[...sec.querySelectorAll('.field')].find(f=>/Size/.test(f.textContent));
+  if(c[6]){const opts=c[6]==='shot'?[[1,'Single'],[2,'Double'],[3,'Triple']]:[[1,'1 tsp'],[2,'2 tsp'],[3,'3 tsp']];const cur=P1C.shots||c[7];
+    const html=`<div class="field"><span class="label">${c[6]==='shot'?'Shots':'Coffee'}</span><div class="seg p1seg">${opts.map(([v,l])=>`<button type="button" data-cofshots="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div></div>`;
+    if(sizeF)sizeF.insertAdjacentHTML('beforebegin',html)}
+  if(sizeF&&!c[3]&&!/filter|tea/.test(c[0]))sizeF.remove();else if(sizeF){const l=sizeF.querySelector('.label');if(l)l.textContent='Cup size'}
+  // milk: grouped, plus your own
+  const milkF=[...sec.querySelectorAll('.field')].find(f=>/Milk/.test(f.textContent));
+  if(milkF){const cur=P1C.milk||(c[3]?'semi':'none');const btn=([id,m])=>`<button type="button" data-cofmilk="${id}" aria-pressed="${cur===id}">${esc(m[0])}</button>`;const all=p1Milks();
+    milkF.innerHTML=`<span class="label">Milk</span><div class="p1cof p1cofm">${all.filter(x=>!x[0].startsWith('own:')).map(btn).join('')}</div>${all.some(x=>x[0].startsWith('own:'))?`<span class="label" style="margin-top:6px">Yours</span><div class="p1cof p1cofm">${all.filter(x=>x[0].startsWith('own:')).map(btn).join('')}</div>`:''}<button type="button" class="linkbtn" data-p1milkadd style="padding:0;min-height:32px">+ Add the milk you actually use</button>${P1C.milkForm?p1MilkForm():''}`}
+  const sum=sec.querySelector('.p1cofsum'),it=p1CofItem();if(sum&&it)sum.textContent=`${it.kcal} kcal · ${it.caffeine} mg caffeine · ${it.protein}p ${it.carbs}c ${it.fat}f`;
+  const lg=sec.querySelector('#cofLog');if(lg&&it)lg.textContent='Log '+it.name.toLowerCase()};
+function p1MilkForm(){const f=P1C.milkForm;return `<div class="p1milkf"><div class="field"><label class="label" for="mkn">Name on the carton</label><input id="mkn" type="search" autocomplete="off" value="${esc(f.name||'')}" placeholder="e.g. Alpro Almond Barista"></div><div id="mkSug" class="p1sugs"></div>
+  <span class="label">Per 100 ml (from the label)</span><div class="p1mk4">${[['kcal','kcal'],['p','Protein g'],['c','Carbs g'],['f','Fat g']].map(([k,l])=>`<label><small>${l}</small><input type="number" inputmode="decimal" step="0.1" data-mk="${k}" value="${f[k]??''}"></label>`).join('')}</div>
+  <div class="actions"><button type="button" class="ghost" data-p1milkno>Cancel</button><button type="button" class="primary" data-p1milksave>Save milk</button></div></div>`}
+let p1MkT=null;
+async function p1MilkSearch(q){const box=document.getElementById('mkSug');if(!box||q.length<3)return;
+  try{const r=await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=6&fields=product_name,brands,nutriments`);const j=await r.json();
+    const ps=(j.products||[]).filter(p=>p.product_name&&p.nutriments&&p.nutriments['energy-kcal_100g']!=null).slice(0,5);
+    box.innerHTML=ps.map(p=>{const n=p.nutriments;const nm=[p.brands&&String(p.brands).split(',')[0],p.product_name].filter(Boolean).join(' ').slice(0,50);return `<button type="button" class="p1sug" data-mkpick='${esc(JSON.stringify({name:nm,kcal:Math.round(n['energy-kcal_100g']),p:n.proteins_100g,c:n.carbohydrates_100g,f:n.fat_100g,ca:n.calcium_100g?Math.round(n.calcium_100g*1000):120}))}'><b>${esc(nm)}</b><small>${Math.round(n['energy-kcal_100g'])} kcal per 100 ml</small></button>`}).join('')}catch(e){}}
+document.addEventListener('input',e=>{const t=e.target;if(!t||!P1C.milkForm)return;if(t.id==='mkn'){P1C.milkForm.name=t.value;clearTimeout(p1MkT);p1MkT=setTimeout(()=>p1MilkSearch(t.value),350)}else if(t.dataset&&t.dataset.mk)P1C.milkForm[t.dataset.mk]=t.value});
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;if(!c('#p1Host'))return;
+  if(x=c('[data-cofshots]')){P1C.shots=+x.dataset.cofshots;p1DrinksDraw();return}
+  if(c('[data-p1milkadd]')){P1C.milkForm={};p1DrinksDraw();return}if(c('[data-p1milkno]')){P1C.milkForm=null;p1DrinksDraw();return}
+  if(x=c('[data-mkpick]')){try{Object.assign(P1C.milkForm,JSON.parse(x.dataset.mkpick))}catch(err){}p1DrinksDraw();return}
+  if(c('[data-p1milksave]')){const f=P1C.milkForm;if(!f.name||f.kcal==null||f.kcal===''){toast('Add the name and calories per 100 ml');return}
+    const m={id:Date.now().toString(36),name:String(f.name).slice(0,40),kcal:+f.kcal||0,p:+f.p||0,c:+f.c||0,f:+f.f||0,ca:+f.ca||120};const list=((meta.milks&&meta.milks.list)||[]).concat([m]);await persistMeta('milks',{list});P1C.milk='own:'+m.id;P1C.milkForm=null;p1DrinksDraw();toast(`${m.name} saved`);return}
+  if(c('[data-cof]')){setTimeout(()=>{const pr=p1LS.get('cof_'+P1C.type);P1C.shots=pr&&pr.shots||null;p1DrinksDraw()},0)}
+  if(c('#cofLog')){const t=P1C.type,pr=p1LS.get('cof_'+t)||{};p1LS.set('cof_'+t,{...pr,shots:P1C.shots})}},true);
+
+// sickness, in the check-in
+const SICK=['Headache','Cold or flu','Sore throat','Stomach or nausea','Vomiting','Diarrhoea','Fever','Other'];
+const SICKMED=['Painkillers','Cold and flu tablets','Antibiotics','Other medicine','Seen a doctor or pharmacist'];
+const SICKFOOD={'Cold or flu':'Warm drinks, soup or broth, and plenty of fluids. Keep some protein at each meal, and fruit and veg with vitamin C like kiwi, oranges and peppers.','Sore throat':'Soft, warm food: soup, porridge, scrambled eggs, yogurt. Honey in warm water soothes it.','Stomach or nausea':'Small sips of water often. When you can eat, keep it plain: toast, crackers, rice, banana, plain potatoes. Ginger tea can settle it. Skip fatty or spicy food and alcohol.','Vomiting':'Small, frequent sips. Rehydration sachets from the pharmacy put back the salts you lose. Plain food once it settles.','Diarrhoea':'Keep drinking, little and often. Rehydration sachets help. Plain food like rice, toast, banana and potatoes.','Headache':'A big glass of water, and something to eat if you\'ve skipped a meal. Go easy on coffee.','Fever':'Keep drinking little and often, with light, easy food. No training until a day after the fever\'s gone.','Other':'Plenty of fluids and simple, regular meals.'};
+const _p1CiOpen=p1CiOpen;
+p1CiOpen=function(){_p1CiOpen();const d=D()[P1.ci.k]||{};P1.ci.sick=d.sick?clone(d.sick):{types:[],sev:null,meds:[]};P1.ci.sickOpen=!!(d.sick&&d.sick.types&&d.sick.types.length);p1CiDraw()};
+const _p1CiDraw=p1CiDraw;
+p1CiDraw=function(){_p1CiDraw();const c=P1.ci;if(!c)return;const s=c.sick||{types:[],meds:[]};const hurt=document.getElementById('p1Hurt');if(!hurt)return;
+  const html=`<section class="p1blk p1sick" id="p1Sick"><h3>${ico('thermometer')} Feeling unwell?</h3>${!c.sickOpen?`<button type="button" class="ghost" data-p1sickopen style="width:100%">Yes, add it</button>`:`
+    <div class="p1cof">${SICK.map(x=>`<button type="button" data-p1sick="${x}" aria-pressed="${s.types.includes(x)}">${x}</button>`).join('')}</div>
+    ${s.types.length?`<div class="field"><span class="label">How bad</span>${p1Seg('sicksev',[['mild','Mild'],['moderate','Moderate'],['bad','Bad']],s.sev||'')}</div>
+    <div class="field"><span class="label">Taken anything, or seen anyone?</span><div class="p1cof">${SICKMED.map(x=>`<button type="button" data-p1med="${x}" aria-pressed="${(s.meds||[]).includes(x)}">${x}</button>`).join('')}</div></div>`:''}
+    <button type="button" class="linkbtn" data-p1sickclear style="padding:0;min-height:32px">${s.types.length?'I\'m better now, clear this':'Close'}</button>`}</section>`;
+  hurt.insertAdjacentHTML('beforebegin',html);if(c.sickScroll){c.sickScroll=false;const el=document.getElementById('p1Sick');if(el)el.scrollIntoView({block:'center'})}};
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;const ci=P1.ci;if(!ci)return;const s=ci.sick=ci.sick||{types:[],sev:null,meds:[]};
+  if(c('[data-p1sickopen]')){ci.sickOpen=true;p1CiDraw();return}
+  if(x=c('[data-p1sick]')){toggleIn(s.types,x.dataset.p1sick);if(!s.sev&&s.types.length)s.sev='mild';p1CiDraw();setTimeout(p1Queue,0);return}
+  if(x=c('[data-p1med]')){s.meds=s.meds||[];toggleIn(s.meds,x.dataset.p1med);p1CiDraw();setTimeout(p1Queue,0);return}
+  if(x=c('[data-p1="sicksev"]')){s.sev=x.dataset.v;p1CiDraw();setTimeout(p1Queue,0);return}
+  if(c('[data-p1sickclear]')){ci.sick={types:[],sev:null,meds:[]};ci.sickOpen=false;p1CiDraw();setTimeout(p1Queue,0);return}},true);
+function p1CiFields(c){const f={bed:c.bed,wake:c.wake,latency:+c.latency,wakes:+c.wakes,awakeMin:+c.wakes?+c.awakeMin:0,sleepQ:+c.sleepQ,energy:+c.energy,mood:+c.mood,stress:+c.stress,sore:+c.sore,sleepH:p1SleepCalc(c)};if(c.screenOff)f.screenOff=c.screenOff;if(c.trainIntent)f.trainIntent=c.trainIntent;
+  const s=c.sick;f.sick=s&&s.types&&s.types.length?{types:s.types.slice(),sev:s.sev||'mild',meds:(s.meds||[]).slice(),at:new Date().toISOString()}:null;return f}
+// the coach's read turns to looking after yourself when you're sick
+const _p1Read5=p1ReadHTML;
+p1ReadHTML=function(k){const d=D()[k]||{};const s=d.sick;if(sampleMode||!s||!s.types||!s.types.length)return _p1Read5(k).replace('<button type="button" class="linkbtn" data-p1pat>','<button type="button" class="linkbtn" data-p1sickgo>Feeling unwell? Add it ›</button><button type="button" class="linkbtn" data-p1pat>');
+  const p=planFor(parse(k));const planned=p&&p.type!=='R'&&!p.pre;const name=(userName()||'').split(/\s+/)[0]||'';
+  const pts=[];if(planned)pts.push(['footprints',s.sev==='mild'&&!s.types.some(x=>/Fever|Vomiting|Diarrhoea|flu/.test(x))?`Keep today's ${TNAME[p.type].toLowerCase()} very easy, or skip it.`:`Skip today's ${TNAME[p.type].toLowerCase()}.`,'Training while you\'re sick slows your recovery. The plan will wait.']);
+  s.types.slice(0,2).forEach(t=>pts.push(['utensils',t==='Other'?'Food and drink':t+':',SICKFOOD[t]||SICKFOOD.Other]));
+  pts.push(['heart-pulse','If it gets worse or lasts more than a few days,','call your GP or pharmacist. For medicine, follow the pack or your pharmacist.']);
+  return `<details class="card p1read p1readsick" data-ms="p1read" open><summary><span class="p1rh">${ico('thermometer')}<b>Go easy${name?', '+esc(name):''}. You're not well${s.sev==='bad'?' at all':''}.</b><i aria-hidden="true">▾</i></span><span class="p1rpts">${esc(s.types.join(', '))}${(s.meds||[]).length?' · '+esc(s.meds.join(', ')):''}</span></summary>
+    <ul>${pts.slice(0,4).map(([ic,a,b])=>`<li><span><b>${esc(a)}</b> ${esc(b)}</span></li>`).join('')}</ul><button type="button" class="linkbtn" data-p1sickgo>Update how you feel ›</button></details>`};
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-p1sickgo]')){p1CiOpen();P1.ci.sickOpen=true;P1.ci.sickScroll=true;p1CiDraw()}});
+Object.assign(ICO,{thermometer:'<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>'});
+
+// coach's overview lives on Today and refreshes once a day after you check in
+var P1OV={tried:''};
+function p1Overview(k){if(sampleMode)return '';const savedAI=meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');
+  const d=D()[k]||{};const stale=!savedAI||iso(new Date(savedAI.at))!==k;
+  if(sample&&stale&&!aiState.busy&&readiness(d)!=null&&P1OV.tried!==k){P1OV.tried=k;setTimeout(()=>{if(tab()==='dashboard')runAI()},800)}
+  return coachHTML(aiText,savedAI)}
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -2915,7 +3026,7 @@ function viewReports(){
   const savedAI=!sampleMode&&meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');
   const aiPanel=coachHTML(aiText,savedAI);
   const W=(title,hint,body)=>`<section class="panel"><h3>${title}</h3>${hint?`<div class="hint">${hint}</div>`:''}${body}</section>`;
-  return toggle+tiles+aiPanel+planStickHTML()+
+  return toggle+tiles+planStickHTML()+
    `<div class="sect">Load</div>`+
    W(`Training load vs ${WORK.toLowerCase()}`,`Bars: minutes × effort per week, by session type (club and extra sessions in teal). Dashed line: hours of ${WORK.toLowerCase()}.`,weeklyChart(wkNow)+`<div class="legend">${['S','E','H','T','X','O'].map(k=>`<span style="--c:var(${TVAR[k]})"><i></i>${TNAME[k]}</span>`).join('')}<span style="--c:var(--farm)"><i></i>${WORK} hours</span></div>`)+
    W('How you spend your days','Average hours per day, by week, including sleep and training.',timeUseChart(now))+
