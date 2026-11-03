@@ -684,8 +684,8 @@ function viewTraining(){
   const due=key===iso(todayDate())&&planDue();const pd=planDay(key);
   const food=pd?`<a class="rpill" href="#food" style="--vc:var(--accent)"><b>${(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot)&&planLogged(key,ix)).length}/${(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).length}</b><span><b>Today's meals</b><br><small>${esc((pd.meals||[]).filter(m=>!/fasted/i.test(m.slot)).map(m=>m.name).slice(0,3).join(' · '))}</small></span><span aria-hidden="true">›</span></a>`:'';
   const nudge=due?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days of food':'Your meal plan ends today'}</b><br><small>Update your food and tap Plan.</small></span><span aria-hidden="true">›</span></button>`:'';
-  const none=!pl?`<article class="card"><div class="chead"><div style="flex:1"><h2>${sel<FIRST?`Plan starts ${fmtD(FIRST)}`:'Plan complete'}</h2><div class="sub">${sel<FIRST?`${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go.`:'The 16 weeks ran to 28 February.'}</div></div></div>${sel<FIRST?`<div class="form"><button type="button" class="primary" data-goto="${iso(FIRST)}">See day one</button></div>`:''}</article>`:'';
-  return pre+(key===iso(todayDate())?injuryBanner():'')+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+extrasCardHTML(key)+patternHTML()+pill;
+  const none=!pl?(sel<FIRST?`<div class="p1pre">${ico('calendar')}<span>Plan starts <b>${fmtD(FIRST,{weekday:'short',day:'numeric',month:'short'})}</b> · ${Math.max(0,Math.round((FIRST-todayDate())/DAY))} days to go</span><button type="button" class="linkbtn" data-goto="${iso(FIRST)}">Day one ›</button></div>`:`<div class="p1pre">${ico('check')}<span>Plan complete</span></div>`):'';
+  return pre+(key===iso(todayDate())?injuryBanner():'')+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+(((!pl||pl.type==='R'||pl.pre)&&((D()[key]||{}).extras||[]).length&&tView==='today'&&!sampleMode)?'':extrasCardHTML(key))+patternHTML()+pill;
 }
 function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Overview']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
 function viewTrainingTab(){if(tView==='route')return planNav(tView)+routeHTML();return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+fullPlanTip()+viewPlan():viewTraining())}
@@ -765,7 +765,7 @@ function viewDashboard(){
   const balance=balTot?`<div class="stack">${bal.map(([f,c,l])=>+yd[f]?`<i style="flex:${+yd[f]};background:${c}" title="${l}"></i>`:'').join('')}</div><div class="legend">${bal.map(([f,c,l])=>`<span style="--c:${c}"><i></i>${l} ${+yd[f]||0} h</span>`).join('')}</div>`:'<div class="ds">Comes from the morning check-in, under Yesterday.</div>';
   const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'').split(' :: ')[0]):[];
   const due=!sampleMode&&planDue();
-  const su=setupChecklistHTML();return p1Top(now)+p1ReadHTML(k)+injuryBanner()+hero+p1FoodMini(k)+`${sampleMode?'':p1Tiles()}${p1SignCard(k)}`+(su?`<details class="kmore p1setup"><summary>Getting started</summary>${su}</details>`:'')+`<details class="kmore"><summary>More about today</summary><div class="p1ex"><button type="button" class="ghost" id="sampleBtn">${sampleMode?'Back to my data':'See an example day'}</button></div><div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
+  const su=setupChecklistHTML();return p1Top()+p1ReadHTML(k)+injuryBanner()+hero+p1FoodMini(k)+`${sampleMode?'':p1Tiles()}${p1SignCard(k)}`+(su?`<details class="kmore p1setup"><summary>Getting started</summary>${su}</details>`:'')+`<details class="kmore"><summary>More about today</summary><div class="p1ex"><button type="button" class="ghost" id="sampleBtn">${sampleMode?'Back to my data':'See an example day'}</button></div><div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section></details>
@@ -1308,6 +1308,7 @@ function ciChip(k){if(sampleMode)return '';const d=D()[k]||{};if(k>iso(todayDate
   return statusRow('todo','Not checked in yet',k===iso(todayDate())?'Takes 30 seconds: say it or tap below':'','')}
 function sessChip(k){if(sampleMode||tView!=='today')return '';const p=planFor(parse(k)),l=L()[k],d=D()[k]||{};
   if((!p||p.type==='R'||p.pre)&&d.trainIntent==='extra'&&!(d.extras||[]).length)return statusRow('todo','Training planned, not logged yet',k>iso(todayDate())?'Coming up':'Log it below once it\'s done','<button type="button" class="stbtn kghost" data-intentclear>It didn\'t happen</button>');
+  if((!p||p.type==='R'||p.pre)&&(d.extras||[]).length)return extrasCardHTML(k);
   if(!p||p.type==='R'||p.pre)return statusRow((d.extras||[]).length?'done':'rest',(d.extras||[]).length?'Extra session logged':p&&p.type==='R'?'Rest day':'No session planned',(d.extras||[]).length?`${d.extras.length} extra session${d.extras.length>1?'s':''} logged`:'Log anything you did below','');
   if(l&&l.status==='done')return statusRow('done','Session done',[l.dur?`${l.dur} min`:'',l.rpe?`effort ${l.rpe}/10`:''].filter(Boolean).join(' · ')||'Logged','');
   if(l&&l.status==='partial')return statusRow('part','Partly done',l.dur?`${l.dur} min`:'','');
@@ -2468,7 +2469,7 @@ function p1Bad(w){return w&&(w.snow>0.2?'snow':w.tmax<=1?'ice':w.rain>=8?'heavy 
 function p1WxWarn(k){const w=(P1WX.daily||[]).find(x=>x.date===k);const p=planFor(parse(k));if(!w||!p||!OUTDOOR[p.type]||p.pre)return null;const b=p1Bad(w);if(!b)return null;
   let alt=null;for(const o of [1,-1,2,-2]){const kk=iso(addD(parse(k),o));if(kk<iso(todayDate()))continue;const pp=planFor(parse(kk)),ww=(P1WX.daily||[]).find(x=>x.date===kk);if(ww&&!p1Bad(ww)&&(!pp||pp.type==='R'||!OUTDOOR[pp.type])){alt=kk;break}}
   return {text:`${b[0].toUpperCase()+b.slice(1)} forecast for ${k===iso(todayDate())?'today\'s':fmtD(parse(k),{weekday:'long'})+'\'s'} ${TNAME[p.type].toLowerCase()}.`,tip:alt?`${fmtD(parse(alt),{weekday:'long'})} looks better. You could swap them, or do it indoors.`:'You could do it indoors, or keep it short.',alt}}
-function p1WxChip(k){const w=(P1WX.daily||[]).find(x=>x.date===k);if(!w){if(meta.loc&&!P1WX.busy&&!P1WX.daily)p1Forecast(false).then(()=>{if(tab()==='dashboard')render()});return `<button type="button" class="p1wxc" data-p1wx>${ico('cloud-sun')}<span>${meta.loc?'Weather':'Add weather'}</span></button>`}
+function p1WxChip(k){const w=(P1WX.daily||[]).find(x=>x.date===k);if(!w){if(meta.loc&&!P1WX.busy&&!P1WX.daily)p1Forecast(false).then(()=>{if(tab()==='dashboard')render()});return `<button type="button" class="p1wxc" data-p1wx aria-label="Weather forecast">${ico('cloud-sun')}</button>`}
   const warn=[0,1,2,3].some(i=>p1WxWarn(iso(addD(parse(k),i))));return `<button type="button" class="p1wxc${warn?' warn':''}" data-p1wx>${ico(p1Sky(w.code)==='Sunny'||p1Sky(w.code)==='Bright spells'?'sun':/Rain|Drizzle|Thunder/.test(p1Sky(w.code))?'cloud-rain':/Snow/.test(p1Sky(w.code))?'snowflake':'cloud-sun')}<span class="num">${w.tmax}°</span>${warn?'<i></i>':''}</button>`}
 async function p1WxOpen(){p1Sheet(`<div class="kshead"><div><h2>Weather</h2><small class="ds">Next two weeks</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div><div class="ds">Getting the forecast…</div>`);
   const dd=await p1Forecast(true);if(!document.querySelector('#p1Host .kshead'))return;
@@ -2653,6 +2654,57 @@ p1FindLoops=async function(){if(!window.__p1route||!RT.start)return _p1FindLoops
   for(const x of got){x.cells=p1Cells(x.coords);if(pick.every(y=>{let s=0;x.cells.forEach(c=>{if(y.cells.has(c))s++});return s/Math.min(x.cells.size,y.cells.size)<0.6}))pick.push(x);if(pick.length===3)break}
   RT.loops=pick;RT.busy=false;RT.sig='';RT.msg='';p1RouteDraw();setTimeout(()=>{const w=document.querySelector('.p1mapwrap');if(w)w.scrollIntoView({behavior:'smooth',block:'start'})},120)};
 function foodHTML(dIso){return foodSub()+(fView==='plan'?planHTML()+p1IdeasHTML():fView==='kitchen'?kitchenHTML():foodTodayHTML(dIso))}
+
+// ================= P1 v4: one-line top bar, compact read, circles back, vitamin info, folded meals =================
+// top bar: date (and weather on Today) sit in one line beside the logo
+function dayHeader(){const key=iso(sel);const mon=addD(sel,-((sel.getDay()+6)%7));if(!stripOpen)return '';let strip='';
+  for(let i=0;i<7;i++){const d=addD(mon,i),p=planFor(d),t=p?p.type:'R',lt=L()[iso(d)],col=lt&&lt.type==='H'&&t==='T'?'H':t;const rs=readiness(D()[iso(d)]);
+    strip+=`<button type="button" data-goto="${iso(d)}" class="${iso(d)===key?'sel':''}" style="--c:var(${TVAR[col]});--rc:${rColor(rs)}" aria-label="${fmtD(d,{weekday:'long',day:'numeric',month:'long'})}"><span class="d">${DOW[i]}</span><span class="n">${d.getDate()}</span><span class="dot ${dotClass(d,p)}"></span><span class="rd"></span></button>`}
+  return `<div class="p1strip"><button type="button" class="p1hn" id="prevD" aria-label="Previous week">‹</button><div class="strip kswipe" title="Swipe to change week">${strip}</div><button type="button" class="p1hn" id="nextD" aria-label="Next week">›</button></div>`}
+function p1Hdr(){const t=tab();const now=sampleMode?SAMPLE.now:todayDate();
+  if(t==='dashboard')return `<span class="p1hd">${fmtD(now,{day:'numeric',month:'short'})}</span>${sampleMode?'':p1WxChip(iso(now))}`;
+  if((t==='food'&&fView==='today')||(t==='training'&&tView==='today')){const isT=iso(sel)===iso(todayDate());
+    return `<button type="button" class="p1hm" id="stripTog" aria-expanded="${stripOpen}">${ico('calendar')}${isT?'Today':fmtD(sel,{weekday:'short'})} ${fmtD(sel,{day:'numeric',month:'short'})} <small>${stripOpen?'▴':'▾'}</small></button>${isT?'':'<button type="button" class="p1hn p1ht" id="goToday" aria-label="Back to today">↺</button>'}`}
+  return `<span class="p1hd">${fmtD(now,{weekday:'short',day:'numeric',month:'short'})}</span>`}
+function p1HdrSet(){const h=document.getElementById('p1hdr');if(h)h.innerHTML=p1Hdr()}
+function p1Top(){return sampleMode?'<div class="banner">Example data, not yours. Open More about today to go back.</div>':''}
+
+// coach's read: greeting and verdict in one line, points short, tips on tap
+const _p1Read=p1ReadHTML;
+p1ReadHTML=function(k){const h=_p1Read(k);if(!h)return sampleMode?'':`<button type="button" class="card p1read p1readc" data-p1tile="ci">${ico('sparkles')}<b>${greet()}.</b><span>Check in for your read on today ›</span></button>`;
+  const head=(h.match(/<div class="p1readh">[\s\S]*?<b>([\s\S]*?)<\/b>/)||[])[1]||'';const verdict=/a little bit down/.test(head)?'A little bit down on today.':/on the up/.test(head)?'You\'re on the up.':/Steady/.test(head)?'Steady going.':'Here\'s your read.';
+  const pts=[...h.matchAll(/<li>([\s\S]*?)<span><b>([\s\S]*?)<\/b> ([\s\S]*?)<\/span><\/li>/g)].map(m=>({ic:m[1],a:m[2],b:m[3]}));
+  return `<details class="card p1read" data-ms="p1read"><summary><span class="p1rh">${ico('sparkles')}<b>${greet()}. ${verdict}</b><i aria-hidden="true">▾</i></span><span class="p1rpts">${pts.map(p=>`<span>${p.ic}${p.a}</span>`).join('')}</span></summary>
+    <ul>${pts.map(p=>`<li><span><b>${p.a}</b> ${p.b}</span></li>`).join('')}</ul><button type="button" class="linkbtn" data-p1pat>See the patterns behind this ›</button></details>`};
+
+// food: circles again, on Today and in the Food tab
+function p1FoodMini(k){const d=D()[k]||{date:k,food:[]};const t=foodTotals(d),dt=dayTypeFor(k);
+  return `<details class="card kfood p1fmini" data-ms="p1fmini" open><summary><b>Food today</b><span class="num">${Math.round(t.kcal)} of ${Math.round(p1Ref('kcal',dt))} kcal</span></summary>${macroRings(t,dt)}${microsHTML(t,dt,k)}</details>`}
+const _p1FT=foodTodayHTML;
+foodTodayHTML=function(dIso){return _p1FT(dIso).replace('<article class="card p1ftot">','<article class="card kmac p1ftot">').replace(/\$\{?<div class="p1mbs">[\s\S]*?<\/div><\/div><\/div>/,'')};
+function p1FoodBars(t,dt){return macroRings(t,dt)}
+
+// meals fold: header and split bar show, items drop down
+function p1MealHTML(m,its){const mt={};['kcal','protein','carbs','fat'].forEach(k=>mt[k]=its.reduce((a,i)=>a+(k==='kcal'?kcalOf(i):(+i[k]||0)),0));const e=(mt.protein*4+mt.carbs*4+mt.fat*9)||1;
+  return `<details class="p1meal" data-ms="meal${m}"><summary><div class="p1mh"><span class="mico" aria-hidden="true">${MICO[m]}</span><b>${m}</b><small>${its.length} item${its.length>1?'s':''}</small><span class="num">${Math.round(mt.kcal)} kcal</span><i aria-hidden="true">▾</i></div>
+    <div class="p1split" aria-hidden="true"><i style="width:${mt.protein*400/e}%;background:var(--s)"></i><i style="width:${mt.carbs*400/e}%;background:var(--e)"></i><i style="width:${mt.fat*900/e}%;background:var(--x)"></i></div>
+    <div class="p1mm num"><span style="--c:var(--s)">${Math.round(mt.protein)} g protein</span><span style="--c:var(--e)">${Math.round(mt.carbs)} g carbs</span><span style="--c:var(--x)">${Math.round(mt.fat)} g fat</span></div></summary>
+    ${its.map(p1FoodRow).join('')}</details>`}
+
+// today's meal plan: folded, each meal labelled as a plan
+const _p1PM=planMealsHTML;
+planMealsHTML=function(k,compact){return _p1PM(k,compact).replace(/<span class="pslot">(Breakfast|Lunch|Dinner|Snack|Supper)/g,'<span class="pslot">$1 plan')};
+
+// vitamins: tap any one to see what it does and where it's found
+const NUT_WHAT={fibre:'Keeps your gut working well, keeps you full and steadies blood sugar.',sodium:'Keeps fluid balance and muscles working. You lose a lot in sweat.',potassium:'Works with sodium on fluid balance, heart rhythm and muscle contractions.',magnesium:'Helps muscles relax, energy production and sleep.',calcium:'Builds bones and teeth, and helps muscles contract.',iron:'Carries oxygen in your blood. Low iron means tiredness.',zinc:'Supports your immune system, healing and recovery.',selenium:'Protects cells from damage and supports the thyroid.',iodine:'Your thyroid needs it to set your energy use.',vitA:'Eyesight, skin and the immune system.',vitC:'Immune system, healing, and helps you absorb iron from plants.',vitD:'Bones, muscles and immunity. In Ireland it\'s hard to get enough from sun between October and March.',vitK:'Blood clotting and bone strength.',b12:'Energy, nerves and making red blood cells. Mostly found in animal foods.',folate:'Making new cells and red blood cells.',choline:'Brain, memory and muscle control.',omega3:'Heart, brain and joints, and may help calm inflammation.',caffeine:'Wakes you up and can help training, but stays in your system for hours and can upset sleep.',protein:'Builds and repairs muscle and keeps you full.',carbs:'Fuel for hard training and your brain.',fat:'Hormones, absorbing vitamins A, D, E and K, and steady energy.',kcal:'The total energy in your food.'};
+function nutBar(n,val,tg){const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);const pct=Math.min(100,val/ref*100);const st=status(val,tg);
+  return `<button type="button" class="mac p1nut" data-nutinfo="${n.k}"><div class="mh"><span>${n.l} <i aria-hidden="true">›</i></span><span class="num"><b>${fmtN(val,n.u)}</b>${n.u==='kcal'?'':' '+n.u} · ${tg.txt}</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:${SC[st]}"></div></div></button>`}
+function p1NutInfo(k){const n=NUTS.find(x=>x.k===k);if(!n)return;const dk=iso(sel);const t=foodTotals(D()[dk]||{});const tg=nutTarget(k,dayTypeFor(dk));
+  p1Sheet(`<div class="kshead"><div><h2>${esc(n.l)}</h2><small class="ds">Today: ${fmtN(t[k]||0,n.u)}${n.u==='kcal'?'':' '+n.u} · target ${esc(tg.txt||'')}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    ${NUT_WHAT[k]?`<section class="p1blk"><h3>What it does</h3><p style="margin:0">${esc(NUT_WHAT[k])}</p></section>`:''}
+    ${NUT_FOODS[k]?`<section class="p1blk"><h3>Foods that have it</h3><p style="margin:0">${esc(NUT_FOODS[k][0].toUpperCase()+NUT_FOODS[k].slice(1))}.</p></section>`:''}
+    <p class="ds" style="font-size:12px;margin:0">Vitamins and minerals come mainly from food. Supplements only fill a gap.</p>`)}
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-nutinfo]');if(x){e.preventDefault();p1NutInfo(x.dataset.nutinfo)}});
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -2960,7 +3012,7 @@ function render(){
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
   $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():pView==='patterns'?p1PatternsView():pView==='export'?p1ExportView():viewReports());
-  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y)}P1R.sig=p1sig;
+  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();p1HdrSet();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y)}P1R.sig=p1sig;
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}
