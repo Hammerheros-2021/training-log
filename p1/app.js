@@ -724,7 +724,7 @@ function viewDashboard(){
     const feel=avg([d.energy!=null?(d.energy-1)/4:null,d.mood!=null?(d.mood-1)/4:null,d.stress!=null?(5-d.stress)/4:null].filter(x=>x!=null));
     const body=avg([d.sore!=null?(5-d.sore)/4:null,1-maxPain(d)/10].filter(x=>x!=null));
     const sl=sh!=null?Math.min(1,sh/need):null;const pc=v=>v==null?'-':Math.round(v*100)+'%';const cl=v=>v==null?'var(--muted)':v>=.75?'var(--ok)':v>=.55?'var(--warn)':'var(--bad)';
-    hero=`<section class="hero" style="--vc:${vc}">${ring(s,100,112,11,'fade',s,'Balance')}<div class="hv"><h2>${vh}</h2><p>${vt}</p>
+    hero=`<section class="hero" style="--vc:${vc}">${ring(s,100,112,11,'fade',s,'Balance')}<div class="hv"><h2>${p1Trend(k)}</h2>
       ${miniBar('Sleep',sl??0,1,cl(sl),pc(sl))}${miniBar('Feel',feel??0,1,cl(feel),pc(feel))}${miniBar('Body',body??0,1,cl(body),pc(body))}</div></section>`}
   else hero=`<a class="hero empty" href="#checkin">${ring(null,100,112,11,'fade','–','Balance')}<div class="hv"><h2>Check in to see your balance</h2><p>Last night's sleep, how you feel and any niggles. Or tap Dictate and just say it.</p><span class="go">Open check-in ›</span></div></a>`;
   // tiles
@@ -1875,7 +1875,7 @@ function kBands(){CMPI=0;let t='';try{t=tab()}catch(e){}if(t!=='reports')return;
   const kids=[...app.children];let cur=null,n=0;kids.forEach(el=>{if(el.classList&&el.classList.contains('sect')){cur=document.createElement('details');cur.className='ksec p1fold'+(n%2?' alt':'');if(n===0)cur.open=true;n++;const sm=document.createElement('summary');sm.className='sect';sm.textContent=el.textContent;cur.appendChild(sm);app.insertBefore(cur,el);el.remove();return}if(cur)cur.appendChild(el)})}
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='coachAcc')coachOpen=e.target.open},true);
 function coachHTML(aiText,savedAI){const pts=String(aiText||'').split('\n').map(x=>x.trim()).filter(x=>x.startsWith('-')).length;
-  return `<details class="kcoach" id="coachAcc" ${coachOpen||aiState.busy?'open':''}><summary><span class="kpic">${ico('sparkles')}</span><span class="kct"><b>Coach's overview</b><small>${aiState.busy?'Reading your last 4 weeks…':aiText?`${pts||'A few'} things worth knowing${savedAI&&!aiState.text?` · ${fmtD(new Date(savedAI.at))}`:''}`:'Your last 4 weeks, read for you'}</small></span><span class="kchev" aria-hidden="true">${ico('chevron-right')}</span></summary>
+  return `<details class="kcoach" id="coachAcc" ${coachOpen||aiState.busy?'open':''}><summary><span class="kpic">${ico('sparkles')}</span><span class="kct"><b>Keelan's overview</b><small>${aiState.busy?'Reading your last 4 weeks…':aiText?`${pts||'A few'} things worth knowing${savedAI&&!aiState.text?` · ${fmtD(new Date(savedAI.at))}`:''}`:'Your last 4 weeks, read for you'}</small></span><span class="kchev" aria-hidden="true">${ico('chevron-right')}</span></summary>
     <div class="kcbody">${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
     ${sample&&!aiState.busy?`<button type="button" class="kchbtn" id="aiBtn">${aiText?'Refresh overview':'Get my overview'}</button>`:''}</div></details>`}
 
@@ -2179,9 +2179,9 @@ function foodTodayHTML(dIso){
     ${p1FoodBars(t,dt,'d')}${microsHTML(t,dt,dIso)}</article>
   ${foodActionsHTML(dIso)}
   ${meals?`<article class="card p1meals">${meals}</article>`:''}
-  ${pd?`<details class="kmore p1pm" data-ms="p1pm"><summary>Today's meal plan · ${pmDone} of ${pm.length} eaten</summary>${planMealsHTML(dIso)}</details>`:''}
+  ${pd?`<details class="kmore p1pm" data-ms="p1pm"><summary>${ico('clipboard-list')}<b>Today's meal plan</b><small>${pmDone} of ${pm.length} eaten</small></summary>${planMealsHTML(dIso)}</details>`:''}
   ${isToday&&due&&!kEmpty?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Make a meal plan':'Your meal plan ends today'}</b><br><small>Tap to plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
-  <article class="card drinks">${suppHTML(dIso)}</article>
+  <details class="card p1fold2 drinks" data-ms="p1supp"><summary>${ico('pill')}<b>Supplements</b><small>${(()=>{const dd=D()[dIso]||{};const l=supps();const tk=l.filter(x=>!(dd.suppMissed||[]).includes(x.id)&&dIso>=(x.since||'0')).length;return l.length?`${tk} of ${l.length} taken`:'None added yet'})()}</small></summary>${suppHTML(dIso)}</details>
   <div class="plantrow p1plants"><b class="num">${pw.size}</b><span>of ${PLANTS_WEEK} plants in the last 7 days${pt.size?` · today: ${esc([...pt].slice(0,8).join(', '))}${pt.size>8?'…':''}`:''}</span></div>`}
 // portion up or down on a logged item: the bars move straight away, saving happens in the background
 let p1PT=null;
@@ -2924,6 +2924,31 @@ foodActionsHTML=function(dIso){const h=_p1FA6(dIso);if(!h)return h;
 // plants: count proper portions of whole plants only
 const P1NOTPLANT=/^(salt|sugar|brown sugar|honey|maple syrup|syrup|sweetener|stevia|flour|plain flour|cornflour|corn starch|starch|yeast|baking powder|vinegar|balsamic vinegar|soy sauce|tamari|ketchup|tomato ketchup|tomato sauce|tomato puree|tomato paste|stock|stock cube|gravy|mustard|mayonnaise|oil|olive oil|rapeseed oil|sunflower oil|coconut oil|sesame oil|vegetable oil|cocoa|cocoa powder|chocolate|dark chocolate|vanilla|coffee|tea|green tea|black tea|herbal tea|black pepper|pepper \(spice\)|paprika|smoked paprika|cumin|turmeric|cinnamon|nutmeg|chilli flakes|chili flakes|chilli powder|chili powder|curry powder|garam masala|mixed herbs|herbs|dried herbs|oregano|basil|thyme|rosemary|parsley|coriander|dill|mint|bay leaf|bay leaves|sage|chives|garlic powder|onion powder|ginger powder|ground ginger|spices|seasoning|sauce|pesto|hummus dip|jam|marmalade|peanut butter|crisps|chips|fries|beer|wine|cider|lager|stout|gin|whiskey|vodka|rum|juice|orange juice|apple juice|squash|cordial|cola)$/i;
 function plantsOn(d){const s=new Set();(d&&d.food||[]).forEach(i=>{if(i.src==='coffee'||i.src==='alcohol'||(i.pct&&i.pct<50))return;(i.plants||[]).forEach(p=>{const n=String(p).toLowerCase().trim();if(n&&!P1NOTPLANT.test(n))s.add(n)})});return s}
+
+// ================= P1 v7: Keelan, session-aware advice, folded supplements =================
+// what to do today, aware of what you've already done (and fine for people who don't train)
+const _p1rV=rVerdict;
+rVerdict=function(s,d){const k=d&&d.date;if(!k||maxPain(d)>=3)return _p1rV(s,d);
+  if(d.sick&&d.sick.types&&d.sick.types.length)return ['var(--bad)','Look after yourself today.','You\'re not well, so rest from training and keep eating and drinking little and often.'];
+  if(s==null)return _p1rV(s,d);
+  const p=planFor(parse(k)),l=L()[k];const planned=!!(p&&p.type!=='R'&&!p.pre);const ex=(d.extras||[]).length;const done=!!(l&&(l.status==='done'||l.status==='partial'));const n=(done?1:0)+ex;
+  if(n){const head=n>1?`${n} sessions in today. Good going.`:'Session done. Nice work.';
+    return [s>=75?'var(--ok)':'var(--warn)',head,s>=75?'Refuel well and enjoy the rest of the day.':s>=55?`Keep the rest of the day easy${n>1?', no more training today,':''} and eat well.`:'You were running a bit low going in, so rest up, eat well and get to bed on time.']}
+  const nm=planned?TNAME[p.type].replace(/^(Easy|Strength|Threshold|Speed|Other|Rest)/,m=>m.toLowerCase()):'';
+  if(planned){if(s>=75)return ['var(--ok)',`Good to go for your ${nm}.`,'You\'re well recovered. Enjoy it.'];
+    if(s>=55)return ['var(--warn)',`Do your ${nm}, but ease off a notch.`,'Hold the effort a bit below target and skip any extras today.'];
+    return ['var(--bad)','Go easy today.',`Swap your ${nm} for a walk or some stretching, eat well and get to bed early.`]}
+  if(s>=75)return ['var(--ok)','A good day to get moving.','A walk, a cycle or whatever you enjoy.'];
+  if(s>=55)return ['var(--warn)','Keep it gentle today.','Easy movement, good food and a decent night\'s sleep.'];
+  return ['var(--bad)','Take it easy today.','Rest, eat well and get to bed on time.']};
+// how this week compares with last, for the balance card
+function p1Trend(k){const DD=D();const r0=readiness(DD[k]);if(r0==null)return 'Your balance';const prev=[];for(let i=1;i<=7;i++){const v=readiness(DD[iso(addD(parse(k),-i))]);if(v!=null)prev.push(v)}
+  const r3=avg([r0,readiness(DD[iso(addD(parse(k),-1))]),readiness(DD[iso(addD(parse(k),-2))])].filter(v=>v!=null));if(prev.length<3)return 'Your balance today';const t=r3-avg(prev);return t<=-6?'A little down on your week':t>=6?'On the up this week':'Steady this week'}
+// Keelan's read: today's advice first, in his name
+const _p1Read7=p1ReadHTML;
+p1ReadHTML=function(k){const h=_p1Read7(k);if(!h||sampleMode)return h;const d=D()[k]||{};const s=readiness(d);const v=rVerdict(s,d);
+  if(h.includes('p1readc'))return h.replace(/<b>[\s\S]*?<\/b>/,`<span class="p1kn">Keelan</span><b>${greet()}.</b>`);
+  return h.replace(/<span class="p1rh">[\s\S]*?<b>[\s\S]*?<\/b>/,`<span class="p1rh"><span class="p1kav" aria-hidden="true">K</span><span class="p1rht"><small>Keelan · ${greet()}</small><b>${esc(v[1])}</b></span>`).replace(/(<span class="p1rpts">)/,`$1<span class="p1rv">${esc(v[2])}</span>`)};
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}

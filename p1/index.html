@@ -1282,6 +1282,21 @@ details.p1fold:not([open]){padding-top:var(--space-2);padding-bottom:var(--space
 .p1evl{display:flex;flex-direction:column;gap:8px;padding:0 16px 14px}.p1evi{display:flex;align-items:center;gap:12px;text-align:left;padding:10px 12px;border-radius:var(--radius-md);border:1px solid var(--line);border-left:3px solid var(--k-amber);background:var(--surface);color:var(--text);font:inherit}
 .p1evd{display:flex;flex-direction:column;align-items:center;width:38px}.p1evd b{font:600 20px/22px var(--font-display)}.p1evd small,.p1evt small{font-size:11px;color:var(--text-muted)}.p1evt{flex:1;display:flex;flex-direction:column;min-width:0}.p1evn{font-size:12px;font-weight:600;color:var(--k-amber)}
 .p1sick .row2 .primary{background:var(--k-pink);border-color:var(--k-pink);color:#fff}
+/* ===P1v7=== */
+.p1kav{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 14px/1 var(--font-display);color:#fff;background:linear-gradient(135deg,#E23D9E,#5B6CFF 55%,#34E3A0)}
+.p1rht{flex:1;display:flex;flex-direction:column;min-width:0}.p1rht small{font-size:12px;color:var(--text-muted)}.p1rht b{font:600 16px/21px var(--font-body)}
+.p1rpts{padding-left:38px!important}.p1rv{color:var(--text)!important;font-size:13px}
+.p1read ul{padding-left:52px!important}.p1read .linkbtn{margin-left:52px!important}
+.p1kn{font-size:12px;color:var(--text-muted);margin-right:4px}
+.p1fold2{padding:0}.p1fold2>summary,.p1pm>summary{list-style:none;display:flex!important;align-items:center;gap:10px;padding:14px 16px;cursor:pointer}
+.p1fold2>summary::-webkit-details-marker,.p1pm>summary::-webkit-details-marker{display:none}
+.p1fold2>summary b,.p1pm>summary b{font:600 16px/20px var(--font-body);color:var(--text)}.p1fold2>summary small,.p1pm>summary small{flex:1;font-size:13px;color:var(--text-muted);font-weight:400}
+.p1fold2>summary>.ki{color:var(--k-violet)}.p1pm>summary>.ki{color:var(--k-amber)}
+.p1fold2>summary::after{content:"\25BE";display:inline-grid;place-items:center;width:30px;height:30px;flex:none;border-radius:50%;background:color-mix(in srgb,var(--text) 12%,transparent);color:var(--text);font:700 16px/1 var(--font-body);transition:transform .2s}
+.p1fold2[open]>summary::after{transform:rotate(180deg)}
+.p1fold2 .srow{padding:0 16px 14px}.p1fold2 .srow>.sh b{display:none}
+.p1pm{background:var(--surface);border-radius:var(--radius-lg)}.p1pm>summary{color:inherit!important}
+.p1meals .p1mh .mico{font-size:18px}
 </style>
 </head>
 <body class="kloading">
@@ -1307,6 +1322,6 @@ details.p1fold:not([open]){padding-top:var(--space-2);padding-bottom:var(--space
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p1/app.js?v=p1g"></script>
+<script src="/p1/app.js?v=p1h"></script>
 </body>
 </html>
