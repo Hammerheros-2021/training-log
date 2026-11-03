@@ -3055,7 +3055,7 @@ p1ReadHTML=function(k){let h=_p2Read(k);if(!h||sampleMode||h.includes('p1readc')
   if(low>=3&&hiStress>=2||last3.every(d=>+d.mood===1))extra.push(`<li class="p2help"><span><b>Things seem heavy at the moment.</b> Talking helps. Samaritans: call 116 123, free, any time. Or text HELLO to 50808.</span></li>`);
   const ph=p2Phase(k);if(ph){const t=CYCTIP[ph.name]&&CYCTIP[ph.name][p2Level()];if(t)extra.push(`<li><span><b>${esc(ph.label)}.</b> ${esc(t)}</span></li>`)}
   const yev=p1EventOn(iso(addD(parse(k),-1)));if(yev)extra.push(`<li><span><b>Day after ${esc(yev.name)}.</b> An easy walk and a loosen-out help you recover. Check in on any knocks. <button type="button" class="linkbtn" data-prog="loosen">Loosen-out ›</button></span></li>`);
-  return extra.length?h.replace('<ul>','<ul>'+extra.join('')):h};
+  if(!extra.length)return h;h=h.replace(/<li><span><b>Nothing stands out\.<\/b>[\s\S]*?<\/li>/,'');return h.replace('<ul>','<ul>'+extra.join(''))};
 
 // ---------- sauna and cold water ----------
 const HC=[['Sauna','flame'],['Hot tub','waves'],['Cold plunge or ice bath','snowflake'],['Sea or lake swim','waves'],['Cold shower','droplets']];
