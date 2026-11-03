@@ -3568,7 +3568,7 @@ let authMode='up';
 async function doAuth(){
   const email=$('#a-email').value.trim(),password=$('#a-pass').value;const b=$('#authGo');b.disabled=true;b.textContent='Please wait…';
   try{
-    if(authMode==='up'){const {data,error}=await sb.auth.signUp({email,password});if(error)throw error;if(!data.session){showGate(authHTML('in','Check your email for a confirmation link, then sign in here.'));return}}
+    if(authMode==='up'){const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+'/p2/'}});if(error)throw error;if(!data.session){showGate(authHTML('in','Check your email for a confirmation link, then sign in here.'));return}}
     else{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error}
     const {data:{session}}=await sb.auth.getSession();SESSION=session;await startUser();
   }catch(e){showGate(authHTML(authMode,e.message||'That did not work. Try again.'))}
@@ -4124,7 +4124,7 @@ document.addEventListener('input',e=>{if(e.target.id==='ob-talk'){ob.talk=e.targ
 document.addEventListener('submit',e=>{if(e.target.id==='authForm'){e.preventDefault();doAuth()}},true);
 document.addEventListener('click',async e=>{
   const am=e.target.closest('[data-auth]');if(am){authMode=am.dataset.auth;showGate(authHTML(authMode));return}
-  if(e.target.id==='forgot'){const em=($('#a-email')&&$('#a-email').value||'').trim();if(!em){toast('Type your email first');return}const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin});toast(error?error.message:'Password reset email sent',4000);return}
+  if(e.target.id==='forgot'){const em=($('#a-email')&&$('#a-email').value||'').trim();if(!em){toast('Type your email first');return}const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+'/p2/'});toast(error?error.message:'Password reset email sent',4000);return}
   const ot=e.target.closest('[data-obtag]');if(ot){obRead();const k=ot.dataset.obtag;const arr=ob.a[k]=ob.a[k]||[];const i=arr.indexOf(ot.dataset.v);if(i>=0)arr.splice(i,1);else arr.push(ot.dataset.v);obSave();obRender();return}
   const og=e.target.closest('[data-obgo]');if(og){obRead();ob.step=+og.dataset.obgo;ob.ret=true;obSave();obRender();window.scrollTo({top:0});return}
   const sp=e.target.closest('[data-speak]');if(sp){speakInto(sp.dataset.speak,sp);return}
