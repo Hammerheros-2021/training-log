@@ -2950,6 +2950,22 @@ p1ReadHTML=function(k){const h=_p1Read7(k);if(!h||sampleMode)return h;const d=D(
   if(h.includes('p1readc'))return h.replace(/<b>[\s\S]*?<\/b>/,`<span class="p1kn">Keelan</span><b>${greet()}.</b>`);
   return h.replace(/<span class="p1rh">[\s\S]*?<b>[\s\S]*?<\/b>/,`<span class="p1rh"><span class="p1kav" aria-hidden="true">K</span><span class="p1rht"><small>Keelan · ${greet()}</small><b>${esc(v[1])}</b></span>`).replace(/(<span class="p1rpts">)/,`$1<span class="p1rv">${esc(v[2])}</span>`)};
 
+// ================= P1 v8: Keelan folded by default, Log food pops up on Today =================
+const _p1Read8=p1ReadHTML;
+p1ReadHTML=function(k){let h=_p1Read8(k);if(!h||h.includes('p1readc'))return h;h=h.replace(/<details class="card p1read([^"]*)" data-ms="p1read" open>/,'<details class="card p1read$1" data-ms="p1read">');
+  const m=h.match(/<span class="p1rpts">([\s\S]*?)<\/span><\/summary>/);if(m){const inner=m[1].replace(/<span class="p1rv">([\s\S]*?)<\/span>/,'');const rv=(m[1].match(/<span class="p1rv">([\s\S]*?)<\/span>/)||[])[1]||'';
+    const lead=(rv?`<li class="p1rvli"><span><b>${rv}</b></span></li>`:'')+(/^Day \d|^[^<]/.test(inner.trim())&&!inner.includes('<span')?`<li><span>${inner}</span></li>`:'');
+    h=h.replace(m[0],'</summary>').replace('<ul>','<ul>'+lead)}return h};
+var P1F={open:false};
+function p1FoodSheet(){const k=iso(todayDate());sel=todayDate();const d=D()[k]||{date:k,food:[]};const t=foodTotals(d),dt=dayTypeFor(k);const n=(d.food||[]).length;
+  p1Sheet(`<div class="kshead"><div><h2>Log food</h2><small class="ds">${n?`${n} item${n>1?'s':''} today · ${Math.round(t.kcal)} kcal`:'Nothing logged yet today'}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <div class="p1fsh">${foodActionsHTML(k)}</div>${macroRings(t,dt)}
+    <button type="button" class="linkbtn" data-p1foodpage style="width:100%">See everything on the Food page ›</button>`)}
+window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
+  if(c('.p1tile[data-p1tile="food"]')){e.stopPropagation();P1F.open=true;p1FoodSheet();return}
+  if(c('[data-p1foodpage]')){P1F.open=false;p1Sheet(null);sel=todayDate();fView='today';location.hash='food';return}
+  if(c('#p1X')||e.target.id==='p1Wrap')P1F.open=false},true);
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -3256,7 +3272,7 @@ function render(){
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
   $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():pView==='patterns'?p1PatternsView():pView==='export'?p1ExportView():viewReports());
-  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();p1HdrSet();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y)}P1R.sig=p1sig;
+  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();p1HdrSet();if(P1F.open&&document.querySelector('#p1Host .kshead'))p1FoodSheet();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y)}P1R.sig=p1sig;
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}
