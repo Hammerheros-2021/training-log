@@ -1875,7 +1875,7 @@ function kBands(){CMPI=0;let t='';try{t=tab()}catch(e){}if(t!=='reports')return;
   const kids=[...app.children];let cur=null,n=0;kids.forEach(el=>{if(el.classList&&el.classList.contains('sect')){cur=document.createElement('details');cur.className='ksec p1fold'+(n%2?' alt':'');if(n===0)cur.open=true;n++;const sm=document.createElement('summary');sm.className='sect';sm.textContent=el.textContent;cur.appendChild(sm);app.insertBefore(cur,el);el.remove();return}if(cur)cur.appendChild(el)})}
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='coachAcc')coachOpen=e.target.open},true);
 function coachHTML(aiText,savedAI){const pts=String(aiText||'').split('\n').map(x=>x.trim()).filter(x=>x.startsWith('-')).length;
-  return `<details class="kcoach" id="coachAcc" ${coachOpen||aiState.busy?'open':''}><summary><span class="kpic">${ico('sparkles')}</span><span class="kct"><b>Keelan's overview</b><small>${aiState.busy?'Reading your last 4 weeks…':aiText?`${pts||'A few'} things worth knowing${savedAI&&!aiState.text?` · ${fmtD(new Date(savedAI.at))}`:''}`:'Your last 4 weeks, read for you'}</small></span><span class="kchev" aria-hidden="true">${ico('chevron-right')}</span></summary>
+  return `<details class="kcoach" id="coachAcc" ${coachOpen||aiState.busy?'open':''}><summary><span class="kpic">${ico('sparkles')}</span><span class="kct"><b>Koach's overview</b><small>${aiState.busy?'Reading your last 4 weeks…':aiText?`${pts||'A few'} things worth knowing${savedAI&&!aiState.text?` · ${fmtD(new Date(savedAI.at))}`:''}`:'Your last 4 weeks, read for you'}</small></span><span class="kchev" aria-hidden="true">${ico('chevron-right')}</span></summary>
     <div class="kcbody">${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
     ${sample&&!aiState.busy?`<button type="button" class="kchbtn" id="aiBtn">${aiText?'Refresh overview':'Get my overview'}</button>`:''}</div></details>`}
 
@@ -2925,7 +2925,7 @@ foodActionsHTML=function(dIso){const h=_p1FA6(dIso);if(!h)return h;
 const P1NOTPLANT=/^(salt|sugar|brown sugar|honey|maple syrup|syrup|sweetener|stevia|flour|plain flour|cornflour|corn starch|starch|yeast|baking powder|vinegar|balsamic vinegar|soy sauce|tamari|ketchup|tomato ketchup|tomato sauce|tomato puree|tomato paste|stock|stock cube|gravy|mustard|mayonnaise|oil|olive oil|rapeseed oil|sunflower oil|coconut oil|sesame oil|vegetable oil|cocoa|cocoa powder|chocolate|dark chocolate|vanilla|coffee|tea|green tea|black tea|herbal tea|black pepper|pepper \(spice\)|paprika|smoked paprika|cumin|turmeric|cinnamon|nutmeg|chilli flakes|chili flakes|chilli powder|chili powder|curry powder|garam masala|mixed herbs|herbs|dried herbs|oregano|basil|thyme|rosemary|parsley|coriander|dill|mint|bay leaf|bay leaves|sage|chives|garlic powder|onion powder|ginger powder|ground ginger|spices|seasoning|sauce|pesto|hummus dip|jam|marmalade|peanut butter|crisps|chips|fries|beer|wine|cider|lager|stout|gin|whiskey|vodka|rum|juice|orange juice|apple juice|squash|cordial|cola)$/i;
 function plantsOn(d){const s=new Set();(d&&d.food||[]).forEach(i=>{if(i.src==='coffee'||i.src==='alcohol'||(i.pct&&i.pct<50))return;(i.plants||[]).forEach(p=>{const n=String(p).toLowerCase().trim();if(n&&!P1NOTPLANT.test(n))s.add(n)})});return s}
 
-// ================= P1 v7: Keelan, session-aware advice, folded supplements =================
+// ================= P1 v7: Koach, session-aware advice, folded supplements =================
 // what to do today, aware of what you've already done (and fine for people who don't train)
 const _p1rV=rVerdict;
 rVerdict=function(s,d){const k=d&&d.date;if(!k||maxPain(d)>=3)return _p1rV(s,d);
@@ -2944,13 +2944,13 @@ rVerdict=function(s,d){const k=d&&d.date;if(!k||maxPain(d)>=3)return _p1rV(s,d);
 // how this week compares with last, for the balance card
 function p1Trend(k){const DD=D();const r0=readiness(DD[k]);if(r0==null)return 'Your balance';const prev=[];for(let i=1;i<=7;i++){const v=readiness(DD[iso(addD(parse(k),-i))]);if(v!=null)prev.push(v)}
   const r3=avg([r0,readiness(DD[iso(addD(parse(k),-1))]),readiness(DD[iso(addD(parse(k),-2))])].filter(v=>v!=null));if(prev.length<3)return 'Your balance today';const t=r3-avg(prev);return t<=-6?'A little down on your week':t>=6?'On the up this week':'Steady this week'}
-// Keelan's read: today's advice first, in his name
+// Koach's read: today's advice first, in his name
 const _p1Read7=p1ReadHTML;
 p1ReadHTML=function(k){const h=_p1Read7(k);if(!h||sampleMode)return h;const d=D()[k]||{};const s=readiness(d);const v=rVerdict(s,d);
-  if(h.includes('p1readc'))return h.replace(/<b>[\s\S]*?<\/b>/,`<span class="p1kn">Keelan</span><b>${greet()}.</b>`);
-  return h.replace(/<span class="p1rh">[\s\S]*?<b>[\s\S]*?<\/b>/,`<span class="p1rh"><span class="p1kav" aria-hidden="true">K</span><span class="p1rht"><small>Keelan · ${greet()}</small><b>${esc(v[1])}</b></span>`).replace(/(<span class="p1rpts">)/,`$1<span class="p1rv">${esc(v[2])}</span>`)};
+  if(h.includes('p1readc'))return h.replace(/<b>[\s\S]*?<\/b>/,`<span class="p1kn">Koach</span><b>${greet()}.</b>`);
+  return h.replace(/<span class="p1rh">[\s\S]*?<b>[\s\S]*?<\/b>/,`<span class="p1rh"><span class="p1kav" aria-hidden="true">K</span><span class="p1rht"><small>Koach · ${greet()}</small><b>${esc(v[1])}</b></span>`).replace(/(<span class="p1rpts">)/,`$1<span class="p1rv">${esc(v[2])}</span>`)};
 
-// ================= P1 v8: Keelan folded by default, Log food pops up on Today =================
+// ================= P1 v8: Koach folded by default, Log food pops up on Today =================
 const _p1Read8=p1ReadHTML;
 p1ReadHTML=function(k){let h=_p1Read8(k);if(!h||h.includes('p1readc'))return h;h=h.replace(/<details class="card p1read([^"]*)" data-ms="p1read" open>/,'<details class="card p1read$1" data-ms="p1read">');
   const m=h.match(/<span class="p1rpts">([\s\S]*?)<\/span><\/summary>/);if(m){const inner=m[1].replace(/<span class="p1rv">([\s\S]*?)<\/span>/,'');const rv=(m[1].match(/<span class="p1rv">([\s\S]*?)<\/span>/)||[])[1]||'';
@@ -3032,7 +3032,7 @@ function p2CycleSection(c){if(!p2CycleShow())return '';const C=CYC();
     <button type="button" class="ghost${cy.start?' on':''}" data-p2cyc="start" style="width:100%">${cy.start?'✓ Period started today':'Period started today'}</button>
     <div class="field" style="margin-top:8px"><span class="label">Anything today? (optional)</span><div class="p1cof">${['Cramps','Tired','Bloated','Headache','Low mood','Heavy'].map(x=>`<button type="button" data-p2cycs="${x}" aria-pressed="${(cy.sym||[]).includes(x)}">${x}</button>`).join('')}</div></div></section>`}
 function p2CycleConsent(){p1Sheet(`<div class="kshead"><div><h2>Cycle-aware advice</h2><small class="ds">Optional. You can turn it off any time.</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
-  <section class="p1blk"><h3>What it does</h3><p style="margin:0">Log when your period starts and anything you notice. Keelan then adjusts his advice on training, food, sleep and recovery to where you are in your cycle, at a level that suits you, from walks to county football.</p></section>
+  <section class="p1blk"><h3>What it does</h3><p style="margin:0">Log when your period starts and anything you notice. Koach then adjusts his advice on training, food, sleep and recovery to where you are in your cycle, at a level that suits you, from walks to county football.</p></section>
   <section class="p1blk"><h3>Your privacy</h3><p style="margin:0">This is health information. It's stored only in your own account. No coach, club or anyone else sees it. Turning it off stops the advice; you can ask us to delete the history.</p></section>
   <div class="field"><label class="label" for="p2len">Usual cycle length (days)</label><input id="p2len" type="number" inputmode="numeric" value="28" min="20" max="45"></div>
   <p class="ds" style="font-size:12px;margin:0">General guidance, not medical advice. Talk to your GP about painful, heavy or irregular periods.</p>
@@ -3047,7 +3047,7 @@ const _p2CiOpen=p1CiOpen;p1CiOpen=function(){_p2CiOpen();const d=D()[P1.ci.k]||{
 const _p2CiDraw=p1CiDraw;p1CiDraw=function(){_p2CiDraw();const c=P1.ci;if(!c)return;const anchor=document.getElementById('p1Sick');const html=p2CycleSection(c);if(anchor&&html)anchor.insertAdjacentHTML('afterend',html)};
 const _p2Fields=p1CiFields;p1CiFields=function(c){const f=_p2Fields(c);if(c.cycle&&(c.cycle.start||(c.cycle.sym||[]).length))f.cycle={start:!!c.cycle.start,sym:(c.cycle.sym||[]).slice()};else if(CYC().on)f.cycle=null;return f};
 
-// ---------- Keelan picks up stress, cycle, recovery and the day after an event ----------
+// ---------- Koach picks up stress, cycle, recovery and the day after an event ----------
 const _p2Read=p1ReadHTML;
 p1ReadHTML=function(k){let h=_p2Read(k);if(!h||sampleMode||h.includes('p1readc'))return h;const DD=D();const extra=[];
   const last3=[0,1,2].map(i=>DD[iso(addD(parse(k),-i))]||{});const hiStress=last3.filter(d=>+d.stress>=4).length;const low=last3.filter(d=>+d.mood&&+d.mood<=2).length;
