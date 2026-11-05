@@ -3556,9 +3556,9 @@ function authHTML(mode,msg){
       <button class="primary" type="submit" id="authGo">${mode==='up'?'Create my account':'Sign in'}</button>
       ${msg?`<div class="hsum" role="status">${esc(msg)}</div>`:''}
     </form>`;
-  if(mode==='in')return `<div class="gcard"><div class="gmark">${KWM_AUTH}<span class="kproto">Prototype</span></div><h1>Welcome back</h1>${form}
+  if(mode==='in')return `<div class="gcard"><div class="gmark">${KWM_AUTH}<span class="kproto">Prototype 2</span></div><h1>Welcome back</h1>${form}
     <button type="button" class="linkbtn" data-auth="up">New here? See what it does and create an account</button><button type="button" class="linkbtn" id="forgot">Forgot password</button></div>`;
-  return `<div class="gcard"><div class="gmark">${KWM_AUTH}<span class="kproto">Prototype</span></div><h1>Feel better day to day</h1><p class="gsub" style="margin:0">Find your balance.</p>
+  return `<div class="gcard"><div class="gmark">${KWM_AUTH}<span class="kproto">Prototype 2</span></div><h1>Feel better day to day</h1><p class="gsub" style="margin:0">Find your balance.</p>
     <p class="gsub">A coach, a food planner and a training diary in one app. Here's what it does:</p>${featuresHTML()}
     <div class="gstep"><span class="num">1</span>Create your account</div>${form}
     <div class="gnext"><span class="num">2</span>Tell it about you, in your own words if you like</div><div class="gnext"><span class="num">3</span>Get your plan, then add the food you can get</div>
