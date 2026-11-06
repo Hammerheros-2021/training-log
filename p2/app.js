@@ -197,7 +197,7 @@ function checkinSummary(saved){
   if(isNum(y.steps))dd.push(`Steps <b>${(+y.steps).toLocaleString('en-IE')}</b>`);
   (y.habits||[]).forEach(h=>dd.push(esc(h)));
   (y.extras||[]).forEach(x=>dd.push(`${esc(x.kind)} <b>${x.dur||'?'}'</b>`));
-  return `<article class="card"><div class="chead">${gauge(s)}<div style="flex:1;min-width:0"><h2>Check-in done</h2><div class="sub">Balance ${s??'-'} / 100</div></div><button type="button" class="editbtn" id="dEditBtn">✎ Edit</button></div>
+  const hid=p2Hidden(saved.date);return `<article class="card"><div class="chead">${hid?'':gauge(s)}<div style="flex:1;min-width:0"><h2>Check-in done</h2><div class="sub">${hid?'Your balance shows after your session':`Balance ${s??'-'} / 100`}</div></div><button type="button" class="editbtn" id="dEditBtn">✎ Edit</button></div>
     <div class="verdict" style="--vc:${vc};margin-top:12px"><b>${vh}</b> ${vt}</div>
     <div class="label" style="padding:0 16px">Last night &amp; this morning</div><div class="chips">${m.map(c=>`<span>${c}</span>`).join('')||'<span>Not filled in</span>'}</div>
     <div class="label" style="padding:0 16px">Yesterday, ${fmtD(parse(prevKey(saved.date)),{weekday:'long'})}</div><div class="chips">${dd.map(c=>`<span>${c}</span>`).join('')||'<span>Not filled in</span>'}</div>
@@ -676,7 +676,7 @@ function ensureDrafts(){const key=iso(sel);
 function viewTraining(){
   ensureDrafts();const pl=planFor(sel),key=iso(sel);const dd=D()[key];const s=readiness(dd);
   let pill;
-  if(dd&&s!=null){const [vc,vh]=rVerdict(s,dd);pill=`<a class="rpill" href="#checkin" style="--vc:${vc}"><b class="num">${s}</b><span><b>${vh}</b><br><small>Balance from today's check-in</small></span><span aria-hidden="true">›</span></a>`}
+  if(dd&&s!=null){const [vc,vh]=rVerdict(s,dd);pill=`<a class="rpill" href="#checkin" style="--vc:${vc}"><b class="num">${p2Hidden(key)?P2WORD(s):s}</b><span><b>${vh}</b><br><small>Balance from today's check-in</small></span><span aria-hidden="true">›</span></a>`}
   else pill=`<a class="rpill" href="#checkin" style="--vc:var(--muted)"><b>–</b><span><b>Do your morning check-in</b><br><small>Sleep, how you feel, niggles. 30 seconds.</small></span><span aria-hidden="true">›</span></a>`;
   let pre='';
   if(todayDate()<FIRST&&key===iso(FIRST))pre=`<div class="banner"><b style="color:var(--fg)">Day one is ${fmtD(FIRST,{weekday:'long',day:'numeric',month:'long'})}.</b></div>`;
@@ -719,14 +719,7 @@ function viewDashboard(){
   const toggle=`<div class="dtop"><div class="kgreet"><h1>${greet()}</h1><small>${fmtD(now,{weekday:'short',day:'numeric',month:'short'})} · ${sampleMode?'Example data, not yours':now<FIRST?`Plan starts in ${Math.round((FIRST-now)/DAY)} days`:pl?`Week ${pl.wk} of 16 · ${PHN[pl.p]}`:'Plan complete'}</small></div><div style="display:flex;gap:8px;align-items:center"><button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'My data':'Example'}</button></div></div>
     <div class="prog" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,(now-FIRST)/(END-FIRST)*100))}%"></i>${[1,2,3].map(i=>`<span style="left:${i*25}%"></span>`).join('')}</div>`;
   // hero
-  const s=readiness(d);let hero;
-  if(d&&s!=null){const [vc,vh,vt]=rVerdict(s,d);const sh=sleepHours(d),need=sleepNeed(k);
-    const feel=avg([d.energy!=null?(d.energy-1)/4:null,d.mood!=null?(d.mood-1)/4:null,d.stress!=null?(5-d.stress)/4:null].filter(x=>x!=null));
-    const body=avg([d.sore!=null?(5-d.sore)/4:null,1-maxPain(d)/10].filter(x=>x!=null));
-    const sl=sh!=null?Math.min(1,sh/need):null;const pc=v=>v==null?'-':Math.round(v*100)+'%';const cl=v=>v==null?'var(--muted)':v>=.75?'var(--ok)':v>=.55?'var(--warn)':'var(--bad)';
-    hero=`<section class="hero" style="--vc:${vc}">${ring(s,100,112,11,'fade',s,'Balance')}<div class="hv"><h2>${p1Trend(k)}</h2>
-      ${miniBar('Sleep',sl??0,1,cl(sl),pc(sl))}${miniBar('Feel',feel??0,1,cl(feel),pc(feel))}${miniBar('Body',body??0,1,cl(body),pc(body))}</div></section>`}
-  else hero=`<a class="hero empty" href="#checkin">${ring(null,100,112,11,'fade','–','Balance')}<div class="hv"><h2>Check in to see your balance</h2><p>Last night's sleep, how you feel and any niggles. Or tap Dictate and just say it.</p><span class="go">Open check-in ›</span></div></a>`;
+  const s=readiness(d);const hero=p2HeroHTML(k,d,s);
   // tiles
   const sh=sleepHours(d),need=sleepNeed(k),debt=sleepDebt(k);
   const tSleep=`<a class="dt" href="#checkin" data-dtab><span class="dl">Sleep</span>${sh!=null?`<b class="big num">${sh}<small>h</small></b><span class="ds">${esc(d.bed||'')}${d.wake?`–${esc(d.wake)}`:''}</span><span class="dots">${[1,2,3,4,5].map(i=>`<i class="${d.sleepQ>=i?'on':''}"></i>`).join('')}</span><span class="ds">Need ${need} h${debt>0.2?` · <b style="color:${debt>=3?'var(--bad)':'var(--warn)'}">${debt} h debt</b>`:''}</span>`:'<b class="big">–</b><span class="ds">Not logged</span>'}</a>`;
@@ -1304,7 +1297,7 @@ function signChip(k){if(sampleMode||k>iso(todayDate()))return '';const d=D()[k]|
   const late=tday&&new Date().getHours()>=19;
   return statusRow(late?'todo late':'todo','Not signed off yet',late?'Finished eating? Check over the day and sign off':'Sign off when you\'ve finished eating','<button type="button" class="stbtn" id="signOpen">Sign off</button>')}
 function ciChip(k){if(sampleMode)return '';const d=D()[k]||{};if(k>iso(todayDate()))return '';
-  if(ciDone(d)){const s=readiness(d);return statusRow('done','Checked in',s!=null?`Balance ${s} / 100`:'Saved','')}
+  if(ciDone(d)){const s=readiness(d);return statusRow('done','Checked in',s!=null?(p2Hidden(k)?'Balance shows after your session':`Balance ${s} / 100`):'Saved','')}
   return statusRow('todo','Not checked in yet',k===iso(todayDate())?'Takes 30 seconds: say it or tap below':'','')}
 function sessChip(k){if(sampleMode||tView!=='today')return '';const p=planFor(parse(k)),l=L()[k],d=D()[k]||{};
   if((!p||p.type==='R'||p.pre)&&d.trainIntent==='extra'&&!(d.extras||[]).length)return statusRow('todo','Training planned, not logged yet',k>iso(todayDate())?'Coming up':'Log it below once it\'s done','<button type="button" class="stbtn kghost" data-intentclear>It didn\'t happen</button>');
@@ -3103,6 +3096,170 @@ p1Patterns=function(){const r=_p2Pat();const rows=r.rows;const add=(cmp,fmt,thr)
   r.list.sort((a,b)=>b.w-a.w);return r};
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#p1Host [data-prog]')){P1.ci=null;P1.day=null;setTimeout(()=>p1Sheet(null),0)}},true);
 
+// ================= P2 v2: personal balance that learns from how sessions feel =================
+// Balance compares you with your own usual, counts recent load and sleep debt, caps when you're unwell,
+// and learns from session feedback which of your inputs best predict how training actually goes.
+// The number stays hidden on training days until after the session, so nobody trains to it.
+const P2W={sleep:18,sleepQ:13,energy:13,mood:9,stress:9,sore:9,pain:10,load:7,debt:5,rhr:5,hrv:10};
+const P2WL={sleep:'Sleep',sleepQ:'Sleep quality',energy:'Energy',mood:'Mood',stress:'Stress',sore:'Body',pain:'Niggles',load:'Recent training and work',debt:'Sleep debt',rhr:'Morning pulse',hrv:'HRV'};
+const clamp01=x=>Math.max(0,Math.min(1,x));
+let P2V=0;const P2M={sig:'',c:{}};
+function p2Sig(){return (sampleMode?'s':'u')+Object.keys(D()).length+'.'+Object.keys(L()).length+'.'+P2V}
+function p2Memo(n,k,fn){const s=p2Sig();if(P2M.sig!==s){P2M.sig=s;P2M.c={}}const key=n+'|'+k;if(key in P2M.c)return P2M.c[key];const v=fn();P2M.c[key]=v;return v}
+const _p2pd=persistDay;persistDay=async function(k,f){P2V++;const r=await _p2pd(k,f);P2V++;return r};
+
+// your usual for a 1-5 slider over the last 2 weeks (needs a week of check-ins)
+function p2Usual(map,k,field){const v=[];for(let i=1;i<=14;i++){const x=map[iso(addD(parse(k),-i))];if(x&&isNum(x[field]))v.push(+x[field])}return v.length>=7?avg(v):null}
+// your own sleep need: the typical sleep before mornings you woke with good energy (8 h until there's enough to go on)
+function p2NeedBase(k){return p2Memo('need',k,()=>{const DD=D();const good=[];for(let i=1;i<=42;i++){const d=DD[iso(addD(parse(k),-i))];if(d&&isNum(d.energy)&&+d.energy>=4){const sh=sleepHours(d);if(sh!=null)good.push(sh)}}
+  if(good.length<8)return 8;good.sort((a,b)=>a-b);return Math.round(Math.max(6.5,Math.min(9,good[Math.floor(good.length/2)]))*4)/4})}
+const _p2sn=sleepNeed;sleepNeed=function(k){return Math.round((_p2sn(k)-8+p2NeedBase(k))*10)/10};
+
+// marks from 0 to 1 for each input, before weighting
+function p2Parts(d,map){
+  if(!d||!d.date)return null;map=map||D();const k=d.date;const P={};
+  const sh=sleepHours(d);if(sh!=null){const need=sleepNeed(k);P.sleep=clamp01((sh-(need-3))/3)}
+  const sl=(f,rev)=>{if(!isNum(d[f]))return;const v=+d[f];const ab=rev?(5-v)/4:(v-1)/4;const u=p2Usual(map,k,f);if(u==null){P[f]=ab;return}
+    const rel=clamp01(.75+(rev?(u-v):(v-u))*.25);P[f]=.5*ab+.5*rel};
+  sl('sleepQ');sl('energy');sl('mood');sl('stress',1);sl('sore',1);
+  if(Object.keys(P).length<3)return null;
+  P.pain=1-maxPain(d)/10;
+  // the last two days of training and work against your usual over four weeks (20% over usual is fine)
+  const ac=.65*dayLoadAll(iso(addD(parse(k),-1)))+.35*dayLoadAll(iso(addD(parse(k),-2)));let ch=0,cn=0;
+  for(let i=1;i<=28;i++){const kk=iso(addD(parse(k),-i));if(map[kk]||L()[kk]){ch+=dayLoadAll(kk);cn++}}
+  if(cn>=10&&ch>0)P.load=clamp01(1-(ac/(ch/cn)-1.2)*.5);
+  // sleep debt over the six nights before last night
+  let debt=0,dn=0;for(let i=1;i<=6;i++){const kk=iso(addD(parse(k),-i)),s2=sleepHours(map[kk]);if(s2!=null){debt+=Math.max(0,sleepNeed(kk)-s2);dn++}}
+  if(dn>=3)P.debt=clamp01(1-debt/5);
+  // pulse and HRV: at your usual or better is full marks, so a normal reading never pulls you down
+  const br=isNum(d.rhr)?baseline(map,k,'rhr'):null;if(br)P.rhr=clamp01(1-(d.rhr-br)/5);
+  const bh=isNum(d.hrv)?baseline(map,k,'hrv'):null;if(bh)P.hrv=clamp01(1+(d.hrv/bh-1)*5);
+  return P}
+function p2Cap(d){let c=100;const mp=maxPain(d);if(mp>=5)c=40;else if(mp>=3)c=60;if(has(d,'Sick / run down'))c=Math.min(c,50);
+  const sk=d.sick;if(sk&&sk.types&&sk.types.length)c=Math.min(c,sk.sev==='bad'?25:sk.sev==='moderate'?40:50);return c}
+function p2Score(d,map,raw){const P=p2Parts(d,map);if(!P)return {s:null};const Ln=raw?null:p2Learn();const W={};let tw=0,tv=0;
+  Object.keys(P).forEach(f=>{W[f]=P2W[f]*((Ln&&Ln.m[f])||1);tw+=W[f];tv+=W[f]*P[f]});
+  let s=100*tv/tw;if(Ln&&Ln.off)s+=Ln.off;s=Math.round(Math.max(0,Math.min(100,s)));const cap=p2Cap(d);
+  return {s:Math.min(s,cap),P,W,tw,capped:s>cap?cap:null}}
+readiness=function(d,map){if(!d)return null;const DD=D();map=map||DD;if(map===DD&&d.date&&DD[d.date]===d)return p2Memo('r',d.date,()=>p2Score(d,map).s);return p2Score(d,map).s};
+
+// ---------- learning from how sessions feel ----------
+const FB_FEEL=[[1,'Awful'],[2,'Tough'],[3,'OK'],[4,'Good'],[5,'Brilliant']];
+const FB_TARGET=[null,25,45,62,80,92];// the balance that would have matched how it felt
+const FB_Q=[['start','How did it start?',[['slow','Slow and groggy'],['normal','Normal'],['sharp','Sharp from the off']]],
+  ['flow','Once you got going',[['better','Got better'],['same','Stayed the same'],['faded','Faded']]],
+  ['energy','Energy',[['low','Lacking'],['steady','Steady'],['full','Full of it']]],
+  ['effort','Compared with what was planned',[['easier','Easier than expected'],['right','About right'],['harder','Harder than expected']]],
+  ['trend','Lately you feel',[['fitter','Getting fitter'],['plateau','Plateaued'],['back','Going backwards'],['unsure','Not sure']]]];
+function p2Target(d){const f=d&&d.sfb;if(!f||!isNum(f.feel))return null;let t=FB_TARGET[Math.max(1,Math.min(5,Math.round(+f.feel)))];if(f.energy==='low')t-=6;else if(f.energy==='full')t+=6;return Math.max(0,Math.min(100,t))}
+const p2Band=s=>s==null?null:s>=75?2:s>=55?1:0;
+function p2Corr(a,b){const n=a.length;if(n<3)return null;const ma=avg(a),mb=avg(b);let sab=0,saa=0,sbb=0;for(let i=0;i<n;i++){sab+=(a[i]-ma)*(b[i]-mb);saa+=(a[i]-ma)**2;sbb+=(b[i]-mb)**2}return saa>1e-9&&sbb>1e-9?sab/Math.sqrt(saa*sbb):null}
+function p2Learn(){return p2Memo('learn','all',()=>{const DD=D();const rows=[];
+  Object.keys(DD).sort().forEach(k=>{const d=DD[k];const t=p2Target(d);if(t==null||p2Cap(d)<100)return;const r=p2Score(d,DD,true);if(r.s==null)return;rows.push({k,t,P:r.P,raw:r.s})});
+  const n=rows.length;const out={n,m:{},off:0,acc:null,better:0,worse:0,corr:{}};if(n<6)return out;
+  const trust=n/(n+12);// trust grows the more feedback there is
+  Object.keys(P2W).forEach(f=>{const pr=rows.filter(r=>r.P[f]!=null);if(pr.length<6)return;const c=p2Corr(pr.map(r=>r.P[f]),pr.map(r=>r.t));if(c!=null)out.corr[f]=c});
+  const cs=Object.values(out.corr);const cbar=cs.length?avg(cs):0;
+  Object.keys(out.corr).forEach(f=>{out.m[f]=Math.round(Math.max(f==='pain'?1:.5,Math.min(1.6,1+(out.corr[f]-cbar)*2*trust))*100)/100});
+  // re-score with the new weights, then nudge the whole scale towards how sessions actually felt
+  const sc=rows.map(r=>{let tw=0,tv=0;Object.keys(r.P).forEach(f=>{const w=P2W[f]*(out.m[f]||1);tw+=w;tv+=w*r.P[f]});return 100*tv/tw});
+  out.off=Math.round(Math.max(-12,Math.min(12,avg(rows.map((r,i)=>r.t-sc[i]))*trust)));
+  let agree=0;rows.forEach((r,i)=>{const s=sc[i]+out.off,bs=p2Band(s),bt=p2Band(r.t);if(bs===bt)agree++;else if(bt>bs)out.better++;else out.worse++});
+  out.acc=Math.round(agree/n*100);return out})}
+
+// ---------- hide the number until after the session ----------
+function p2Pending(k){const p=planFor(parse(k)),d=D()[k]||{},l=L()[k];const planned=!!(p&&p.type!=='R'&&!p.pre);
+  const done=!!(l&&l.status)||(d.extras||[]).length>0;return !done&&(planned||d.trainIntent==='extra')}
+function p2Hidden(k){if(sampleMode||!k||k!==iso(todayDate()))return false;const d=D()[k]||{};if(d.showBal||(meta.flags&&meta.flags.showBalAlways))return false;return p2Pending(k)}
+function p2NeedsFb(k){if(sampleMode)return false;const d=D()[k]||{},l=L()[k];return !d.sfb&&(!!(l&&(l.status==='done'||l.status==='partial'))||(d.extras||[]).length>0)}
+const P2WORD=s=>s>=75?'Go':s>=55?'Steady':'Easy';
+function p2HeroHTML(k,d,s){
+  if(!(d&&s!=null))return `<a class="hero empty" href="#checkin">${ring(null,100,112,11,'fade','–','Balance')}<div class="hv"><h2>Check in to see your balance</h2><p>Last night's sleep, how you feel and any niggles. Or tap Dictate and just say it.</p><span class="go">Open check-in ›</span></div></a>`;
+  const [vc]=rVerdict(s,d);
+  if(p2Hidden(k))return `<section class="hero p2hid" style="--vc:var(--line)">${ring(100,100,112,11,'fade',P2WORD(s),'Balance')}<div class="hv"><h2>Train by feel today</h2>
+    <p>Your number shows after your session, once you've said how it felt, so it doesn't set the tone before you start.</p>
+    <div class="p2hb"><button type="button" class="linkbtn" data-p2show="${k}">Show it now</button><button type="button" class="linkbtn" data-p2always>Always show my number</button></div></div></section>`;
+  const sh=sleepHours(d),need=sleepNeed(k);
+  const feel=avg([d.energy!=null?(d.energy-1)/4:null,d.mood!=null?(d.mood-1)/4:null,d.stress!=null?(5-d.stress)/4:null].filter(x=>x!=null));
+  const body=avg([d.sore!=null?(5-d.sore)/4:null,1-maxPain(d)/10].filter(x=>x!=null));
+  const sl=sh!=null?Math.min(1,sh/need):null;const pc=v=>v==null?'-':Math.round(v*100)+'%';const cl=v=>v==null?'var(--muted)':v>=.75?'var(--ok)':v>=.55?'var(--warn)':'var(--bad)';
+  const f=d.sfb;let fbl='';
+  if(f&&isNum(f.feel)){const t=p2Target(d);const gap=p2Band(t)-p2Band(s);const w=(FB_FEEL.find(x=>x[0]===+f.feel)||[0,''])[1].toLowerCase();
+    fbl=`<p class="p2fbl">You said it felt <b>${esc(w)}</b>. ${gap>0?'Better than your balance suggested. Keel learns from that.':gap<0?'Harder than your balance suggested. Keel learns from that.':'Your balance read it right.'} <button type="button" class="linkbtn" data-p2fb="${k}">Change</button></p>`}
+  else if(p2NeedsFb(k))fbl=`<button type="button" class="p2fbask" data-p2fb="${k}">${ico('sparkles')}<span><b>How did it go?</b><small>20 seconds. Helps Keel learn what your body's telling you.</small></span><span aria-hidden="true">›</span></button>`;
+  return `<section class="hero" style="--vc:${vc}">${ring(s,100,112,11,'fade',s,'Balance')}<div class="hv"><h2>${p1Trend(k)}</h2>
+    ${miniBar('Sleep',sl??0,1,cl(sl),pc(sl))}${miniBar('Feel',feel??0,1,cl(feel),pc(feel))}${miniBar('Body',body??0,1,cl(body),pc(body))}${(meta.flags&&meta.flags.showBalAlways&&!sampleMode)?`<button type="button" class="linkbtn p2hb1" data-p2hide>Hide my number until after training</button>`:''}</div></section>${fbl}`}
+
+// ---------- session feedback sheet ----------
+const P2FB={k:null,f:null};
+function p2FbOpen(k){const d=D()[k]||{};P2FB.k=k;P2FB.f=Object.assign({feel:null,start:null,flow:null,energy:null,effort:null,trend:null,note:''},clone(d.sfb||{}));p2FbDraw()}
+function p2FbDraw(){const f=P2FB.f;const b=(q,v,l)=>`<button type="button" data-p2fq="${q}" data-p2fv="${v}" aria-pressed="${String(f[q])===String(v)}">${esc(l)}</button>`;
+  p1Sheet(`<div class="kshead"><h2>How did it go?</h2><button type="button" class="x" id="p2FbX" aria-label="Close">${ico('x')}</button></div>
+  <p class="ds" style="margin:0 0 12px">Keel uses this to tune your plan, your recovery and how your balance is worked out for you.</p>
+  <div class="field"><span class="label">Overall</span><div class="p1cof p2fbr">${FB_FEEL.map(([v,l])=>b('feel',v,l)).join('')}</div></div>
+  ${FB_Q.map(([q,l,o])=>`<div class="field"><span class="label">${l}</span><div class="p1cof">${o.map(([v,t])=>b(q,v,t)).join('')}</div></div>`).join('')}
+  <div class="field"><label class="label" for="p2FbNote">Anything else? <small>optional</small></label><textarea id="p2FbNote" rows="2" maxlength="400" placeholder="e.g. legs heavy for the first 10 minutes, then flew">${esc(f.note||'')}</textarea></div>
+  <button type="button" class="primary" id="p2FbSave" style="width:100%">Save</button>`)}
+async function p2FbSave(){const f=P2FB.f,k=P2FB.k;const el=document.getElementById('p2FbNote');if(el)f.note=el.value.slice(0,400);if(!f.feel){toast('Pick how it felt overall');return}
+  const doc={...f,at:new Date().toISOString()};if(sampleMode){p1Sheet(null);return}
+  const ok=await persistDay(k,{sfb:doc,showBal:true});p1Sheet(null);if(ok){const s=readiness(D()[k]);toast(s!=null?`Saved. Your balance this morning was ${s}.`:'Saved. Thanks.',3500)}render()}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p2fq]')){const el=document.getElementById('p2FbNote');if(el)P2FB.f.note=el.value;const q=x.dataset.p2fq,v=x.dataset.p2fv;P2FB.f[q]=q==='feel'?+v:(P2FB.f[q]===v?null:v);p2FbDraw();return}
+  if(c('#p2FbSave')){p2FbSave();return}
+  if(c('#p2FbX')){p1Sheet(null);return}
+  if(x=c('[data-p2fb]')){p2FbOpen(x.dataset.p2fb||iso(todayDate()));return}
+  if(x=c('[data-p2show]')){persistDay(x.dataset.p2show,{showBal:true}).then(()=>render());return}
+  if(c('[data-p2always]')){persistMeta('flags',Object.assign({},meta.flags||{},{showBalAlways:true})).then(()=>render());return}
+  if(c('[data-p2hide]')){persistMeta('flags',Object.assign({},meta.flags||{},{showBalAlways:false})).then(()=>render());return}
+  if(c('[data-p2adjust]')){p2AdjustWeek();return}},true);
+// ask straight after a session is logged
+const _p2saveLog=saveLog;saveLog=async function(pl){const k=(sDraft&&sDraft.date)||iso(sel);await _p2saveLog(pl);P2V++;const l=L()[k];
+  if(!sampleMode&&l&&(l.status==='done'||l.status==='partial')&&!(D()[k]||{}).sfb&&k>=iso(addD(todayDate(),-2)))setTimeout(()=>p2FbOpen(k),450)};
+const _p2addExtra=addExtra;addExtra=async function(){const k=iso(sel);const n0=((D()[k]||{}).extras||[]).length;await _p2addExtra();const n1=((D()[k]||{}).extras||[]).length;
+  if(!sampleMode&&n1>n0&&!(D()[k]||{}).sfb&&k>=iso(addD(todayDate(),-2)))setTimeout(()=>p2FbOpen(k),450)};
+
+// ---------- feedback into Koach's advice and the plan ----------
+function p2FbRecent(k,n){const out=[];for(let i=0;i<28&&out.length<n;i++){const kk=iso(addD(parse(k),-i)),d=D()[kk];if(d&&d.sfb&&isNum(d.sfb.feel))out.push({date:kk,...d.sfb})}return out}
+function p2FbPoints(k){const r=p2FbRecent(k,4);if(r.length<2)return [];const cnt=(q,v,m)=>r.slice(0,m||4).filter(x=>x[q]===v).length;const pts=[];
+  const adj=t=>` <button type="button" class="linkbtn" data-p2adjust>${t} ›</button>`;
+  if(cnt('trend','back')>=2)pts.push(['You feel you\'re going backwards.','That\'s usually tiredness, not lost fitness. An easier few days often brings it back.'+adj('Ask Koach to ease my week')]);
+  else if(cnt('effort','harder',3)>=2)pts.push(['Sessions are feeling harder than planned.','Hold the effort a notch lower and put sleep first this week.'+adj('Ask Koach to ease my week')]);
+  else if(cnt('trend','plateau')>=2)pts.push(['You feel you\'ve plateaued.','Change one thing for two weeks: a different interval set, an extra easy run or earlier nights.'+adj('Ask Koach to freshen up my week')]);
+  else if(cnt('trend','fitter')>=2)pts.push(['You feel yourself getting fitter.','Keep doing what you\'re doing. Steady sleep and good food lock it in.']);
+  if(cnt('start','slow')>=3)pts.push(['Your sessions keep starting slow.','Give the warm-up the full 15 minutes and build into it rather than starting at target effort.']);
+  if(cnt('flow','faded')>=2)pts.push(['You\'ve been fading in sessions.','Eat something 2-3 hours before, bring water, and check your food on training days.']);
+  if(cnt('energy','low')>=3)pts.push(['Energy has been low in training.','Look at sleep and food first. A gentle Recover session in place of one hard day can help.']);
+  return pts.slice(0,2)}
+const _p2Read2=p1ReadHTML;
+p1ReadHTML=function(k){let h=_p2Read2(k);if(!h||sampleMode||h.includes('p1readc'))return h;const pts=p2FbPoints(k);if(!pts.length)return h;
+  h=h.replace(/<li><span><b>Nothing stands out\.<\/b>[\s\S]*?<\/li>/,'');return h.replace('<ul>','<ul>'+pts.map(([a,b])=>`<li><span><b>${a}</b> ${b}</span></li>`).join(''))};
+async function p2AdjustWeek(){if(!sample||sampleMode){toast('This needs the AI coach');return}const d0=todayDate();const days7=[];
+  for(let i=0;i<7;i++){const dd=addD(d0,i),kk=iso(dd),p=planFor(dd);if(p&&!p.pre&&!L()[kk])days7.push({date:kk,weekday:fmtD(dd,{weekday:'long'}),code:p.type,session:sessionBrief(dd,p)})}
+  if(!days7.length){toast('Nothing left to change this week');return}toast('Koach is looking at your week…',5000);
+  try{const out=await sample.json(`${XABOUT()} tells us after each session how it felt. Use that to make small, sensible changes to the coming week.
+Session feedback, newest first (feel is 1-5): ${JSON.stringify(p2FbRecent(iso(d0),8))}
+Last 7 days: ${JSON.stringify(loadHistory(iso(addD(d0,-1))))}
+Coming days (you may change only these): ${JSON.stringify(days7)}
+Session codes: ${planCodes().map(c=>`${c} = ${TNAME[c]}`).join(', ')}.
+Rules: if sessions feel harder than planned, they feel they're going backwards, energy is low or they fade, ease the week: make one or two hard sessions (${HARDC.filter(c=>TNAME[c]).map(c=>TNAME[c]).join(', ')}) easier or swap one for an easy or rest day. If they feel they've plateaued but otherwise fine, freshen it: change what one session asks of them (a note with a different set or a swap), adding no more than about 10% work. If they feel fitter and sessions are about right, change nothing. Slow starts: a note on the next hard day about a longer warm-up. Keep at least one rest day in any 7. Fixed classes or club sessions stay put. Change at most 3 days.
+Reply with ONLY JSON: {"adjust":[{"date":"YYYY-MM-DD","type":"code","note":"one short practical line"}],"summary":"one short line"}`,{modelTier:'quick'});
+    const applied=await applyAdjust(out&&out.adjust,'feedback');toast(applied.length?`Week updated: ${String(out.summary||`${applied.length} day${applied.length>1?'s':''} changed`).slice(0,140)}`:String((out&&out.summary)||'Your week looks right as it is.').slice(0,140),6000);render()}
+  catch(e){toast(foodErr(e),4000)}}
+const _p2BS=buildSummary;buildSummary=function(now){let s=_p2BS(now);const fb=p2FbRecent(iso(now),12);
+  if(fb.length)s+='\nHow sessions felt, newest first: '+fb.map(f=>`${f.date}: ${f.feel}/5${f.start?`, start ${f.start}`:''}${f.flow?`, then ${f.flow}`:''}${f.energy?`, energy ${f.energy}`:''}${f.effort?`, vs plan ${f.effort}`:''}${f.trend?`, lately ${f.trend}`:''}${f.note?` "${String(f.note).slice(0,100)}"`:''}`).join('; ');
+  const Ln=p2Learn();if(Ln.n>=6)s+=`\nBalance checked against ${Ln.n} sessions: matched how they felt ${Ln.acc}% of the time (felt better than it said ${Ln.better} times, worse ${Ln.worse}).`;return s};
+
+// ---------- Patterns: how your balance is worked out ----------
+function p2BalCard(){const Ln=p2Learn();const k=iso(sampleMode?SAMPLE.now:todayDate());const need=p2NeedBase(k);
+    const fs=Object.keys(P2W).filter(f=>f!=='hrv'&&(f!=='rhr'||Object.values(D()).some(d=>isNum(d.rhr))));const tw0=fs.reduce((a,f)=>a+P2W[f],0),tw=fs.reduce((a,f)=>a+P2W[f]*(Ln.m[f]||1),0);
+  const rows=fs.map(f=>{const sh=P2W[f]*(Ln.m[f]||1)/tw,r=sh/(P2W[f]/tw0);
+    return `<li><span>${P2WL[f]}</span><span class="num"><b>${Math.round(sh*100)}%</b>${r>=1.15?' <small class="p2up">counts more for you</small>':r<=.85?' <small class="p2dn">counts less for you</small>':''}</span></li>`}).join('');
+  const head=Ln.n<6?`<p>After each session, say how it felt. Once there are 6, Keel starts checking which of your inputs best predict a good session and adjusts how much each one counts for you. <b>${Ln.n} so far.</b></p>`
+    :`<p>Checked against <b>${Ln.n} sessions</b>. Your balance matched how they felt <b>${Ln.acc}%</b> of the time. You felt better than it said ${Ln.better} time${Ln.better===1?'':'s'} and worse ${Ln.worse} time${Ln.worse===1?'':'s'}.${Ln.off?` Your scores are nudged ${Ln.off>0?'up':'down'} ${Math.abs(Ln.off)} point${Math.abs(Ln.off)===1?'':'s'} to match how your sessions actually go.`:''}</p>`;
+  return `<article class="card p2balc"><div class="chead"><div style="flex:1"><h2>How your balance is worked out</h2><div class="sub">Compared with your own usual, and learning from your sessions</div></div></div><div class="form">${head}
+    <ul class="p2wts">${rows}</ul><p class="ds">Your sleep need: <b>${need} h</b>${need===8?' (Keel works this out once it has a few weeks of check-ins)':', from the nights before mornings you felt good'}. Niggles, feeling unwell and the "Sick / run down" tag also put a ceiling on the score.</p></div></article>`}
+const _p2PV=p1PatternsView;p1PatternsView=function(){return _p2PV()+p2BalCard()};
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -3273,7 +3430,7 @@ async function runAI(){
 Each day's sleep fields describe the night before that date. Strain is 0-21 combining training and ${WORK.toLowerCase()}. No wearable; all values are self-logged. Readiness 0-100; scores out of 5; RPE out of 10.
 ${buildSummary(now)}
 
-Write a short review in plain text, no headings, no bold. Use 6-10 bullet points. Each bullet is ONE line in this exact form: "- " then a short headline of 4-9 words, then " :: ", then 2-4 sentences of detail tied to the numbers and ending with one practical thing to do. Cover, where the data allows: training load and readiness trends; sleep timing and consistency, screens-off time, caffeine timing; how farm work, desk and car time relate to soreness, niggles and readiness; family time and mood; nutrition adherence, protein, vitamin and mineral gaps, fasting hours and how they relate to energy; niggle patterns and likely triggers; progress in strength, threshold pace and 5 km. Then one final line starting "Next week:" with the single most useful change. Under 220 words. No medical diagnoses; if pain is 5/10 or more, say to get it checked by a physio.`;
+Use the session feedback to judge whether the plan, the recovery and the balance score suit them, and say so if the score keeps disagreeing with how sessions feel. Never quote today's balance number. Write a short review in plain text, no headings, no bold. Use 6-10 bullet points. Each bullet is ONE line in this exact form: "- " then a short headline of 4-9 words, then " :: ", then 2-4 sentences of detail tied to the numbers and ending with one practical thing to do. Cover, where the data allows: training load and readiness trends; sleep timing and consistency, screens-off time, caffeine timing; how farm work, desk and car time relate to soreness, niggles and readiness; family time and mood; nutrition adherence, protein, vitamin and mineral gaps, fasting hours and how they relate to energy; niggle patterns and likely triggers; progress in strength, threshold pace and 5 km. Then one final line starting "Next week:" with the single most useful change. Under 220 words. No medical diagnoses; if pain is 5/10 or more, say to get it checked by a physio.`;
   aiState={busy:true,text:'',err:''};render();
   try{const {text}=await sample(prompt,{onText:({text})=>{aiState.text=text;const el=$('#aiOut');if(el)el.textContent=text},cache:false});
     aiState={busy:false,text,err:''};
@@ -3342,7 +3499,7 @@ function viewReports(){
 let SAMPLE=null;
 function buildSample(){
   const LIB=DEF_LIB;
-  const now=addD(FIRST,63);const logs={},days={};let tb=80,ss=12,pace=290;let seed=11;const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
+  const now=addD(FIRST,63);const logs={},days={};let tb=80,ss=12,pace=290;let seed=11,fs=29;const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
   const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
   const classes=[
     {summary:'4 rounds for time',runM:4000,items:[['Run','1 km','Run',['Quads','Calves','Hamstrings']],['Wall balls','25','Wall balls',['Quads','Glutes','Shoulders']],['Sled push','2 × 25 m','Sled push',['Quads','Glutes','Calves']],['Burpee broad jumps','15','Burpee broad jumps',['Quads','Chest','Core']]]},
@@ -3396,7 +3553,11 @@ function buildSample(){
     if(typ==='S'&&status!=='missed'){l.tb=tb;l.ss=ss;if(!DELOAD[p.wk]&&status==='done'){tb+=5;ss+=1}}
     if(typ==='T'){if(p.wk===1)l.fivek='22:40';else if(rnd()<.2){l.type='H';l.hyrox=mkH(classes[Math.floor(rnd()*3)])}else if(status!=='missed'){l.pace=fromSec(pace);pace-=3}}
     if(typ==='H')l.hyrox=mkH(classes[Math.floor(rnd()*3)]);
-    logs[k]=l;}
+    logs[k]=l;
+    // how sessions felt, on its own random stream so the rest of the example data stays the same
+    if(status!=='missed'){fs=(fs*16807)%2147483647;const fr=(fs-1)/2147483646;fs=(fs*16807)%2147483647;const fr2=(fs-1)/2147483646;
+      const feel=cl(Math.round(1.6+(sh-6.5)*.75+(energy-3)*.45-(sore>=4?.5:0)+fr*1.4),1,5);
+      days[k].sfb={feel,start:fr2<.3?'slow':fr2>.8?'sharp':'normal',flow:feel>=4?'better':feel<=2?'faded':'same',energy:feel>=4?'full':feel<=2?'low':'steady',effort:feel<=2?'harder':feel>=5?'easier':'right',trend:p.wk>=6&&p.wk<=8?'plateau':p.wk>=10?'fitter':'unsure',note:''}}}
   return {now,logs,days};
 }
 // ================= render + events =================
