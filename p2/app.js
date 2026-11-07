@@ -3103,6 +3103,11 @@ p1Patterns=function(){const r=_p2Pat();const rows=r.rows;const add=(cmp,fmt,thr)
   r.list.sort((a,b)=>b.w-a.w);return r};
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#p1Host [data-prog]')){P1.ci=null;P1.day=null;setTimeout(()=>p1Sheet(null),0)}},true);
 
+// dictation and photo check from the Log food pop-up: food mode, and shown on top
+window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);if(!c('#p1Host'))return;
+  if(c('#fSay')||c('#fType')){vForce='food';P1F.open=false;p1Sheet(null)}},true);
+window.addEventListener('change',e=>{const t=e.target;if(t&&(t.id==='mealFile'||t.id==='mealFile2')&&t.closest&&t.closest('#p1Host')){P1F.open=false;setTimeout(()=>p1Sheet(null),0)}},true);
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}

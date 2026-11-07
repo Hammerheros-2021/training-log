@@ -2966,6 +2966,11 @@ window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closes
   if(c('[data-p1foodpage]')){P1F.open=false;p1Sheet(null);sel=todayDate();fView='today';location.hash='food';return}
   if(c('#p1X')||e.target.id==='p1Wrap')P1F.open=false},true);
 
+// dictation and photo check from the Log food pop-up: food mode, and shown on top
+window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);if(!c('#p1Host'))return;
+  if(c('#fSay')||c('#fType')){vForce='food';P1F.open=false;p1Sheet(null)}},true);
+window.addEventListener('change',e=>{const t=e.target;if(t&&(t.id==='mealFile'||t.id==='mealFile2')&&t.closest&&t.closest('#p1Host')){P1F.open=false;setTimeout(()=>p1Sheet(null),0)}},true);
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
