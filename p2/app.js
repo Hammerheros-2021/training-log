@@ -765,7 +765,7 @@ function viewDashboard(){
   const balance=balTot?`<div class="stack">${bal.map(([f,c,l])=>+yd[f]?`<i style="flex:${+yd[f]};background:${c}" title="${l}"></i>`:'').join('')}</div><div class="legend">${bal.map(([f,c,l])=>`<span style="--c:${c}"><i></i>${l} ${+yd[f]||0} h</span>`).join('')}</div>`:'<div class="ds">Comes from the morning check-in, under Yesterday.</div>';
   const ov=!sampleMode&&meta.overview?String(meta.overview.text).split('\n').filter(x=>x.trim().startsWith('-')).slice(0,2).map(x=>x.replace(/^-\s*/,'').split(' :: ')[0]):[];
   const due=!sampleMode&&planDue();
-  const su=setupChecklistHTML();return p1Top()+p1ReadHTML(k)+injuryBanner()+hero+p1FoodMini(k)+p2SleepCard(k)+`${sampleMode?'':p1Tiles()}${p2Habits(k)}${p1SignCard(k)}${p1Overview(k)}`+(su?`<details class="kmore p1setup"><summary>Getting started</summary>${su}</details>`:'')+`<details class="kmore"><summary>More about today</summary><div class="p1ex"><button type="button" class="ghost" id="sampleBtn">${sampleMode?'Back to my data':'See an example day'}</button></div><div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
+  const su=setupChecklistHTML();return p1Top()+p1ReadHTML(k)+injuryBanner()+hero+p2HrNudge(k)+p1FoodMini(k)+p2SleepCard(k)+`${sampleMode?'':p1Tiles()}${p2Habits(k)}${p1SignCard(k)}${p1Overview(k)}`+(su?`<details class="kmore p1setup"><summary>Getting started</summary>${su}</details>`:'')+`<details class="kmore"><summary>More about today</summary><div class="p1ex"><button type="button" class="ghost" id="sampleBtn">${sampleMode?'Back to my data':'See an example day'}</button></div><div class="dgrid">${tSleep}${tSess}${tFast}${tStrain}${tBody}${tPlants}${tHab}</div>
    <section class="panel"><div class="ph"><h3>This week</h3><span class="ds">${pn?`${dn} of ${pn} sessions done`:'No sessions yet'}</span></div><div class="wstrip">${wk}</div></section>
    <section class="panel"><div class="ph"><h3>Balance, 14 days</h3><span class="ds">${rv.length?`avg <b class="num">${Math.round(avg(rv))}</b>`:''}</span></div>${rv.length>1?spark(rs,0,100):'<div class="ds">Builds up as you check in each morning.</div>'}</section>
    <section class="panel"><div class="ph"><h3>Yesterday's hours</h3></div>${balance}</section></details>
@@ -1960,7 +1960,7 @@ const P1SL=[['sleepQ','Sleep quality',['Broken','Restless','Okay','Good','Deep']
 const P1LAT=[[0,'Straight away'],[15,'About 15 min'],[30,'About 30 min'],[60,'An hour or more']];
 const P1WAKES=[[0,'No'],[1,'Once'],[2,'2 or 3 times'],[4,'On and off all night']];
 const P1AWAKE=[[0,'Hardly'],[15,'Under 15 min'],[40,'About 30-45 min'],[90,'1-2 hours'],[180,'Over 2 hours']];
-function p1CiOpen(){const k=iso(todayDate()),d=D()[k]||{};const prev=Object.values(D()).filter(x=>x&&x.bed&&x.wake).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||{};
+function p1CiOpen(){const k=P2CIK||iso(todayDate()),d=D()[k]||{};const prev=Object.values(D()).filter(x=>x&&x.bed&&x.wake).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||{};
   P1.ci={k,bed:d.bed||prev.bed||'23:00',wake:d.wake||prev.wake||'07:00',latency:d.latency??0,wakes:d.wakes??0,awakeMin:d.awakeMin??0,
     sleepQ:d.sleepQ??3,energy:d.energy??3,mood:d.mood??3,stress:d.stress??2,sore:d.sore??2,trainIntent:d.trainIntent||null,screenOff:d.screenOff||'',busy:false};p1CiDraw()}
 function p1Seg(name,opts,cur){return `<div class="seg p1seg">${opts.map(([v,l])=>`<button type="button" data-p1="${name}" data-v="${v}" aria-pressed="${String(cur)===String(v)}">${l}</button>`).join('')}</div>`}
@@ -3108,6 +3108,71 @@ window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closes
   if(c('#fSay')||c('#fType')){vForce='food';P1F.open=false;p1Sheet(null)}},true);
 window.addEventListener('change',e=>{const t=e.target;if(t&&(t.id==='mealFile'||t.id==='mealFile2')&&t.closest&&t.closest('#p1Host')){P1F.open=false;setTimeout(()=>p1Sheet(null),0)}},true);
 
+// ================= P2: heart rate pop-up, and editing any day's check-in =================
+Object.assign(ICO,{heart:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>'});
+const HRT=[['wake','Just woke, still in bed','The best one: before you get up or check your phone.'],['lie','Lying down for 5 minutes','Good at bedtime, or any quiet lie-down.'],['sit','Sitting quietly for 5 minutes','The afternoon one: sit, no phone, then count.']];
+const HROFF={wake:0,lie:3,sit:8};
+// each kind of reading has its own normal; readings are also turned into a morning-equivalent so the balance score can use them
+function hrList(type,beforeK,n){const out=[];const DD=D();Object.keys(DD).sort().reverse().forEach(k=>{if(beforeK&&k>=beforeK)return;const h=DD[k]&&DD[k].hr;if(h&&h.type===type&&isNum(h.bpm)&&out.length<(n||14))out.push(+h.bpm)});return out}
+const med=a=>{if(!a.length)return null;const s=a.slice().sort((x,y)=>x-y);return s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2};
+function hrOffset(type,k){if(type==='wake')return 0;const a=hrList(type,k),w=hrList('wake',k);if(a.length>=3&&w.length>=3)return med(a)-med(w);return HROFF[type]}
+function hrUsual(type,k){const a=hrList(type,k);return a.length>=5?Math.round(med(a)):null}
+let P2R=null;
+function p2HrCheck(type,k){const now=p1Min(p1Now());const d=D()[k]||{};const isT=k===iso(todayDate());if(!isT)return null;
+  const food=(d.food||[]).filter(x=>x.at);const caf=food.filter(x=>(+x.caffeine||0)>=20).map(x=>p1Min(x.at)).filter(v=>v!=null&&v<=now);const meals=food.filter(x=>kcalOf(x)>=300).map(x=>p1Min(x.at)).filter(v=>v!=null&&v<=now);
+  if(type==='wake'){const w=p1Min(d.wake);if((w!=null&&now-w>60)||now>11*60||caf.length||meals.length)return {msg:'This doesn\'t look like a just-woke reading: you\'ve been up a while. Pick "Sitting quietly" or "Lying down" instead, so it compares fairly.'}; return null}
+  let ready=0;const why=[];const lc=caf.length?Math.max(...caf):null,lm=meals.length?Math.max(...meals):null;
+  if(lc!=null&&now-lc<60){ready=Math.max(ready,lc+60);why.push('coffee')}
+  if(lm!=null&&now-lm<60){ready=Math.max(ready,lm+60);why.push('a meal')}
+  (d.hc||[]).forEach(x=>{const t=p1Min(x.at);if(t!=null&&now-t<60){ready=Math.max(ready,t+60);why.push(x.type.toLowerCase())}});
+  return ready?{msg:`It's soon after ${why.join(' and ')}, which pushes it up. Better around ${hm(ready)}.`,ready}:null}
+function p2HrOpen(k){k=k||iso(todayDate());const d=D()[k]||{};const last=p1LS.get('hrtype');const h=d.hr||{};
+  P2R={k,type:h.type||last||'wake',bpm:h.bpm||'',count:null};p2HrDraw()}
+function p2HrDraw(){const r=P2R;const chk=p2HrCheck(r.type,r.k);const us=hrUsual(r.type,r.k);const isT=r.k===iso(todayDate());
+  p1Sheet(`<div class="kshead"><div><h2>Heart rate</h2><small class="ds">${isT?'Today':fmtD(parse(r.k),{weekday:'long',day:'numeric',month:'short'})}${us?` · your usual for this: ${us}`:''}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <span class="label">When are you taking it?</span><div class="p2hrt">${HRT.map(([v,l,s])=>`<button type="button" data-p2hrt="${v}" aria-pressed="${r.type===v}"><b>${l}</b><small>${s}</small></button>`).join('')}</div>
+    ${chk?`<div class="p2hrw">${ico('triangle-alert')}<span>${esc(chk.msg)} You can still save it.</span></div>`:''}
+    <div class="p2hrin"><input id="p2bpm" type="number" inputmode="numeric" min="30" max="200" placeholder="—" value="${esc(r.bpm)}" aria-label="Beats per minute"><span>beats per minute</span></div>
+    <button type="button" class="ghost" data-p2hrcount style="width:100%">${r.count!=null?(r.count>0?`Counting… ${r.count}s`:'Done. Type in what you counted'):`${ico('timer')} Count for me (60 seconds)`}</button>
+    <p class="ds" style="font-size:12px;margin:0">Two fingers on your wrist or the side of your neck. ${r.type==='wake'?'Stay lying down.':'Settle for 5 minutes first.'} Count the beats until the timer ends.</p>
+    <button type="button" class="primary" data-p2hrsave style="width:100%">Save</button>`);setTimeout(()=>{const i=$('#p2bpm');if(i&&!r.bpm&&r.count==null)i.focus()},60)}
+let p2HrT=null;
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p2hropen]')){const ci=P1.ci;if(ci){p1Queue();await p1Flush()}p2HrOpen(x.dataset.p2hropen||(ci&&ci.k));P2R.fromCi=!!ci;return}
+  if(!P2R)return;
+  if(x=c('[data-p2hrt]')){P2R.type=x.dataset.p2hrt;P2R.bpm=($('#p2bpm')||{}).value||P2R.bpm;p2HrDraw();return}
+  if(c('[data-p2hrcount]')){if(P2R.count>0)return;P2R.count=60;p2HrDraw();clearInterval(p2HrT);p2HrT=setInterval(()=>{P2R.count--;const b=document.querySelector('[data-p2hrcount]');if(b)b.textContent=P2R.count>0?`Counting… ${P2R.count}s`:'Done. Type in what you counted';if(P2R.count<=0){clearInterval(p2HrT);try{navigator.vibrate&&navigator.vibrate([300,120,300])}catch(err){}const i=$('#p2bpm');if(i)i.focus()}},1000);return}
+  if(c('[data-p2hrsave]')){const bpm=Math.round(+(($('#p2bpm')||{}).value||0));if(!(bpm>=30&&bpm<=200)){toast('Type in your beats per minute');return}const r=P2R;clearInterval(p2HrT);
+    const off=hrOffset(r.type,r.k);const eq=Math.round(bpm-off);const us=hrUsual(r.type,r.k);p1LS.set('hrtype',r.type);
+    await persistDay(r.k,{hr:{bpm,type:r.type,at:r.k===iso(todayDate())?p1Now():null},rhr:eq});P2R=null;
+    const back=r.fromCi;p1Sheet(null);render();toast(us?(bpm-us>=5?`${bpm}: that's ${bpm-us} above your usual. Go easy today.`:bpm-us<=-4?`${bpm}: lower than usual. Nicely rested.`:`${bpm}: right about your usual.`):`${bpm} saved. Your usual settles after about a week.`,4000);if(back){P2CIK=r.k;p1CiOpen()}return}
+  if(c('#p1X')){P2R=null;clearInterval(p2HrT)}},true);
+document.addEventListener('input',e=>{if(P2R&&e.target&&e.target.id==='p2bpm')P2R.bpm=e.target.value});
+
+// in the check-in: a big heart-rate button, and choose which day you're checking in for
+var P2CIK=null;
+const _p2CiDrawHR=p1CiDraw;
+p1CiDraw=function(){_p2CiDrawHR();const c=P1.ci;if(!c)return;const host=document.querySelector('#p1Host .ksheet');if(!host)return;const d=D()[c.k]||{};const h=d.hr;
+  const head=host.querySelector('.kshead');const t=iso(todayDate()),y=iso(addD(todayDate(),-1));const had=!!(d.bed||d.sleepQ||d.energy);
+  if(head&&!host.querySelector('.p2ciday')){const h2=head.querySelector('h2');if(h2)h2.textContent=had?'Edit check-in':'Check in';
+    head.insertAdjacentHTML('afterend',`<div class="p2ciday"><button type="button" data-p2ciday="${t}" aria-pressed="${c.k===t}">Today</button><button type="button" data-p2ciday="${y}" aria-pressed="${c.k===y}">Yesterday</button><label class="p2cidp${c.k!==t&&c.k!==y?' on':''}">${c.k!==t&&c.k!==y?fmtD(parse(c.k),{day:'numeric',month:'short'}):'Other day'}<input type="date" data-p2cidate max="${t}" value="${c.k}"></label></div>`)}
+  const first=host.querySelector('.p1blk,.p1sleep,section');if(first&&!host.querySelector('.p2hrbtn'))first.insertAdjacentHTML('beforebegin',`<button type="button" class="p2hrbtn${h?' on':''}" data-p2hropen="${c.k}">${ico('heart')}<span><b>${h?`${h.bpm} bpm`:'Heart rate'}</b><small>${h?esc((HRT.find(x=>x[0]===h.type)||[])[1]||''):'Tap to log it: now or later in the day'}</small></span><i>›</i></button>`)};
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p2ciday]');if(!x||!P1.ci)return;p1Queue();p1Flush();P2CIK=x.dataset.p2ciday;p1CiOpen()},true);
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.p2cidate!=null&&P1.ci&&t.value){p1Queue();p1Flush();P2CIK=t.value;p1CiOpen()}});
+document.addEventListener('click',e=>{if(e.target.closest&&(e.target.closest('#p1X')||e.target.id==='p1Wrap')&&!P2R)P2CIK=null},true);
+
+// Today: the check-in tile says you can edit it, and the balance asks for a heart rate when it's missing
+const _p2Tiles=p1Tiles;
+p1Tiles=function(){return _p2Tiles().replace(/(<button type="button" class="p1tile done" data-p1tile="ci">[\s\S]*?<small>)Done today(<\/small>)/,'$1Done · tap to edit$2')};
+function p2HrNudge(k){if(sampleMode||k!==iso(todayDate()))return '';const d=D()[k]||{};if(d.hr||isNum(d.rhr))return `<button type="button" class="p2hrn done" data-p2hropen="${k}">${ico('heart')}<span>${d.hr?d.hr.bpm:d.rhr} bpm${d.hr?' · '+esc(((HRT.find(x=>x[0]===d.hr.type)||[])[1]||'').toLowerCase()):''}</span><i>Change</i></button>`;
+  if(!readiness(d))return '';return `<button type="button" class="p2hrn" data-p2hropen="${k}">${ico('heart')}<span>Add your heart rate to finish today's balance</span><i>›</i></button>`}
+
+// Progress: a trend for each kind of reading
+function p2HrTrends(){const DD=D();const rows=[];const end=todayDate();for(let i=41;i>=0;i--){const k=iso(addD(end,-i));rows.push((DD[k]||{}).hr||null)}
+  const lines=HRT.map(([v,l])=>{const vals=rows.map(h=>h&&h.type===v?+h.bpm:null);const n=vals.filter(x=>x!=null).length;if(n<2)return '';const us=med(vals.filter(x=>x!=null));
+    return `<div class="p2hrl"><div class="p2hrlh"><b>${l}</b><span class="num">usual ${Math.round(us)} · ${n} readings</span></div>${p1Spark(vals,'#E23D9E')}</div>`}).join('');
+  return lines?`<article class="card"><div class="chead"><div style="flex:1"><h2>Heart rate</h2><div class="sub">Each kind of reading has its own normal. A rise of 5 or more is worth noticing.</div></div></div><div class="form">${lines}</div></article>`:''}
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -3413,7 +3478,7 @@ function render(){
   const t=tab();const p1sig=t+'|'+tView+'|'+fView+'|'+pView+'|'+iso(sel)+'|'+sampleMode;const p1same=p1sig===P1R.sig;const p1y=window.scrollY;const p1ds=p1same?p1DState():null;document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===({checkin:'dashboard',recover:'dashboard',mobility:'dashboard',profile:'dashboard'}[t]||t)?'page':'false'));
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
-  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():pView==='patterns'?p1PatternsView():pView==='export'?p1ExportView():viewReports());
+  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():pView==='patterns'?p1PatternsView()+p2HrTrends():pView==='export'?p1ExportView():viewReports());
   updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();p1HdrSet();if(P1F.open&&document.querySelector('#p1Host .kshead'))p1FoodSheet();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y)}P1R.sig=p1sig;
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
