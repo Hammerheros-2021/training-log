@@ -3211,6 +3211,36 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
     if(P2R.count<=0){clearInterval(p2HrT);try{navigator.vibrate&&navigator.vibrate([300,120,300])}catch(err){}P2R.step='enter';p2HrDraw()}},1000);return}},true);
 const _p2HrOpen=p2HrOpen;p2HrOpen=function(k){_p2HrOpen(k);P2R.step=(D()[P2R.k]||{}).hr?'enter':'type';p2HrDraw()};
 
+// ================= P2: move logged food to the right time or meal =================
+Object.assign(ICO,{clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'});
+var P2FT=null;const P2OPEN=new Set();document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.classList&&d.classList.contains('p1meal')){const m=(d.dataset.ms||'').replace('meal','');if(d.open)P2OPEN.add(m);else P2OPEN.delete(m)}},true);
+function p2TimeEd(attr,id,at,meal){return `<div class="p2fte"><label class="p2ftt">${ico('clock')}<span>Time</span><input type="time" ${attr}="${id}" value="${esc(at||p1Now())}"></label>
+  <div class="p2mch">${MEALS.map(m=>`<button type="button" data-p2fmv="${id}" data-m="${m}" data-scope="${attr==='data-p2fti'?'item':'meal'}" aria-pressed="${meal===m}">${m}</button>`).join('')}</div><button type="button" class="linkbtn" data-p2ftx>Done</button></div>`}
+function p1FoodRow(i){const pc=i.pct||100;const tag=i.src==='plan'?' <span class="est">plan</span>':i.src==='alcohol'?' <span class="est">drink</span>':i.est?' <span class="est">est.</span>':'';const ed=P2FT&&P2FT.ix===i.ix;
+  return `<div class="p1fi${ed?' p2edit':''}"><div class="p1fit"><div class="fn">${esc(i.name)}${tag}</div><b class="num">${kcalOf(i)} kcal</b>${sampleMode?'':`<button type="button" class="x" data-del-food="${i.ix}" aria-label="Remove ${esc(i.name)}">${ico('x')}</button>`}</div>
+    <div class="p1fib"><span class="fq num">${sampleMode?esc(i.at||''):`<button type="button" class="p2tc" data-p2ft="${i.ix}" aria-label="Change time">${ico('clock')}<span>${i.at?esc(i.at):'Add time'}</span></button>`} ${esc(i.qty||'')}<br>${Math.round(+i.protein||0)}p · ${Math.round(+i.carbs||0)}c · ${Math.round(+i.fat||0)}f</span>${sampleMode?'':`<div class="p1por" role="group" aria-label="Portion"><button type="button" data-fpct="${i.ix}:-25" aria-label="Less">${ico('minus')}</button><span class="num">${pc}%</span><button type="button" data-fpct="${i.ix}:25" aria-label="More">${ico('plus')}</button></div>`}</div>
+    ${ed?p2TimeEd('data-p2fti',i.ix,i.at,i.meal):''}</div>`}
+function p1MealHTML(m,its){const mt={};['kcal','protein','carbs','fat'].forEach(k=>mt[k]=its.reduce((a,i)=>a+(k==='kcal'?kcalOf(i):(+i[k]||0)),0));const e=(mt.protein*4+mt.carbs*4+mt.fat*9)||1;
+  const ats=its.map(i=>i.at).filter(Boolean).sort();const first=ats[0]||null;const ed=P2FT&&P2FT.meal===m;const keep=ed||(P2FT&&P2FT.ix!=null&&its.some(i=>i.ix===P2FT.ix))||P2OPEN.has(m);
+  return `<details class="p1meal" data-ms="meal${m}" ${keep?'open':''}><summary><div class="p1mh"><span class="mico" aria-hidden="true">${MICO[m]}</span><b>${m}</b>${sampleMode?`<small>${its.length} item${its.length>1?'s':''}</small>`:`<button type="button" class="p2tc p2tcm" data-p2fmt="${m}" aria-label="Move ${m}">${ico('clock')}<span>${first?esc(first):'time'}</span></button>`}<span class="num">${Math.round(mt.kcal)} kcal</span><i aria-hidden="true">▾</i></div>
+    <div class="p1split" aria-hidden="true"><i style="width:${mt.protein*400/e}%;background:var(--s)"></i><i style="width:${mt.carbs*400/e}%;background:var(--e)"></i><i style="width:${mt.fat*900/e}%;background:var(--x)"></i></div>
+    <div class="p1mm num"><span style="--c:var(--s)">${Math.round(mt.protein)} g protein</span><span style="--c:var(--e)">${Math.round(mt.carbs)} g carbs</span><span style="--c:var(--x)">${Math.round(mt.fat)} g fat</span></div></summary>
+    ${ed?`<div class="p2ftm"><small>Move all ${its.length} item${its.length>1?'s':''} in ${m.toLowerCase()}</small>${p2TimeEd('data-p2fmi',m,first,m)}</div>`:''}${its.map(p1FoodRow).join('')}</details>`}
+let p2FtS=null;
+function p2FoodSave(k,food){days[k]={...(days[k]||{date:k}),food};render();clearTimeout(p2FtS);p2FtS=setTimeout(()=>persistDay(k,{food:days[k].food}),600)}
+const p2Shift=(t,d)=>{const m=p1Min(t);return m==null?t:hm(m+d)};
+window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p2fmt]')){e.preventDefault();e.stopPropagation();const det=x.closest('details');if(det)det.open=true;P2FT=P2FT&&P2FT.meal===x.dataset.p2fmt?null:{meal:x.dataset.p2fmt};render();return}
+  if(x=c('[data-p2ft]')){e.preventDefault();e.stopPropagation();const ix=+x.dataset.p2ft;P2FT=P2FT&&P2FT.ix===ix?null:{ix};render();return}
+  if(c('[data-p2ftx]')){e.preventDefault();e.stopPropagation();P2FT=null;render();return}
+  if(x=c('[data-p2fmv]')){e.preventDefault();e.stopPropagation();const k=iso(sel);const food=clone((days[k]||{}).food||[]);const m=x.dataset.m;
+    if(x.dataset.scope==='item'){const it=food[+x.dataset.p2fmv];if(!it)return;it.meal=m}else{food.forEach(it=>{if(it.meal===x.dataset.p2fmv)it.meal=m});P2FT={meal:m};const det=document.querySelector(`details[data-ms="meal${m}"]`);if(det)det.open=true}
+    p2FoodSave(k,food);setTimeout(()=>{const d=document.querySelector(`details[data-ms="meal${m}"]`);if(d&&!d.open){d.open=true}},0);return}},true);
+document.addEventListener('change',e=>{const t=e.target;if(!t||!t.dataset||!t.value)return;const k=iso(sel);
+  if(t.dataset.p2fti!=null){const food=clone((days[k]||{}).food||[]);const it=food[+t.dataset.p2fti];if(!it)return;it.at=t.value;const nm=p1MealFor(t.value);const moved=nm!==it.meal;it.meal=nm;if(moved)P2FT=null;p2FoodSave(k,food);if(moved){setTimeout(()=>{const d=document.querySelector(`details[data-ms="meal${nm}"]`);if(d)d.open=true},0);toast(`Moved to ${nm.toLowerCase()} at ${t.value}`)}return}
+  if(t.dataset.p2fmi!=null){const m=t.dataset.p2fmi;const food=clone((days[k]||{}).food||[]);const its=food.filter(i=>i.meal===m);const first=its.map(i=>i.at).filter(Boolean).sort()[0];const d=first?p1Min(t.value)-p1Min(first):0;const nm=p1MealFor(t.value);
+    its.forEach(i=>{i.at=i.at?p2Shift(i.at,d):t.value;i.meal=nm});P2FT=null;p2FoodSave(k,food);setTimeout(()=>{const dd=document.querySelector(`details[data-ms="meal${nm}"]`);if(dd)dd.open=true},0);toast(`${m} moved to ${t.value}${nm!==m?` (now ${nm.toLowerCase()})`:''}`)}});
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
