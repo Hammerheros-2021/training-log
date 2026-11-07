@@ -1875,7 +1875,7 @@ function kBands(){CMPI=0;let t='';try{t=tab()}catch(e){}if(t!=='reports')return;
   const kids=[...app.children];let cur=null,n=0;kids.forEach(el=>{if(el.classList&&el.classList.contains('sect')){cur=document.createElement('details');cur.className='ksec p1fold'+(n%2?' alt':'');if(n===0)cur.open=true;n++;const sm=document.createElement('summary');sm.className='sect';sm.textContent=el.textContent;cur.appendChild(sm);app.insertBefore(cur,el);el.remove();return}if(cur)cur.appendChild(el)})}
 document.addEventListener('toggle',e=>{if(e.target&&e.target.id==='coachAcc')coachOpen=e.target.open},true);
 function coachHTML(aiText,savedAI){const pts=String(aiText||'').split('\n').map(x=>x.trim()).filter(x=>x.startsWith('-')).length;
-  return `<details class="kcoach" id="coachAcc" ${coachOpen||aiState.busy?'open':''}><summary><span class="kpic">${ico('sparkles')}</span><span class="kct"><b>Koach's overview</b><small>${aiState.busy?'Reading your last 4 weeks…':aiText?`${pts||'A few'} things worth knowing${savedAI&&!aiState.text?` · ${fmtD(new Date(savedAI.at))}`:''}`:'Your last 4 weeks, read for you'}</small></span><span class="kchev" aria-hidden="true">${ico('chevron-right')}</span></summary>
+  return `<details class="kcoach" id="coachAcc" ${coachOpen||(aiState.busy&&!P1OV.auto)?'open':''}><summary><span class="kpic">${ico('sparkles')}</span><span class="kct"><b>Koach's overview</b><small>${aiState.busy?'Reading your last 4 weeks…':aiText?`${pts||'A few'} things worth knowing${savedAI&&!aiState.text?` · ${fmtD(new Date(savedAI.at))}`:''}`:'Your last 4 weeks, read for you'}</small></span><span class="kchev" aria-hidden="true">${ico('chevron-right')}</span></summary>
     <div class="kcbody">${aiState.busy?`<div class="ai" id="aiOut" aria-live="polite">${esc(aiText)||'Thinking…'}</div>`:aiText?ovPointsHTML(aiText):''}${aiState.err?`<div class="alert amber">${esc(aiState.err)}</div>`:''}
     ${sample&&!aiState.busy?`<button type="button" class="kchbtn" id="aiBtn">${aiText?'Refresh overview':'Get my overview'}</button>`:''}</div></details>`}
 
@@ -3140,8 +3140,8 @@ let p2HrT=null;
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(x=c('[data-p2hropen]')){const ci=P1.ci;if(ci){p1Queue();await p1Flush()}p2HrOpen(x.dataset.p2hropen||(ci&&ci.k));P2R.fromCi=!!ci;return}
   if(!P2R)return;
-  if(x=c('[data-p2hrt]')){P2R.type=x.dataset.p2hrt;P2R.bpm=($('#p2bpm')||{}).value||P2R.bpm;p2HrDraw();return}
-  if(c('[data-p2hrcount]')){if(P2R.count>0)return;P2R.count=60;p2HrDraw();clearInterval(p2HrT);p2HrT=setInterval(()=>{P2R.count--;const b=document.querySelector('[data-p2hrcount]');if(b)b.textContent=P2R.count>0?`Counting… ${P2R.count}s`:'Done. Type in what you counted';if(P2R.count<=0){clearInterval(p2HrT);try{navigator.vibrate&&navigator.vibrate([300,120,300])}catch(err){}const i=$('#p2bpm');if(i)i.focus()}},1000);return}
+  if(c('[data-p2hrt]'))return;
+  if(c('[data-p2hrcount]')&&false){if(P2R.count>0)return;P2R.count=60;p2HrDraw();clearInterval(p2HrT);p2HrT=setInterval(()=>{P2R.count--;const b=document.querySelector('[data-p2hrcount]');if(b)b.textContent=P2R.count>0?`Counting… ${P2R.count}s`:'Done. Type in what you counted';if(P2R.count<=0){clearInterval(p2HrT);try{navigator.vibrate&&navigator.vibrate([300,120,300])}catch(err){}const i=$('#p2bpm');if(i)i.focus()}},1000);return}
   if(c('[data-p2hrsave]')){const bpm=Math.round(+(($('#p2bpm')||{}).value||0));if(!(bpm>=30&&bpm<=200)){toast('Type in your beats per minute');return}const r=P2R;clearInterval(p2HrT);
     const off=hrOffset(r.type,r.k);const eq=Math.round(bpm-off);const us=hrUsual(r.type,r.k);p1LS.set('hrtype',r.type);
     await persistDay(r.k,{hr:{bpm,type:r.type,at:r.k===iso(todayDate())?p1Now():null},rhr:eq});P2R=null;
@@ -3172,6 +3172,44 @@ function p2HrTrends(){const DD=D();const rows=[];const end=todayDate();for(let i
   const lines=HRT.map(([v,l])=>{const vals=rows.map(h=>h&&h.type===v?+h.bpm:null);const n=vals.filter(x=>x!=null).length;if(n<2)return '';const us=med(vals.filter(x=>x!=null));
     return `<div class="p2hrl"><div class="p2hrlh"><b>${l}</b><span class="num">usual ${Math.round(us)} · ${n} readings</span></div>${p1Spark(vals,'#E23D9E')}</div>`}).join('');
   return lines?`<article class="card"><div class="chead"><div style="flex:1"><h2>Heart rate</h2><div class="sub">Each kind of reading has its own normal. A rise of 5 or more is worth noticing.</div></div></div><div class="form">${lines}</div></article>`:''}
+
+// ================= P2: steadier screens and a clearer heart rate pop-up =================
+// pop-ups keep your place: compare the pop-up's own title, not one changed after drawing
+function p1Sheet(html){let h=document.getElementById('p1Host');if(!h){h=document.createElement('div');h.id='p1Host';document.body.appendChild(h)}
+  if(!html){h.innerHTML='';h.dataset.t='';document.body.classList.remove('sheet-open');return}
+  const ps=h.querySelector('.ksheet'),pw=h.querySelector('.kshwrap');const st=ps?ps.scrollTop:0,wt=pw?pw.scrollTop:0;const prevT=ps?h.dataset.t:null;
+  const newT=((html.match(/<h2>([\s\S]*?)<\/h2>/)||[])[1]||'').trim();
+  if(ps)ps.style.minHeight=ps.offsetHeight+'px';
+  h.innerHTML=`<div class="kshwrap" id="p1Wrap"><div class="ksheet p1sheet" role="dialog" aria-modal="true">${html}</div></div>`;document.body.classList.add('sheet-open');h.dataset.t=newT;
+  const ns=h.querySelector('.ksheet'),nw=h.querySelector('.kshwrap');
+  if(prevT!=null&&prevT===newT){if(ns){ns.style.minHeight=ps?ps.style.minHeight:'';ns.scrollTop=st}if(nw)nw.scrollTop=wt;requestAnimationFrame(()=>{if(ns){ns.scrollTop=st;ns.style.minHeight=''}if(nw)nw.scrollTop=wt})}}
+// the overview refreshes quietly: it no longer pops open on its own
+var P1OV=P1OV||{tried:''};
+function p1Overview(k){if(sampleMode)return '';const savedAI=meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');const d=D()[k]||{};const stale=!savedAI||iso(new Date(savedAI.at))!==k;
+  if(sample&&stale&&!aiState.busy&&readiness(d)!=null&&P1OV.tried!==k){P1OV.tried=k;P1OV.auto=true;setTimeout(()=>{if(tab()==='dashboard')runAI()},800)}
+  const busy=aiState.busy;if(P1OV.auto)aiState.busy=false;const h=coachHTML(aiState.text&&P1OV.auto&&busy?(savedAI?savedAI.text:''):aiText,savedAI);aiState.busy=busy;return h}
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#aiBtn'))P1OV.auto=false},true);
+const _p2runAI=runAI;runAI=async function(){const r=await _p2runAI.apply(this,arguments);if(P1OV.auto){P1OV.auto=false}return r};
+
+Object.assign(ICO,{armchair:'<path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3"/><path d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z"/><path d="M5 18v2"/><path d="M19 18v2"/>'});
+// heart rate: two clear steps
+function p2HrDraw(){const r=P2R;r.step=r.step||'type';const chk=p2HrCheck(r.type,r.k);const us=hrUsual(r.type,r.k);const isT=r.k===iso(todayDate());const T=HRT.find(x=>x[0]===r.type)||HRT[0];
+  const IC={wake:'moon',lie:'bed',sit:'armchair'};
+  p1Sheet(`<div class="kshead"><div><h2>Heart rate</h2><small class="ds">${isT?'Today':fmtD(parse(r.k),{weekday:'long',day:'numeric',month:'short'})}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <section class="p2hs${r.step==='type'?' cur':' done'}"><div class="p2hsh"><span class="p2hn">${r.step!=='type'?'✓':'1'}</span><b>${r.step!=='type'?esc(T[1]):'How are you right now?'}</b>${r.step!=='type'?`<button type="button" class="linkbtn" data-p2hrstep="type">Change</button>`:''}</div>
+      ${r.step==='type'?`<div class="p2hrt">${HRT.map(([v,l,s])=>`<button type="button" data-p2hrt="${v}" aria-pressed="${r.type===v}">${ico(IC[v])}<span><b>${l}</b><small>${s}</small></span></button>`).join('')}</div>`:''}
+      ${chk&&r.step==='type'?`<div class="p2hrw">${ico('triangle-alert')}<span>${esc(chk.msg)}</span></div>`:''}</section>
+    <section class="p2hs${r.step!=='type'?' cur':''}"><div class="p2hsh"><span class="p2hn">2</span><b>Your pulse</b></div>
+      ${r.step==='type'?'<p class="ds p2hsoff">Pick how you are above first.</p>':r.step==='count'?`<div class="p2hcount"><div class="p2hring" style="--p:${(60-Math.max(0,r.count))/60}"><b class="num" id="p2hc">${Math.max(0,r.count)}</b><small>seconds</small></div><p>Count every beat until it buzzes.</p><button type="button" class="ghost" data-p2hrstep="enter">Stop</button></div>`
+      :r.step==='how'?`<ol class="p2how"><li>Put two fingers on the inside of your wrist, below the thumb, or on the side of your neck.</li><li>${r.type==='wake'?'Stay lying still.':'You\'ve already settled for 5 minutes.'} When you can feel it, tap Start.</li><li>Count every beat until the phone buzzes after 60 seconds.</li></ol>
+        <button type="button" class="primary" data-p2hrgo style="width:100%">${ico('timer')} Start the 60-second count</button><button type="button" class="linkbtn" data-p2hrstep="enter" style="width:100%">I already have the number (watch or ring)</button>`
+      :`<label class="p2hrin"><span>Beats in 60 seconds</span><input id="p2bpm" type="number" inputmode="numeric" min="30" max="200" placeholder="e.g. 58" value="${esc(r.bpm)}"></label>${us?`<p class="ds" style="margin:0 0 10px;font-size:13px">Your usual for this is about ${us}.</p>`:''}<button type="button" class="primary" data-p2hrsave style="width:100%">Save</button>`}</section>`)}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;if(!P2R)return;
+  if(x=c('[data-p2hrt]')){P2R.type=x.dataset.p2hrt;P2R.step='how';setTimeout(p2HrDraw,0);return}
+  if(x=c('[data-p2hrstep]')){clearInterval(p2HrT);P2R.step=x.dataset.p2hrstep;P2R.count=null;p2HrDraw();return}
+  if(c('[data-p2hrgo]')){P2R.step='count';P2R.count=60;p2HrDraw();clearInterval(p2HrT);p2HrT=setInterval(()=>{if(!P2R){clearInterval(p2HrT);return}P2R.count--;const b=document.getElementById('p2hc'),ring=document.querySelector('.p2hring');if(b)b.textContent=Math.max(0,P2R.count);if(ring)ring.style.setProperty('--p',(60-Math.max(0,P2R.count))/60);
+    if(P2R.count<=0){clearInterval(p2HrT);try{navigator.vibrate&&navigator.vibrate([300,120,300])}catch(err){}P2R.step='enter';p2HrDraw()}},1000);return}},true);
+const _p2HrOpen=p2HrOpen;p2HrOpen=function(k){_p2HrOpen(k);P2R.step=(D()[P2R.k]||{}).hr?'enter':'type';p2HrDraw()};
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -3478,8 +3516,9 @@ function render(){
   const t=tab();const p1sig=t+'|'+tView+'|'+fView+'|'+pView+'|'+iso(sel)+'|'+sampleMode;const p1same=p1sig===P1R.sig;const p1y=window.scrollY;const p1ds=p1same?p1DState():null;document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===({checkin:'dashboard',recover:'dashboard',mobility:'dashboard',profile:'dashboard'}[t]||t)?'page':'false'));
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
+  const p1app=$('#app');if(p1same)p1app.style.minHeight=p1app.offsetHeight+'px';
   $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():pView==='patterns'?p1PatternsView()+p2HrTrends():pView==='export'?p1ExportView():viewReports());
-  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();p1HdrSet();if(P1F.open&&document.querySelector('#p1Host .kshead'))p1FoodSheet();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y)}P1R.sig=p1sig;
+  updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();p1HdrSet();if(P1F.open&&document.querySelector('#p1Host .kshead'))p1FoodSheet();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y);requestAnimationFrame(()=>{window.scrollTo(0,p1y);p1app.style.minHeight=''})}else p1app.style.minHeight='';P1R.sig=p1sig;
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};
   if(['training','checkin','food'].includes(tab())){if(tab()==='training')tView='today';render();window.scrollTo({top:0})}else{tView='today';location.hash='training'}}
