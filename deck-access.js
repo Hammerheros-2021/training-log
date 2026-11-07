@@ -1,9 +1,12 @@
 // Deck access codes, stored only as salted SHA-256 hashes. To add, rename or revoke a code, ask for this file to be regenerated.
 export const SALT = "9781ca944babc5dd8bfb89e173ee9ebd";
+// Shared codes stop working at the end of 17 November 2026 (Irish time). Codes marked "noExpiry" keep working.
+export const EXPIRES = "2026-11-17T23:59:59Z";
 export const CODES = [
  {
   "h": "9f012726fd92b9d5de2023d7fe53d9fa89e9fc816d2cc083f0ff80ff670f4c65",
   "name": "Darren",
+  "noExpiry": true,
   "typedOnly": true,
   "decks": [
    "app",

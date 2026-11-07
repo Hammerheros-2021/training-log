@@ -4,7 +4,7 @@
 // once accepted it is remembered in a cookie for 90 days. Each unlock and view
 // is written to the Vercel logs with the code's name, so you can see who opened what.
 import { next } from '@vercel/functions';
-import { SALT, CODES } from './deck-access.js';
+import { SALT, CODES, EXPIRES } from './deck-access.js';
 
 export const config = { matcher: ['/deck/:path*'] };
 
@@ -21,7 +21,9 @@ async function lookup(raw) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(SALT + code));
   const h = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
   const hit = CODES.find((c) => c.h === h);
-  return hit ? { ...hit, code } : null;
+  if (!hit) return null;
+  if (!hit.noExpiry && Date.now() > Date.parse(EXPIRES)) return null;
+  return { ...hit, code };
 }
 
 function cookieValue(req) {
