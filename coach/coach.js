@@ -233,14 +233,14 @@ function buildDemo(){
 async function loadTeams(){const {data,error}=await sb.rpc('keel_my_teams');if(error){ERR=/keel_my_teams|function|schema/i.test(error.message||'')?'setup':error.message;return []}
   ERR='';const all=data||[];if(all.length&&!('staff' in all[0]))ERR='upgrade';return all.filter(t=>t.role==='coach')}
 async function loadSquad(t){
-  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();await loadSC(t);return}
+  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();await loadSC(t);await loadNut(t);return}
   const from=addK(todayK(),-80),to=todayK();
   const {data:sq,error:e1}=await sb.rpc('keel_team_squad',{t:t.team_id});if(e1)throw e1;
   const rows=[];for(let off=0;off<50000;off+=1000){const {data,error}=await sb.rpc('keel_team_data',{t:t.team_id,from_day:from,to_day:to}).range(off,off+999);if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break}
   const by={};(sq||[]).forEach(m=>{by[m.user_id]=mkPlayer({id:m.user_id,name:m.display_name||(m.about&&m.about.name)||'Player',pos:m.pos||'',role:m.role,staff:m.staff,share:m.share,food:!!m.share_food,joined:m.joined_at,about:m.about||{}})});
   rows.forEach(r=>{const p=by[r.user_id];if(!p)return;(r.kind==='day'?p.D:p.L)[r.key]=Object.assign({date:r.key},r.data)});
   SQUAD=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name));
-  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes();await loadSC(t)}
+  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes();await loadSC(t);await loadNut(t)}
 function attachNotes(){SQUAD.forEach(p=>{p.notes=NOTES.filter(n=>n.player_id===p.id);p._di={}})}
 async function selectTeam(id){TEAM=TEAMS.find(t=>t.team_id===id)||TEAMS[0];try{localStorage.setItem('keelCoachTeam',TEAM.team_id)}catch(e){}LOADING=true;render();
   try{await loadSquad(TEAM)}catch(e){toast('Could not load the squad: '+(e.message||e),5000);SQUAD=[];NOTES=[]}LOADING=false;render()}
@@ -529,7 +529,7 @@ function viewPlayer(id){const p=SQUAD.find(x=>x.id===id);if(!p)return `<div clas
   const body={overview:(fl.length?`<section class="card"><header><div><h2>Worth knowing</h2></div></header><div class="flags">${fl.map(f=>`<div class="flag"><span class="ic" style="background:color-mix(in srgb,${f.col} 15%,transparent);color:${f.col}">${ico(f.ic)}</span><span class="who"><b>${esc(f.t)}</b><span>${esc(f.s)}</span></span></div>`).join('')}</div></section>`:'')+`<div class="grid g2">${bal}${sleep}${load}${line('energy','How they feel','Energy, 1 to 5')}</div>`,
     sc:playerSC(p)+`<div class="grid g2">${load}${bal}</div>${sessT}`,
     physio:`<div class="grid g2">${pain||nigT}${line('sore','Body soreness','1 fresh to 5 very sore','var(--caution)')}</div>${pain?nigT:''}`,
-    nutrition:foodBody,
+    nutrition:foodBody+nutWorkspace(p),
     mindset:`<div class="grid g2">${line('mood','Mood','1 low to 5 great')}${line('stress','Stress','1 calm to 5 very stressed','var(--caution)')}${line('energy','Energy','1 drained to 5 full of it')}${sleep}</div>`}[tab];
   return head+body+notesCard(p)+`<p class="tiny muted">${p.food?'Food is shared as daily totals only. ':''}Notes, cycle tracking and${p.food?'':' food,'} drinks with alcohol stay private to ${esc(first(p.name))}.</p>`}
 
@@ -570,10 +570,11 @@ function restrCard(){const k=S.k;const rs=[];sharing().forEach(p=>activeRestr(p,
   return `<section class="card"><header><div><h2>Restrictions in place</h2><p>Set by the staff. They count towards availability.</p></div></header><div class="flags">${rs.map(({p,n})=>`<button class="flag" data-player="${esc(p.id)}"><span class="ic" style="background:color-mix(in srgb,var(--caution) 15%,transparent);color:var(--caution)">${ico('clock')}</span><span class="who"><b>${esc(p.name)} · ${esc(n.body)}</b><span>${esc(staffLabel(n.author_staff))} · ${n.until_day?'until '+esc(fmtK(n.until_day,{weekday:'short',day:'numeric',month:'short'})):'until further notice'}</span></span></button>`).join('')}</div></section>`}
 function viewOverview(){const h=viewToday();const i=h.indexOf('<div class="grid g-today">');if(i<0)return h;return h.slice(0,i)+hubStrip()+restrCard()+h.slice(i)}
 
-function render(){TIPS={};tipN=0;const rt=route();const root=$('#root');
+function render(){if(render._busy){setTimeout(render,0);return}render._busy=true;try{render2()}finally{render._busy=false}}
+function render2(){TIPS={};tipN=0;const rt=route();const root=$('#root');
   if(!SESSION){root.innerHTML=gateHTML();return}
   const title=rt.v==='player'?'Player':(VIEWS.find(v=>v[0]===rt.v)||VIEWS[0])[1];
-  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,sc:viewSCHub,physio:viewPhysio,nutrition:viewNutrition,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
+  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,sc:viewSCHub,physio:viewPhysio,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
   const sy=scrollY;root.innerHTML=shell(body,title);if(render._v===location.hash)scrollTo(0,sy);else scrollTo(0,0);render._v=location.hash}
 let GATE={mode:'in',msg:''};
 function gateHTML(){if(GATE.mode==='up')return `<div class="gate"><form class="gcard" id="signup"><img src="/keel-wordmark.svg" alt="keel"><div><h1>Join the backroom team</h1><p class="muted small" style="margin-top:4px">For coaches, S&amp;C, physios, nutritionists and mindset coaches. You need the staff code from your team's manager.</p></div>
@@ -593,7 +594,7 @@ async function joinPending(){let pj=null;try{pj=JSON.parse(localStorage.getItem(
   toast(error?error.message:'You\'ve joined the team',4000)}
 
 // ================= events =================
-window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#player'))S.ptab=null;if(!location.hash.startsWith('#sc')){S.progEdit=null;S.draft=null;S.exEdit=null}render()});
+window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#player'))S.ptab=null;if(!location.hash.startsWith('#sc')){S.progEdit=null;S.draft=null;S.exEdit=null}S.nutT=null;S.nutP=null;render()});
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(x=c('[data-gate]')){GATE={mode:x.dataset.gate,msg:''};render();return}
   if(x=c('[data-player]')){location.hash='player/'+encodeURIComponent(x.dataset.player);return}
@@ -828,7 +829,7 @@ document.addEventListener('input',e=>{const t=e.target;if(!S.draft)return;
   else if(t.dataset.f){const di=t.closest('.pitem');const day=draftDay(di);day.items[+di.dataset.ii][t.dataset.f]=t.value}
   else if(t.dataset.d){draftDay(t)[t.dataset.d]=t.dataset.d==='dow'?+t.value:t.value}});
 document.addEventListener('change',async e=>{const t=e.target;
-  if(t.id==='libQ'){S.libQ=t.value;render();return}
+  if(t.id==='libQ'){S.libQ=t.value;setTimeout(render,0);return}
   if(t.dataset.assignload){if(await setLoad(t.dataset.assignload,+t.value))toast('Load set to '+t.value+'%');return}});
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(x=c('[data-koach]')){if(await setLoad(x.dataset.koach,+x.dataset.pct)){toast('Load set to '+x.dataset.pct+'%');render()}return}
@@ -878,10 +879,138 @@ document.addEventListener('submit',async e=>{const f=e.target;
     else{const {data,error}=await sb.from('sc_exercises').insert(Object.assign({team_id:TEAM.team_id},row)).select().single();if(error){S.exBusy=null;toast(error.message,4000);render();return}SC.ex.push(data)}
     SC.ex.sort((a,b)=>a.name.localeCompare(b.name));S.exBusy=null;S.exEdit=null;toast('Exercise saved');render();return}});
 
+// ================= Nutrition workspace: targets and meal plans sent into players' Food tab =================
+const NUT={targets:[],plans:[],own:{},missing:false};
+const DT=[['training','Training day'],['match','Match day'],['rest','Rest day']];
+const MAC=[['kcal','Calories',''],['protein','Protein','g'],['carbs','Carbs','g'],['fat','Fat','g']];
+// starting targets for a squad player (about 80 kg); the nutritionist adjusts per player
+const APP_DEF={rest:{kcal:2400,protein:160,carbs:250,fat:80},training:{kcal:2900,protein:170,carbs:360,fat:85},match:{kcal:3250,protein:170,carbs:440,fat:85}};
+async function loadNut(t){NUT.missing=false;NUT.own={};
+  if(t.team_id===DEMO_ID){Object.assign(NUT,buildDemoNut());return}
+  const a=await sb.from('nut_targets').select('*').eq('team_id',t.team_id);if(a.error){if(/relation|does not exist|schema cache/i.test(a.error.message))NUT.missing=true;NUT.targets=NUT.plans=[];return}
+  NUT.targets=a.data||[];const b=await sb.from('nut_plans').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(300);NUT.plans=b.data||[];
+  const c=await sb.rpc('keel_team_nutrition',{t:t.team_id});(c.data||[]).forEach(r=>NUT.own[r.user_id]=r.own)}
+const tgtOf=pid=>NUT.targets.find(x=>x.player_id===pid&&x.active);
+const ownTargets=pid=>{const o=NUT.own[pid];if(!o)return null;const r={};DT.forEach(([k])=>{r[k]=Object.assign({},APP_DEF[k],o[k]||{})});return r};
+const plansOf=pid=>NUT.plans.filter(x=>x.player_id===pid).sort((a,b)=>b.created_at.localeCompare(a.created_at));
+// a day's type from what the player has on: match, training or rest
+function dayTypeGuess(p,k){const ss=sessionsOn(p,k);if(ss.some(s=>/match/i.test(s.what)))return 'match';
+  if(ss.some(s=>s.st!=='missed'))return 'training';const dow=(parse(k).getDay()+6)%7+1;
+  if(SC.assigns.some(a=>{if(a.player_id!==p.id)return false;const pp=progPos(a,k);return pp&&pp.week&&pp.week.days.some(d=>d.dow===dow)}))return 'training';
+  if(dow===7)return 'match';if(dow===2||dow===4)return 'training';return 'rest'}
+// Koach's starting point for targets: the player's own app targets (or Keel's defaults) nudged by what they eat and do
+function koachTargets(p){const base=ownTargets(p.id)||JSON.parse(JSON.stringify(APP_DEF));const why=[];const wk=lastN(S.k,14);
+  const lg=wk.map(kk=>foodOn(p,kk)).filter(Boolean);const prot=avgOf(lg.map(f=>f.protein));const load=p.E.load7(S.k);
+  const out=JSON.parse(JSON.stringify(base));
+  if(load>2500){DT.forEach(([k])=>{out[k].carbs=Math.round(out[k].carbs*1.15)});out.training.kcal+=150;out.match.kcal+=200;why.push('Heavy training load: more carbs and energy on training and match days')}
+  if(prot!=null&&prot<out.training.protein*.8)why.push(`Eating about ${Math.round(prot)} g protein a day, well under target: spread it over 4 meals`);
+  out.match.carbs=Math.max(out.match.carbs,out.training.carbs+60);if(!why.length)why.push('Their current targets suit their load. Fine-tune from here');
+  DT.forEach(([k])=>{const o=out[k];o.kcal=Math.round(4*o.carbs+4*o.protein+9*o.fat)});return {t:out,why}}
+
+function viewNutHub(){const t=route().id||'squad';
+  const tabs=`<div class="toolbar"><div class="seg">${[['squad','Squad food'],['plans','Players and plans']].map(([v,l])=>`<a href="#nutrition/${v}" aria-pressed="${t===v}" class="segl">${l}</a>`).join('')}</div></div>`;
+  if(t==='plans'){if(NUT.missing)return tabs+`<section class="card"><header><div><h2>One more database step</h2><p>Targets and meal plans need their own tables.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/nutrition.sql</b> and click Run, then confirm.</li><li>Refresh this page.</li></ol></section>`;return tabs+viewNutPlans()}
+  return tabs+viewNutrition()}
+function viewNutPlans(){const ps=players().sort((a,b)=>a.name.localeCompare(b.name));const k=todayK();
+  return `<section class="card"><header><div><h2>Players and plans</h2><p>Set each player's targets and send them meal plans. Koach drafts, you check and send. Players see them in their Food tab as "From your team".</p></div></header>
+   <div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Shares food</th><th>Targets</th><th>Meal plan</th><th>Logged this week</th><th></th></tr>${ps.map(p=>{const tg=tgtOf(p.id);const pl=plansOf(p.id)[0];const lg=p.food?lastN(k,7).filter(kk=>foodOn(p,kk)).length:null;
+    return `<tr><td><b style="color:var(--text)">${esc(p.name)}</b><div class="tiny muted">${esc(p.pos||'')}</div></td><td>${p.food?'<span class="chip good">Yes</span>':'<span class="chip">No</span>'}</td>
+     <td class="small">${tg?`Set ${esc(fmtK(tg.updated_at.slice(0,10),{day:'numeric',month:'short'}))}${tg.set_by_name?' · '+esc(tg.set_by_name):''}`:'<span class="muted">Their own</span>'}</td>
+     <td class="small">${pl?(pl.last_day>=k?`<span style="color:var(--good)">Until ${esc(fmtK(pl.last_day,{weekday:'short',day:'numeric',month:'short'}))}</span>`:`Ended ${esc(fmtK(pl.last_day,{day:'numeric',month:'short'}))}`):'<span class="muted">None</span>'}</td>
+     <td>${lg==null?'<span class="muted">–</span>':sevChip(lg,5,3,lg+'/7')}</td><td style="text-align:right"><button class="btn ghost sm" data-nutopen="${esc(p.id)}">Open</button></td></tr>`}).join('')}</table></div></section>`}
+
+// player page: the nutritionist's workspace
+function nutWorkspace(p){if(NUT.missing)return `<section class="card"><div class="empty">Run <b>supabase/nutrition.sql</b> in Supabase to set targets and send meal plans.</div></section>`;
+  const tg=tgtOf(p.id),own=ownTargets(p.id);const ed=S.nutT&&S.nutT.pid===p.id?S.nutT:null;const cur=ed?ed.t:(tg?tg.targets:(own||APP_DEF));
+  const cell=(dt,m)=>ed?`<input class="in num" data-nt="${dt}.${m}" value="${esc(cur[dt]&&cur[dt][m]!=null?cur[dt][m]:'')}" inputmode="numeric" style="padding:6px 8px;width:86px">`:`<span class="num">${cur[dt]&&cur[dt][m]!=null?Math.round(cur[dt][m]):'–'}</span>`;
+  const targetsCard=`<section class="card"><header><div><h2>Targets</h2><p>${tg?`Set by ${esc(tg.set_by_name||'the team')} on ${esc(fmtK(tg.updated_at.slice(0,10)))}. The player's Food tab uses these.`:own?'Their own app targets. Set team targets to replace them.':`Keel's starting targets${p.food?'':' (they don\'t share food, so their own targets are private)'}.`}</p></div>
+     ${ed?'':`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-nutedit="${esc(p.id)}">Edit</button><button class="btn sm" data-nutkoach="${esc(p.id)}">${ico('zap','width:15px;height:15px')}Koach suggests</button></div>`}</header>
+    ${ed&&ed.why?`<div class="flag" style="margin-bottom:10px"><span class="ic" style="background:color-mix(in srgb,var(--blue-2) 18%,transparent);color:var(--blue)">${ico('zap')}</span><span class="who"><b>Koach's suggestion</b><span>${esc(ed.why.join(' · '))}</span></span></div>`:''}
+    <div style="overflow-x:auto"><table class="list"><tr><th></th>${MAC.map(m=>`<th>${m[1]}${m[2]?' ('+m[2]+')':''}</th>`).join('')}</tr>${DT.map(([dt,l])=>`<tr><td><b style="color:var(--text)">${l}</b></td>${MAC.map(([m])=>`<td>${cell(dt,m)}</td>`).join('')}</tr>`).join('')}</table></div>
+    ${ed?`<div class="field" style="margin-top:12px"><label>Note for the player (optional)</label><input class="in" id="ntNote" value="${esc(ed.note||'')}" placeholder="e.g. Bump protein at breakfast; carbs up the day before matches"></div>
+     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" data-nutsave="${esc(p.id)}">Approve and send to ${esc(first(p.name))}</button><button class="btn ghost" data-nutcancel="1">Cancel</button></div>`:(tg&&tg.note?`<p class="small" style="margin-top:10px">Note: ${esc(tg.note)}</p>`:'')}</section>`;
+  const pe=S.nutP&&S.nutP.pid===p.id?S.nutP:null;const sent=plansOf(p.id);
+  const tgFor=dt=>((tg?tg.targets:(own||APP_DEF))[dt])||APP_DEF[dt];
+  const planEditor=pe?`<div class="demo-note" style="border-color:var(--blue-2)">${ico('zap','width:16px;height:16px;flex:none')}<span>${pe.koach?'<b>Koach\'s draft.</b> ':''}Check each meal, change what you like, then send. Totals compare each day with its targets.</span></div>
+    ${pe.days.map((d,di)=>{const tot={kcal:0,protein:0,carbs:0,fat:0};d.meals.forEach(m=>MAC.forEach(([x])=>tot[x]+=+m[x]||0));const T=tgFor(d.dayType);
+      return `<section class="card nday" data-di="${di}"><header style="flex-wrap:wrap;align-items:center"><div><h2>${esc(fmtK(d.date,{weekday:'long',day:'numeric',month:'short'}))}</h2></div>
+        <select class="in" data-nd="dayType" style="width:auto">${DT.map(([v,l])=>`<option value="${v}" ${d.dayType===v?'selected':''}>${l}</option>`).join('')}</select></header>
+        <div class="legend" style="margin-bottom:10px">${MAC.map(([x,l,u])=>{const v=Math.round(tot[x]),t=T[x];const off=t?Math.abs(v-t)/t:0;return `<span style="color:${off<=.08?'var(--good)':off<=.18?'var(--caution)':'var(--alert)'}">${l} ${v}${u?' '+u:''} / ${t}</span>`}).join('')}</div>
+        <div class="nmeal phead2"><span>Meal</span><span>Time</span><span>What</span><span>Ingredients</span><span>Calories</span><span>Protein</span><span>Carbs</span><span>Fat</span><span></span></div>
+        <div class="pitems">${d.meals.map((m,mi)=>`<div class="nmeal" data-mi="${mi}"><input class="in" data-nm="slot" value="${esc(m.slot||'')}" placeholder="Meal"><input class="in" data-nm="time" value="${esc(m.time||'')}" placeholder="Time"><input class="in" data-nm="name" value="${esc(m.name||'')}" placeholder="What it is">
+          <input class="in nitems" data-nm="itemsTxt" value="${esc((m.items||[]).map(i=>i.qty?i.qty+' '+i.name:i.name).join(', '))}" placeholder="Ingredients, e.g. 80 g oats, 250 ml milk">
+          ${MAC.map(([x,l])=>`<input class="in num" data-nm="${x}" value="${esc(m[x]??'')}" placeholder="${l}" inputmode="numeric" title="${l}">`).join('')}<button type="button" class="btn ghost sm" data-nmdel="${mi}" aria-label="Remove meal">✕</button></div>`).join('')}</div>
+        <button type="button" class="btn ghost sm" data-nmadd="${di}" style="margin-top:10px">+ Add a meal</button></section>`}).join('')}
+    <section class="card"><div class="field"><label>Note for the player (optional)</label><input class="in" id="npNote" value="${esc(pe.note||'')}" placeholder="e.g. Batch-cook the chicken on Sunday; swap rice for potatoes if you like"></div>
+     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" data-npsend="${esc(p.id)}">Send to ${esc(first(p.name))}</button><button class="btn ghost" data-npcancel="1">Cancel</button></div></section>`:'';
+  const planCard=`<section class="card"><header><div><h2>Meal plans</h2><p>Shows in ${esc(first(p.name))}'s Food tab with a tick to log each meal.</p></div>${pe?'':`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-npnew="${esc(p.id)}">Blank 3 days</button><button class="btn sm" data-npkoach="${esc(p.id)}" ${S.npBusy?'disabled':''}>${ico('zap','width:15px;height:15px')}${S.npBusy?'Koach is drafting…':'Draft 3 days with Koach'}</button></div>`}</header>
+    ${!pe?`<div class="field" style="margin-bottom:12px"><label>Anything Koach should know for this player</label><input class="in" id="npAsk" value="${esc(S.npAsk||'')}" placeholder="e.g. Doesn't eat fish; works on a building site, packed lunch; likes porridge"></div>`:''}
+    ${sent.length?`<table class="list"><tr><th>Dates</th><th>Sent by</th><th>Days</th><th></th></tr>${sent.slice(0,6).map(s=>`<tr><td>${esc(fmtK(s.first_day,{day:'numeric',month:'short'}))} – ${esc(fmtK(s.last_day,{day:'numeric',month:'short'}))}${s.last_day>=todayK()?' <span class="chip good">Live</span>':''}</td><td class="small">${esc(s.sent_by_name||'')}</td><td class="num">${(s.plan.days||[]).length}</td><td style="text-align:right"><button class="btn ghost sm" data-npcopy="${esc(s.id)}">Reuse</button> <button class="btn danger sm" data-npdel="${esc(s.id)}">Withdraw</button></td></tr>`).join('')}</table>`:'<div class="small muted">No plans sent yet.</div>'}</section>`;
+  return targetsCard+planCard+planEditor}
+
+function blankDays(p,n){const start=todayK();return Array.from({length:n},(_,i)=>{const k=addK(start,i+1);return {date:k,dayType:dayTypeGuess(p,k),meals:[{slot:'Breakfast',time:'08:00',name:'',items:[]},{slot:'Lunch',time:'13:00',name:'',items:[]},{slot:'Snack',time:'16:00',name:'',items:[]},{slot:'Dinner',time:'19:00',name:'',items:[]}]}})}
+function templateDays(p,n){const tg=tgtOf(p.id);const T=dt=>((tg?tg.targets:(ownTargets(p.id)||APP_DEF))[dt])||APP_DEF[dt];
+  const M={training:[['Breakfast','08:00','Porridge with berries and Greek yoghurt','80 g oats, 300 ml milk, 100 g berries, 150 g Greek yoghurt, 1 tsp honey',.25],['Lunch','13:00','Chicken, rice and veg bowl','150 g chicken, 200 g cooked rice, mixed veg, olive oil',.3],['Pre-training','17:00','Banana and toast with peanut butter','1 banana, 2 slices toast, 1 tbsp peanut butter',.13],['Dinner','20:00','Salmon, potatoes and greens','180 g salmon, 300 g potatoes, broccoli, butter',.32]],
+    match:[['Breakfast','09:00','Eggs on toast and fruit','3 eggs, 2 slices toast, 1 banana, orange juice',.25],['Pre-match','12:00','Pasta with chicken and tomato sauce','120 g dry pasta, 120 g chicken, tomato sauce',.32],['Post-match','17:00','Recovery shake and sandwich','whey shake with milk, chicken sandwich',.18],['Dinner','20:00','Steak, potatoes and veg','200 g steak, 300 g potatoes, veg',.25]],
+    rest:[['Breakfast','09:00','Omelette with spinach and toast','3 eggs, spinach, 1 slice toast',.27],['Lunch','13:00','Lentil and vegetable soup with bread','lentils, carrots, onion, bread',.28],['Snack','16:00','Greek yoghurt and nuts','200 g Greek yoghurt, 30 g walnuts',.15],['Dinner','19:00','Chicken stir-fry','150 g chicken, mixed veg, 150 g cooked noodles',.3]]};
+  return blankDays(p,n).map(d=>{const t=T(d.dayType);return Object.assign(d,{meals:M[d.dayType].map(([slot,time,name,items,f])=>({slot,time,name,items:items.split(', ').map(x=>({name:x})),kcal:Math.round(t.kcal*f),protein:Math.round(t.protein*f),carbs:Math.round(t.carbs*f),fat:Math.round(t.fat*f)}))})})}
+async function koachMealPlan(p){S.npAsk=($('#npAsk')||{}).value||'';S.npBusy=true;render();let days=null;const base=blankDays(p,3);const tg=tgtOf(p.id);const T=(tg?tg.targets:(ownTargets(p.id)||APP_DEF));
+  if(!isDemo()&&SESSION&&SESSION.access_token){const lg=lastN(S.k,14).map(kk=>foodOn(p,kk)).filter(Boolean);
+    const prompt=`You are Koach, the nutrition assistant in Keel, drafting 3 days of meals for a GAA footballer for the team's nutritionist to review. Food first, simple Irish home cooking and shop-bought staples, no supplements beyond a whey shake.
+Days: ${base.map(d=>`${d.date} (${d.dayType} day)`).join(', ')}.
+Targets per day type (kcal, protein g, carbs g, fat g): ${DT.map(([k,l])=>`${l}: ${T[k].kcal} kcal, ${T[k].protein} P, ${T[k].carbs} C, ${T[k].fat} F`).join('; ')}.
+${lg.length?`Over the last 2 weeks they averaged ${Math.round(avgOf(lg.map(f=>f.kcal))||0)} kcal and ${Math.round(avgOf(lg.map(f=>f.protein))||0)} g protein a day on days they logged.`:''}
+${S.npAsk?'Nutritionist notes: '+S.npAsk:''}
+Hit each day's targets within about 5%. 4 or 5 meals a day, with carbs before and after training and around matches. Give quantities.
+Reply with JSON only: {"days":[{"date":"YYYY-MM-DD","dayType":"training|match|rest","meals":[{"slot":"Breakfast","time":"08:00","name":"...","items":[{"qty":"80 g","name":"oats"}],"kcal":600,"protein":35,"carbs":80,"fat":15}]}]}`;
+    try{const r=await fetch('/api/claude',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+SESSION.access_token},body:JSON.stringify({prompt,maxTokens:9000})});const j=await r.json();const m=(j.text||'').match(/\{[\s\S]*\}/);
+      if(m){const o=JSON.parse(m[0]);if(Array.isArray(o.days)&&o.days.length)days=o.days.slice(0,7).map((d,i)=>({date:/^\d{4}-\d\d-\d\d$/.test(d.date)?d.date:base[Math.min(i,2)].date,dayType:DT.some(x=>x[0]===d.dayType)?d.dayType:'training',
+        meals:(d.meals||[]).map(mm=>({slot:String(mm.slot||''),time:String(mm.time||''),name:String(mm.name||''),items:(mm.items||[]).map(i=>({qty:i.qty?String(i.qty):'',name:String(i.name||'')})),kcal:Math.round(+mm.kcal||0),protein:Math.round(+mm.protein||0),carbs:Math.round(+mm.carbs||0),fat:Math.round(+mm.fat||0)}))}))}}catch(e){}}
+  if(!days){days=templateDays(p,3);if(!isDemo())toast('Koach couldn\'t be reached, so here\'s a starter plan scaled to their targets',4500)}
+  S.npBusy=false;S.nutP={pid:p.id,days,koach:true,note:''};render()}
+const parseItems=t=>String(t||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>{const m=x.match(/^(\d[\d.,]*\s*(?:g|kg|ml|l|tsp|tbsp|slices?|scoops?|cups?)?)\s+(.+)$/i);return m?{qty:m[1],name:m[2]}:{name:x}});
+
+function buildDemoNut(){const T=[],P=[];const now=new Date().toISOString();
+  players().forEach((p,ix)=>{if(ix%3===0)T.push({id:'nt'+ix,team_id:DEMO_ID,player_id:p.id,targets:JSON.parse(JSON.stringify(APP_DEF)),note:ix===0?'Protein at every meal; carbs up the day before matches.':null,set_by_name:'Sinéad (nutrition)',active:true,updated_at:now});
+    if(ix%4===0)P.push({id:'np'+ix,team_id:DEMO_ID,player_id:p.id,plan:{days:templateDays(p,3)},first_day:addK(todayK(),1),last_day:addK(todayK(),3),sent_by_name:'Sinéad (nutrition)',created_at:now})});
+  const own={};players().forEach(p=>{if(p.food)own[p.id]=JSON.parse(JSON.stringify(APP_DEF))});return {targets:T,plans:P,own,missing:false}}
+
+document.addEventListener('input',e=>{const t=e.target;
+  if(t.dataset.nt&&S.nutT){const [dt,m]=t.dataset.nt.split('.');S.nutT.t[dt]=S.nutT.t[dt]||{};S.nutT.t[dt][m]=t.value===''?null:+t.value}
+  if(t.id==='ntNote'&&S.nutT)S.nutT.note=t.value;if(t.id==='npNote'&&S.nutP)S.nutP.note=t.value;if(t.id==='npAsk')S.npAsk=t.value;
+  if(t.dataset.nm&&S.nutP){const m=S.nutP.days[+t.closest('.nday').dataset.di].meals[+t.closest('.nmeal').dataset.mi];if(t.dataset.nm==='itemsTxt')m.items=parseItems(t.value);else if(MAC.some(x=>x[0]===t.dataset.nm))m[t.dataset.nm]=t.value===''?null:+t.value;else m[t.dataset.nm]=t.value}});
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset.nd&&S.nutP){S.nutP.days[+t.closest('.nday').dataset.di].dayType=t.value;setTimeout(render,0)}
+  if(t.dataset.nm&&S.nutP&&MAC.some(x=>x[0]===t.dataset.nm))setTimeout(render,0)});
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-nutopen]')){S.ptab='nutrition';location.hash='player/'+encodeURIComponent(x.dataset.nutopen);return}
+  if(x=c('[data-nutedit]')){const tg=tgtOf(x.dataset.nutedit);S.nutT={pid:x.dataset.nutedit,t:JSON.parse(JSON.stringify(tg?tg.targets:(ownTargets(x.dataset.nutedit)||APP_DEF))),note:tg&&tg.note||''};render();return}
+  if(x=c('[data-nutkoach]')){const p=SQUAD.find(y=>y.id===x.dataset.nutkoach);const k=koachTargets(p);const tg=tgtOf(p.id);S.nutT={pid:p.id,t:k.t,why:k.why,note:tg&&tg.note||''};render();return}
+  if(c('[data-nutcancel]')){S.nutT=null;render();return}
+  if(x=c('[data-nutsave]')){const pid=x.dataset.nutsave;const t=S.nutT.t;for(const [dt] of DT){for(const [m] of MAC){if(!isNum(t[dt]&&t[dt][m])){toast('Fill in every target first');return}}}
+    const row={team_id:TEAM.team_id,player_id:pid,targets:t,note:S.nutT.note||null,set_by_name:myName(),active:true,updated_at:new Date().toISOString()};
+    if(isDemo()){NUT.targets=NUT.targets.filter(y=>y.player_id!==pid);NUT.targets.push(Object.assign({id:uid()},row))}
+    else{const {data,error}=await sb.from('nut_targets').upsert(row,{onConflict:'team_id,player_id'}).select().single();if(error){toast(error.message,4000);return}NUT.targets=NUT.targets.filter(y=>y.player_id!==pid);NUT.targets.push(data)}
+    S.nutT=null;toast(`Sent. ${first(playerName(pid))}'s Food tab now uses these targets.`,4000);render();return}
+  if(x=c('[data-npnew]')){const p=SQUAD.find(y=>y.id===x.dataset.npnew);S.nutP={pid:p.id,days:blankDays(p,3),koach:false,note:''};render();return}
+  if(x=c('[data-npkoach]')){await koachMealPlan(SQUAD.find(y=>y.id===x.dataset.npkoach));return}
+  if(x=c('[data-npcopy]')){const s=NUT.plans.find(y=>y.id===x.dataset.npcopy);const p=SQUAD.find(y=>y.id===s.player_id);const fresh=blankDays(p,(s.plan.days||[]).length||3);
+    S.nutP={pid:p.id,days:(s.plan.days||[]).map((d,i)=>Object.assign(JSON.parse(JSON.stringify(d)),{date:fresh[i].date})),koach:false,note:s.note||''};render();return}
+  if(c('[data-npcancel]')){S.nutP=null;render();return}
+  if(x=c('[data-nmadd]')){S.nutP.days[+x.dataset.nmadd].meals.push({slot:'Snack',time:'',name:'',items:[]});render();return}
+  if(x=c('[data-nmdel]')){S.nutP.days[+x.closest('.nday').dataset.di].meals.splice(+x.dataset.nmdel,1);render();return}
+  if(x=c('[data-npsend]')){const pid=x.dataset.npsend;const days=S.nutP.days.map(d=>Object.assign({},d,{meals:d.meals.filter(m=>m.name||(m.items||[]).length).map(m=>Object.assign({},m,{kcal:Math.round(+m.kcal||0),protein:Math.round(+m.protein||0),carbs:Math.round(+m.carbs||0),fat:Math.round(+m.fat||0)}))})).filter(d=>d.meals.length).sort((a,b)=>a.date.localeCompare(b.date));
+    if(!days.length){toast('Add at least one meal first');return}
+    const row={team_id:TEAM.team_id,player_id:pid,plan:{days},note:S.nutP.note||null,first_day:days[0].date,last_day:days[days.length-1].date,sent_by_name:myName()};
+    if(isDemo())NUT.plans.unshift(Object.assign({id:uid(),created_at:new Date().toISOString()},row));else{const {data,error}=await sb.from('nut_plans').insert(row).select().single();if(error){toast(error.message,4000);return}NUT.plans.unshift(data)}
+    S.nutP=null;toast(`Sent. ${first(playerName(pid))} will see it in their Food tab.`,4000);render();return}
+  if(x=c('[data-npdel]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Sure?';return}
+    if(!isDemo()){const {error}=await sb.from('nut_plans').delete().eq('id',x.dataset.npdel);if(error){toast(error.message);return}}NUT.plans=NUT.plans.filter(y=>y.id!==x.dataset.npdel);toast('Withdrawn');render();return}
+});
+
 // ================= start =================
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
-  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());render();return}
+  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());render();return}
     $('#root').innerHTML='<div class="gate"><div class="gcard"><h1>Not set up yet</h1><p class="muted">The dashboard can\'t reach the database settings.</p></div></div>';return}
   const {data:{session}}=await sb.auth.getSession();SESSION=session;if(!session){render();return}
   await joinPending();

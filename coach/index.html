@@ -58,6 +58,8 @@ textarea.in{resize:vertical;min-height:60px;font:inherit}
 .phead2{font-size:11px;color:var(--muted);margin-bottom:-2px}
 .phead2 span{padding-left:4px}
 .pday>header{gap:8px;align-items:center}.pday>header .in{padding:8px 10px}
+.nmeal{display:grid;grid-template-columns:110px 70px minmax(160px,1.3fr) minmax(200px,2fr) repeat(4,70px) auto;gap:6px;align-items:center}
+.nmeal .in{padding:8px 10px;font-size:14px}
 .pickgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
 .pick{display:flex;gap:10px;align-items:center;padding:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;cursor:pointer}
 .pick span{display:flex;flex-direction:column;font-size:14px;color:var(--text)}.pick small{font-size:12px;color:var(--muted)}
@@ -253,6 +255,8 @@ table.list{width:100%;border-collapse:collapse;font-size:14px}
   .pitem{grid-template-columns:1fr 1fr 1fr;padding:10px;border:1px solid var(--line);border-radius:12px}
   .pitem>:first-child,.pitem .pnote{grid-column:1/-1}
   .phead2{display:none}
+  .nmeal{grid-template-columns:1fr 1fr 1fr 1fr;padding:10px;border:1px solid var(--line);border-radius:12px}
+  .nmeal [data-nm=name],.nmeal .nitems{grid-column:1/-1}
 }
 @media (max-width:680px){
   h1{font-size:22px}
@@ -278,6 +282,6 @@ table.list{width:100%;border-collapse:collapse;font-size:14px}
 <body>
 <div id="root"><div class="spin"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/coach/coach.js?v=c3"></script>
+<script src="/coach/coach.js?v=c4"></script>
 </body>
 </html>

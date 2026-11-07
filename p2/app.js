@@ -4577,6 +4577,25 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
   if(x=c('[data-mypdone]')){document.querySelectorAll('[data-mypdone]').forEach(b=>b.setAttribute('aria-pressed',b===x?'true':'false'));return}
   if(x=c('[data-mypsave]')){x.disabled=true;await mypSave(x.dataset.mypsave,x.dataset.k);return}
 });
+// ================= P2: nutrition from your team (see supabase/nutrition.sql) =================
+// The team's nutritionist sets targets and sends meal plans. Targets replace the app's own; plan days
+// replace the app's plan for those dates, so "Ate" ticks and totals work as normal.
+const MYN={d:null,loading:false};
+async function mynLoad(){if(!sb||!UID||MYN.loading||sampleMode)return;MYN.loading=true;try{const {data,error}=await sb.rpc('keel_my_nutrition');MYN.d=error?{}:(data||{})}catch(e){MYN.d={}}MYN.loading=false;applyTeamNut();render()}
+function applyTeamNut(){const t=MYN.d&&MYN.d.targets;if(!t||!t.targets)return;['rest','training','match'].forEach(k=>{const x=t.targets[k];if(x&&DAYT[k])['kcal','protein','carbs','fat'].forEach(m=>{if(isNum(x[m]))DAYT[k][m]=Math.round(+x[m])})})}
+const _mynAP=applyProfile;applyProfile=function(p){_mynAP(p);applyTeamNut()};
+function mynDay(k){if(sampleMode)return null;const ps=((MYN.d&&MYN.d.plans)||[]).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
+  for(const p of ps){const d=((p.plan&&p.plan.days)||[]).find(x=>x.date===k);if(d)return Object.assign({team:true,from:p.sent_by_name,teamName:p.team},d)}return null}
+const _mynPD=planDay;planDay=function(k){return mynDay(k)||_mynPD(k)};
+function mynCard(){if(sampleMode)return '';if(MYN.d==null){setTimeout(mynLoad,0);return ''}const t=MYN.d.targets;const today=iso(todayDate());
+  const dates=[];((MYN.d.plans)||[]).forEach(p=>((p.plan&&p.plan.days)||[]).forEach(d=>{if(d.date>=today&&!dates.includes(d.date))dates.push(d.date)}));dates.sort();
+  if(!t&&!dates.length)return '';
+  const tl=t?`<div class="ds">Your targets are set by ${esc(t.set_by_name||'your nutritionist')}${t.team?' ('+esc(t.team)+')':''}: ${['training','match','rest'].map(k=>`${DAYT[k].label.toLowerCase()} ${DAYT[k].kcal} kcal, ${DAYT[k].protein} g protein`).join(' · ')}.</div>${t.note?`<div class="ds" style="font-style:italic">“${esc(t.note)}”</div>`:''}`:'';
+  const notes=[...new Set(((MYN.d.plans)||[]).filter(p=>p.last_day>=today&&p.note).map(p=>p.note))];
+  const days=dates.slice(0,4).map(k=>{const d=mynDay(k);return `<div style="display:flex;flex-direction:column;gap:6px"><b style="font-size:15px">${k===today?'Today':esc(fmtD(parse(k),{weekday:'long',day:'numeric',month:'short'}))} <span class="ds" style="font-weight:400">· ${esc((DAYT[d.dayType]||{}).label||'')}</span></b>${planMealsHTML(k,true)}</div>`}).join('');
+  return `<section class="panel" id="mynCard"><h3>From your team · Nutrition</h3>${tl}${notes.map(n=>`<div class="ds" style="font-style:italic">“${esc(n)}”</div>`).join('')}${days}</section>`}
+const _mynFood=viewFood;viewFood=function(){const h=_mynFood();return mynCard()+h};
+const _mynDash=viewDashboard;viewDashboard=function(){if(MYN.d==null&&!sampleMode)setTimeout(mynLoad,0);return _mynDash()};
 const P2REC=/type=recovery/.test(location.hash+location.search);
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
