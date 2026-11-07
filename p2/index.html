@@ -1356,6 +1356,15 @@ details.p1fold:not([open]){padding-top:var(--space-2);padding-bottom:var(--space
 .p2fta{display:flex;gap:8px;width:100%}.p2fta button{flex:1;min-height:42px}.p2ftm .p2fte{flex-direction:column;align-items:stretch}.p2ftm #p2mt{min-height:44px;font-size:18px}
 .p2undo{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:90;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:#15171E;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.4);font-size:14px}
 .p2undo span{flex:1}.p2undo button{border:0;background:none;color:#34E3A0;font:700 14px/1 var(--font-body);min-height:36px;padding:0 6px}
+/* P2 v2: balance after the session, session feedback, how balance is worked out */
+.p2hid h2{color:var(--text)!important}.p2hid .hv p{margin:4px 0 6px;color:var(--muted);font-size:13px;line-height:1.4}
+.p2hb{display:flex;gap:16px;flex-wrap:wrap}.p2hb .linkbtn,.p2hb1{font-size:13px;padding:0;min-height:32px}
+.p2fbask{display:flex;align-items:center;gap:12px;width:100%;margin-top:10px;text-align:left;background:var(--surface);border:1px solid var(--k-green);border-radius:16px;padding:14px;color:var(--text);font:inherit;cursor:pointer}
+.p2fbask span{flex:1;display:flex;flex-direction:column;gap:2px}.p2fbask small{color:var(--muted);font-size:12.5px}.p2fbask .ki{color:var(--k-green)}
+.p2fbl{margin:8px 2px 0;font-size:13px;color:var(--muted);line-height:1.45}.p2fbl b{color:var(--text)}.p2fbl .linkbtn{font-size:13px;padding:0;min-height:0}
+.p2fbr button[aria-pressed="true"]{background:var(--k-green);border-color:var(--k-green)}
+.p2wts{list-style:none;margin:6px 0 10px;padding:0;display:grid;gap:6px}.p2wts li{display:flex;justify-content:space-between;gap:10px;font-size:14px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.p2up{color:var(--k-green);font-size:11.5px}.p2dn{color:var(--muted);font-size:11.5px}
 </style>
 </head>
 <body class="kloading">
@@ -1381,6 +1390,6 @@ details.p1fold:not([open]){padding-top:var(--space-2);padding-bottom:var(--space
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p2/app.js?v=p2n"></script>
+<script src="/p2/app.js?v=p2o"></script>
 </body>
 </html>
