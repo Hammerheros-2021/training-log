@@ -4491,21 +4491,25 @@ document.addEventListener('click',async e=>{
 // will and won't see. Sharing can be paused or the team left at any time. See supabase/teams.sql.
 const TEAM={list:null,busy:false,err:'',ask:null,loading:false};
 const TEAM_SEES=['Your balance each day and how it is trending','Sleep times and sleep quality','The check-in sliders: energy, mood, stress and how your body feels','Niggles: where, which side and how sore (not your notes)','Sessions: type, minutes, effort, done or missed, and how they felt','That you\'re unwell and how badly (not what it is)','Morning pulse and HRV if you log them','Your name, age, sport and goal from sign-up'];
-const TEAM_NEVER=['Food, drinks, alcohol and supplements','Any notes you write','Cycle tracking','Your weight, photos, Koach\'s chats and overview'];
+const TEAM_NEVER=['Food, unless you turn on food sharing below (and then only daily totals)','Drinks with alcohol, notes and photos','Cycle tracking','Your weight, Koach\'s chats and overview'];
 async function teamLoad(){if(!sb||TEAM.loading)return;TEAM.loading=true;try{const {data,error}=await sb.rpc('keel_my_teams');if(error)throw error;TEAM.list=data||[];TEAM.err=''}catch(e){TEAM.list=[];TEAM.err=/keel_my_teams|function|schema/i.test(String(e&&e.message))?'Teams are not switched on for this app yet.':''}TEAM.loading=false;render()}
 function teamPanel(){
   if(TEAM.list==null){setTimeout(teamLoad,0);return `<section class="panel" id="teamPanel"><h3>Your team</h3><div class="ds">Loading…</div></section>`}
-  const mine=TEAM.list.map(m=>`<div class="cmp"><span class="q">${esc(m.name||'Team')} <span class="ds">· ${m.role==='coach'?'Coach':m.share?'Sharing with your coach':'Sharing paused'}</span></span>
+  const mine=TEAM.list.map(m=>`<div class="cmp"><span class="q">${esc(m.name||'Team')} <span class="ds">· ${m.role==='coach'?'Staff':m.share?'Sharing with the staff':'Sharing paused'}</span></span>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${m.role==='coach'?`<a class="primary" href="/coach/" style="flex:none;text-decoration:none;padding:8px 16px;font-size:15px">Open the coach dashboard</a>`:`<button type="button" class="ghost" data-teamshare="${m.team_id}" data-on="${m.share?0:1}" style="color:var(--fg)">${m.share?'Pause sharing':'Share again'}</button>`}
-    <button type="button" class="ghost danger" data-teamleave="${m.team_id}">Leave</button></div></div>`).join('');
-  const ask=TEAM.ask?`<div class="cmp" style="gap:12px"><b>Before you join</b><div class="ds" style="font-size:13px">Your coach will see:</div><ul style="margin:0 0 0 18px;font-size:14px;line-height:1.5">${TEAM_SEES.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
-    <div class="ds" style="font-size:13px">Your coach will never see:</div><ul style="margin:0 0 0 18px;font-size:14px;line-height:1.5">${TEAM_NEVER.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+    <button type="button" class="ghost danger" data-teamleave="${m.team_id}">Leave</button></div>${m.role!=='coach'&&m.share?`<label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-top:4px"><input type="checkbox" data-teamfood="${m.team_id}" ${m.share_food?'checked':''} style="margin-top:3px"><span>Share food totals with the nutritionist and staff<br><span class="ds">Daily calories, protein, carbs, fat, fibre, plants, water and a few vitamins. Never meals, photos or drinks with alcohol.</span></span></label>`:''}</div>`).join('');
+  const ask=TEAM.ask?`<div class="cmp" style="gap:12px"><b>Before you join</b><div class="ds" style="font-size:13px">The team's staff (manager, coaches, S&amp;C, physio, nutritionist, mindset coach) will see:</div><ul style="margin:0 0 0 18px;font-size:14px;line-height:1.5">${TEAM_SEES.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+    <div class="ds" style="font-size:13px">They will never see:</div><ul style="margin:0 0 0 18px;font-size:14px;line-height:1.5">${TEAM_NEVER.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     <div class="ds">This includes what you've already logged. You can pause sharing or leave the team here at any time.</div>
     <div style="display:flex;gap:8px"><button type="button" class="ghost" id="teamBack" style="flex:1;color:var(--fg)">Not now</button><button type="button" class="primary" id="teamYes" ${TEAM.busy?'disabled':''}>${TEAM.busy?'Joining…':'Join and share'}</button></div></div>`
    :`<div class="field"><label class="label" for="teamCode">Join a team</label><input id="teamCode" type="text" autocomplete="off" autocapitalize="characters" placeholder="Code from your coach, e.g. K7PQ2M" style="text-transform:uppercase;letter-spacing:.1em"></div>
     <button type="button" class="ghost" id="teamNext" style="color:var(--fg)">Next</button>`;
   return `<section class="panel" id="teamPanel"><h3>Your team</h3>${TEAM.err?`<div class="ds">${esc(TEAM.err)}</div>`:`<div class="ds">Share how you're going with your coach, so they can plan sessions around the squad.</div>${mine}${ask}`}</section>`}
 const _p2vp=viewProfile;viewProfile=function(){const h=_p2vp();const i=h.indexOf('<section class="panel"><h3>Send feedback');return i<0?h+teamPanel():h.slice(0,i)+teamPanel()+h.slice(i)};
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||!t.dataset.teamfood)return;const on=t.checked;
+  const {error}=await sb.from('team_members').update({share_food:on}).eq('team_id',t.dataset.teamfood).eq('user_id',UID);
+  if(error){t.checked=!on;toast(/share_food/.test(error.message)?'Food sharing isn\'t switched on for this team yet.':'Could not change that. Try again.');return}
+  toast(on?'Food totals are now shared with the staff':'Food is private again',3500);TEAM.list=null;render()});
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(c('#teamNext')){const v=(($('#teamCode')||{}).value||'').replace(/\s/g,'').toUpperCase();if(v.length<6){toast('Type the 6-letter code from your coach');return}TEAM.ask=v;render();return}
   if(c('#teamBack')){TEAM.ask=null;render();return}
@@ -4514,7 +4518,7 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
     if(error){toast(error.message||'Could not join. Check the code.',4000);render();return}
     TEAM.ask=null;toast(data&&data.role==='coach'?`You're a coach on ${data.name}`:`You've joined ${data&&data.name||'the team'}`,3500);TEAM.list=null;render();return}
   if(x=c('[data-teamshare]')){const on=x.dataset.on==='1';const {error}=await sb.from('team_members').update({share:on}).eq('team_id',x.dataset.teamshare).eq('user_id',UID);
-    if(error){toast('Could not change that. Try again.');return}toast(on?'Sharing again':'Sharing paused. Your coach sees nothing new or old until you share again.',4000);TEAM.list=null;render();return}
+    if(error){toast('Could not change that. Try again.');return}toast(on?'Sharing again':'Sharing paused. The staff see nothing new or old until you share again.',4000);TEAM.list=null;render();return}
   if(x=c('[data-teamleave]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Tap again to leave';return}
     const {error}=await sb.from('team_members').delete().eq('team_id',x.dataset.teamleave).eq('user_id',UID);if(error){toast('Could not leave. Try again.');return}toast('You have left the team');TEAM.list=null;render();return}
 });

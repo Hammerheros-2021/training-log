@@ -7,10 +7,10 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Keel Coach">
+<meta name="apple-mobile-web-app-title" content="Keel Team">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<title>Keel · Coach</title>
+<title>Keel · Team</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@600;700&family=JetBrains+Mono:wght@400;500&family=Sora:wght@600&display=swap">
 <style>
@@ -46,6 +46,12 @@ h1{font-size:26px} h2{font-size:18px} h3{font-size:15px}
 .nav a svg{width:19px;height:19px;flex:none}
 .nav a:hover{background:var(--surface);color:var(--text)}
 .nav a[aria-current="page"]{background:var(--raised);color:var(--text)}
+.nav a em{margin-left:auto;font-style:normal;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:1px 7px}
+.navh{font:600 11px var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:14px 12px 6px}
+.navh:first-child{padding-top:0}
+a.kpi.hub{text-decoration:none;transition:border-color .15s}
+a.kpi.hub:hover{border-color:var(--line-2)}
+textarea.in{resize:vertical;min-height:60px;font:inherit}
 .side .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:0 8px;font-size:12px;color:var(--faint)}
 .side .foot button{color:var(--muted);text-align:left;font-size:13px}
 .main{min-width:0;display:flex;flex-direction:column}
@@ -58,7 +64,7 @@ h1{font-size:26px} h2{font-size:18px} h3{font-size:15px}
 .datenav button:hover{color:var(--text)}
 .datenav button:disabled{opacity:.3;cursor:default}
 .datenav b{min-width:118px;text-align:center;font-weight:600;color:var(--text);font-size:14px}
-.page{padding:24px 28px 60px;display:flex;flex-direction:column;gap:20px;max-width:1500px;width:100%}
+.page{min-width:0;overflow-x:clip;padding:24px 28px 60px;display:flex;flex-direction:column;gap:20px;max-width:1500px;width:100%}
 .demo-note{display:flex;gap:10px;align-items:center;background:color-mix(in srgb,var(--blue-2) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--blue-2) 35%,var(--line));border-radius:var(--r-md);padding:10px 14px;font-size:13px;color:var(--text-body)}
 .demo-note b{color:var(--text)}
 .tabs{display:none}
@@ -74,7 +80,7 @@ h1{font-size:26px} h2{font-size:18px} h3{font-size:15px}
 .g-today{grid-template-columns:minmax(0,1fr) 380px}
 
 /* KPI strip */
-.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.kpis{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:14px}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px 18px;display:flex;align-items:center;gap:14px;min-width:0;text-align:left}
 button.kpi:hover{border-color:var(--line-2)}
 .kpi .v{font:600 32px/1 var(--f-display);color:var(--text);letter-spacing:-.02em}
@@ -165,10 +171,10 @@ table.hm{border-collapse:separate;border-spacing:3px;width:100%}
 .avcol{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-md);padding:14px;display:flex;flex-direction:column;gap:8px;min-height:120px}
 .avcol h3{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .avcol h3 .num{margin-left:auto;color:var(--muted);font-weight:500}
-.avp{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--surface);text-align:left;width:100%}
+.avp{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:8px 10px;border-radius:10px;background:var(--surface);text-align:left;width:100%}
 .avp:hover{background:var(--raised)}
-.avp b{font-size:14px;color:var(--text);font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.avp small{font-size:12px;color:var(--muted);white-space:nowrap}
+.avp b{font-size:14px;color:var(--text);font-weight:600;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.avp small{font-size:12px;color:var(--muted);line-height:1.35}
 .bodyrow{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
 .bodyrow:first-child{border-top:0}
 
@@ -208,7 +214,8 @@ table.list{width:100%;border-collapse:collapse;font-size:14px}
 
 /* iPad */
 @media (max-width:1240px){
-  .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .kpis{grid-template-columns:repeat(min(var(--n,5),3),minmax(0,1fr))}
+  .av[style]{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
   .g-today{grid-template-columns:1fr}
   .g3{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -229,9 +236,9 @@ table.list{width:100%;border-collapse:collapse;font-size:14px}
 }
 @media (max-width:680px){
   h1{font-size:22px}
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:10px}
   .kpi{padding:12px;gap:10px}.kpi .ic{display:none}.kpi .v{font-size:26px}
-  .g2,.g3,.av{grid-template-columns:1fr}
+  .g2,.g3,.av,.av[style]{grid-template-columns:1fr !important}
   .card{padding:16px;border-radius:16px}
   .board{grid-template-columns:1fr;gap:8px}
   .pt{padding:10px 12px;flex-direction:row;align-items:center;justify-content:space-between}
@@ -243,12 +250,14 @@ table.list{width:100%;border-collapse:collapse;font-size:14px}
   .sel{max-width:150px}
   .datenav b{min-width:84px;font-size:13px}
   .bodyrow{grid-template-columns:1fr}
+  .demo-note{flex-wrap:wrap}
+  .demo-note>span{flex-basis:100%}
 }
 </style>
 </head>
 <body>
 <div id="root"><div class="spin"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/coach/coach.js?v=c1"></script>
+<script src="/coach/coach.js?v=c2"></script>
 </body>
 </html>

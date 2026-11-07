@@ -43,6 +43,9 @@ const IC={
  back:'<path d="m15 18-6-6 6-6"/>',
  copy:'<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
  refresh:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"/>',
+ food:'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+ mind:'<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/>',
+ note:'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8"/>',
  balance:'<path d="M12 3v18M5 8h14M5 8l-3 7a4 4 0 0 0 6 0L5 8ZM19 8l-3 7a4 4 0 0 0 6 0l-3-7Z"/>',
 };
 const ico=(n,st)=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${st?` style="${st}"`:''}>${IC[n]||''}</svg>`;
@@ -106,9 +109,9 @@ function dayInfo(p,k){
   const d=p.D[k];const ci=checkedIn(d);const s=ci?p.E.bal(k):null;
   const nig=latest(p,k,3,x=>x.niggles&&x.niggles.length);const sick=latest(p,k,2,x=>(x.sick&&x.sick.on)||has(x,'Sick / run down'));
   const pain=nig?maxPain(nig.d):0;const sev=sick?(sick.d.sick&&sick.d.sick.sev)||'mild':null;
-  let av='avail';if(pain>=5||sev==='bad')av='out';else if(pain>=3||sick||(s!=null&&s<55))av='mod';
+  const rs=activeRestr(p,k);let av='avail';if(pain>=5||sev==='bad')av='out';else if(pain>=3||sick||rs.length||(s!=null&&s<55))av='mod';
   const st=s==null?'none':s>=75?'good':s>=55?'caution':'alert';
-  return {d,ci,s,st,pain,nig,sick:sick?{k:sick.k,sev}:null,av,sleep:ci?sleepHours(d):null}})());
+  return {d,ci,s,st,pain,nig,sick:sick?{k:sick.k,sev}:null,av,rs,sleep:ci?sleepHours(d):null}})());
 }
 const ST={good:['var(--good)','Ready'],caution:['var(--caution)','Cap the effort'],alert:['var(--alert)','Back off'],none:['var(--faint)','No check-in']};
 const AV={avail:['var(--good)','Available','check'],mod:['var(--caution)','Modify','niggle'],out:['var(--alert)','Unavailable','sick']};
@@ -116,6 +119,7 @@ const lastCheckin=(p,k)=>{for(let i=0;i<60;i++){const kk=addK(k,-i);if(checkedIn
 function flagsFor(p,k){
   const i=dayInfo(p,k),E=p.E,out=[];
   if(i.sick)out.push({w:9,ic:'sick',col:'var(--alert)',t:`Unwell${i.sick.sev?` (${i.sick.sev})`:''}`,s:i.sick.k===k?'Logged this morning':'Logged '+fmtK(i.sick.k,{weekday:'long'})});
+  i.rs.forEach(n=>out.push({w:8,ic:'clock',col:'var(--caution)',t:'Restriction: '+n.body,s:`${staffLabel(n.author_staff)} · ${n.until_day?'until '+fmtK(n.until_day,{weekday:'short',day:'numeric',month:'short'}):'until further notice'}`}));
   if(i.pain>=3){const area=i.nig.d.niggles.reduce((a,n)=>(+n.pain||0)>(+a.pain||0)?n:a);const prev=latest(p,addK(i.nig.k,-1),5,x=>x.niggles&&x.niggles.some(n=>n.area===area.area));
     const rising=prev&&maxPain(prev.d)<i.pain;out.push({w:i.pain>=5?10:7,ic:'niggle',col:i.pain>=5?'var(--alert)':'var(--caution)',t:`${area.area}${area.side&&area.side!=='Both'?' ('+area.side.toLowerCase()+')':''} ${i.pain}/10`,s:prev?(rising?'Getting worse over the last few days':'Ongoing'):'New niggle'})}
   if(i.s!=null&&i.s<55&&!i.sick&&i.pain<3)out.push({w:6,ic:'balance',col:'var(--alert)',t:`Balance ${i.s}`,s:'Low today. Worth a quick word before training'});
@@ -164,12 +168,22 @@ function barChart(pts,o){o=o||{};const W=o.w||560,H=o.h||150,l=34,r=10,t=10,b=22
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.label||'Chart')}">${g}</svg></div>`}
 
 // ================= state =================
-let sb=null,SESSION=null,TEAMS=[],TEAM=null,SQUAD=[],LOADING=false,ERR='';
-const S={k:todayK(),sort:'status',filter:'all',metric:'bal',days:28,nums:false};
+let sb=null,SESSION=null,TEAMS=[],TEAM=null,SQUAD=[],NOTES=[],LOADING=false,ERR='';
+const S={k:todayK(),sort:'status',filter:'all',metric:'bal',days:28,nums:false,ptab:null,demoAs:'manager',noteKind:'note'};
 const DEMO_ID='demo';
 const players=()=>SQUAD.filter(p=>p.role==='member');
 const sharing=()=>players().filter(p=>p.share);
-function mkPlayer(o){const p=Object.assign({D:{},L:{},_di:{}},o);p.E=engine(p.D,p.L);return p}
+const staffList=()=>SQUAD.filter(p=>p.role==='coach');
+function mkPlayer(o){const p=Object.assign({D:{},L:{},_di:{},notes:[]},o);p.E=engine(p.D,p.L);return p}
+// backroom roles
+const STAFF={manager:['Manager','today'],coach:['Coach','today'],sc:['S&C','sc'],physio:['Physio','physio'],nutrition:['Nutrition','nutrition'],mindset:['Mindset','mindset']};
+const STAFF_LONG={manager:'Manager',coach:'Coach / selector',sc:'Strength & conditioning',physio:'Physio',nutrition:'Nutritionist',mindset:'Mindset coach'};
+const myStaff=()=>isDemo()?S.demoAs:(TEAM&&TEAM.staff)||null;
+const isManager=()=>myStaff()==='manager';
+const homeView=()=>(STAFF[myStaff()]||STAFF.manager)[1];
+const staffLabel=s=>(STAFF[s]||['Staff'])[0];
+function activeRestr(p,k){return (p.notes||[]).filter(n=>n.kind==='restriction'&&n.created_at.slice(0,10)<=k&&(!n.until_day||n.until_day>=k))}
+function myName(){const me=SQUAD.find(x=>x.id===(SESSION&&SESSION.user.id));return (me&&me.name)||((SESSION&&SESSION.user.email)||'').split('@')[0]||'Staff'}
 
 // ================= demo squad (made up, never stored) =================
 function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return ((t^t>>>14)>>>0)/4294967296}}
@@ -178,7 +192,7 @@ function buildDemo(){
   const names=['Cian Gallagher','Oisín McGovern','Darragh Flynn','Ronan Clancy','Eoin McSharry','Seán Rooney','Pádraig Keaney','Conor Gilmartin','Niall Dolan','Ciarán Mulvey','Fiachra Feeney','Tadhg Ward','Rory McTernan','Shane Meehan','Aidan Rooney','Liam Kelly','Kevin Moran','Dylan Fowley','Jack Gaffney','Ultan Brennan','Mark Harte','Diarmuid Leonard','Colm Travers','Brian McHugh'];
   const POS=['Goalkeeper','Corner-back','Full-back','Corner-back','Wing-back','Centre-back','Wing-back','Midfield','Midfield','Wing-forward','Centre-forward','Wing-forward','Corner-forward','Full-forward','Corner-forward','Goalkeeper','Back','Back','Midfield','Forward','Forward','Back','Forward','Midfield'];
   const T=todayK(),N=70;const out=[];
-  names.forEach((nm,ix)=>{const p={id:'demo'+ix,name:nm,pos:POS[ix],role:'member',share:true,about:{name:nm,sport:['GAA football']}};const D={},L={};
+  names.forEach((nm,ix)=>{const p={id:'demo'+ix,name:nm,pos:POS[ix],role:'member',share:true,food:ix%4!==3,about:{name:nm,sport:['GAA football']}};const flog=rnd(.45,.95),pro=ix===5?rnd(85,100):rnd(120,185),kc=rnd(2300,3000);const D={},L={};
     const sb0=rnd(6.7,8.1),eb=rnd(3.1,4),stb=rnd(1.8,2.8),ci=ix===21?.35:rnd(.72,.97),farm=ix%5===0,gym=ix%3===0,run=ix%4===1,bedB=rnd(22.4,23.6);
     for(let i=N;i>=0;i--){const k=addK(T,-i),dow=(parse(k).getDay()+6)%7;const yd=(parse(addK(k,-1)).getDay()+6)%7;
       const post=yd===6?1:yd===5||yd===1||yd===3?.4:0;let sl=cl(sb0+rnd(-.9,.7)-(dow===5?.3:0),4.5,9.5),e=eb-post*.6+rnd(-.8,.8),m=3.4+rnd(-.9,.9),st=stb+rnd(-.8,1),so=1.4+post*1.4+rnd(-.5,.7);
@@ -202,44 +216,61 @@ function buildDemo(){
       if(!skip){const bm=Math.round((bedB+rnd(-.5,.6))*60),wm=bm+Math.round(sl*60);d.bed=pad(Math.floor(bm/60)%24)+':'+pad(bm%60);d.wake=pad(Math.floor(wm/60)%24)+':'+pad(wm%60);
         d.sleepQ=cl(Math.round(2.6+(sl-6.5)*.8+rnd(-.6,.6)),1,5);d.energy=cl(Math.round(e+(sl-7)*.4),1,5);d.mood=cl(Math.round(m),1,5);d.stress=cl(Math.round(st),1,5);d.sore=cl(Math.round(so),1,5);
         if(nig)d.niggles=[nig];if(sick)d.sick={on:true,sev};if(R()<.25&&ix%2===0)d.rhr=ri(50,58)+(sick?7:0)}
+      if(!skip&&p.food&&R()<flog){const tr=extras.length||(i>0&&((gym&&dow===0)||(run&&dow===2)));const pool=['oats','spinach','broccoli','carrot','onion','garlic','tomato','pepper','apple','banana','blueberries','lentils','chickpeas','potato','sweet potato','kale','rice','peas','beans','mushroom','avocado','walnuts','almonds','cabbage','leek','orange','berries','quinoa','pumpkin seeds','beetroot'];const np=ix===5?ri(2,4):ri(3,9),pl=[];for(let j=0;j<np;j++)pl.push(pool[Math.floor(R()*pool.length)]);
+        d.food={n:ri(3,7),kcal:Math.round(kc+(tr&&ix!==9?rnd(250,600):0)+rnd(-300,300)),protein:Math.round(pro+rnd(-25,20)),carbs:Math.round(rnd(180,340)+(tr?60:0)),fat:Math.round(rnd(70,120)),fibre:Math.round(rnd(14,40)),iron:r1(rnd(7,16)),calcium:Math.round(rnd(550,1300)),vitD:r1(rnd(2,16)),omega3:Math.round(rnd(.1,2.4)*100)/100,plants:[...new Set(pl)],water:r1(rnd(1.2,3.2))}}
       if(extras.length)d.extras=extras;if(farm&&dow<5){d.farm=ri(1,3);d.farmHrs=ri(3,7)}
       if(i>0&&((gym&&dow===0)||(run&&dow===2))){const miss=R()<.12;L[k]={date:k,type:gym&&dow===0?'S':'E',status:miss?'missed':'done',dur:gym&&dow===0?ri(45,60):ri(30,45),rpe:gym&&dow===0?ri(6,8):ri(3,5)}}
       if(i>0&&(extras.length||L[k])&&!skip&&R()<.75){let f=cl(Math.round(2.3+(d.energy||3)*.45+rnd(-.8,.8)),1,5);if(ix===12&&i<=6)f=ri(1,2);d.sfb={feel:f,energy:f>=4?'full':f<=2?'low':'steady',effort:f<=2?'harder':'right',trend:'unsure'}}
       if(Object.keys(d).length>1)D[k]=d}
     out.push(mkPlayer(Object.assign(p,{D,L})))});
-  return out}
+  const ago=n=>new Date(Date.now()-n*864e5).toISOString();let nid=0;const NT=(pi,who,st,kind,body,days,until)=>({id:'dn'+(++nid),team_id:DEMO_ID,player_id:'demo'+pi,author_id:'staff-'+st,author_name:who,author_staff:st,kind,body,until_day:until==null?null:addK(T,until),created_at:ago(days)});
+  const notes=[NT(2,'Aoife (physio)','physio','restriction','No sprinting, kicking or contact. Bike and upper body only.',0,7),NT(2,'Mark (S&C)','sc','note','Swapped his pitch session for bike intervals and upper body.',0),
+    NT(6,'Darren','manager','note','Off with a flu. Told him to stay home until he\'s 24 hours clear.',0),NT(14,'Niamh (mindset)','mindset','note','New baby at home. Keep sessions short this fortnight and check in after training.',3),
+    NT(10,'Mark (S&C)','sc','note','Doing extra gym on his own most days. Talk to him about the load before Sunday.',1),NT(16,'Aoife (physio)','physio','restriction','Ankle: no cutting drills.',22,-14),NT(8,'Aoife (physio)','physio','restriction','Calf: limit sprints to 80%.',0,3)];
+  return {squad:out,notes}}
 
 // ================= data =================
-async function loadTeams(){const {data,error}=await sb.rpc('keel_my_teams');if(error){ERR=/keel_my_teams|function/i.test(error.message||'')?'setup':error.message;return []}ERR='';return (data||[]).filter(t=>t.role==='coach')}
+async function loadTeams(){const {data,error}=await sb.rpc('keel_my_teams');if(error){ERR=/keel_my_teams|function|schema/i.test(error.message||'')?'setup':error.message;return []}
+  ERR='';const all=data||[];if(all.length&&!('staff' in all[0]))ERR='upgrade';return all.filter(t=>t.role==='coach')}
 async function loadSquad(t){
-  if(t.team_id===DEMO_ID){SQUAD=buildDemo();return}
+  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();return}
   const from=addK(todayK(),-80),to=todayK();
   const {data:sq,error:e1}=await sb.rpc('keel_team_squad',{t:t.team_id});if(e1)throw e1;
   const rows=[];for(let off=0;off<50000;off+=1000){const {data,error}=await sb.rpc('keel_team_data',{t:t.team_id,from_day:from,to_day:to}).range(off,off+999);if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break}
-  const by={};(sq||[]).forEach(m=>{by[m.user_id]=mkPlayer({id:m.user_id,name:m.display_name||(m.about&&m.about.name)||'Player',pos:m.pos||'',role:m.role,share:m.share,joined:m.joined_at,about:m.about||{}})});
+  const by={};(sq||[]).forEach(m=>{by[m.user_id]=mkPlayer({id:m.user_id,name:m.display_name||(m.about&&m.about.name)||'Player',pos:m.pos||'',role:m.role,staff:m.staff,share:m.share,food:!!m.share_food,joined:m.joined_at,about:m.about||{}})});
   rows.forEach(r=>{const p=by[r.user_id];if(!p)return;(r.kind==='day'?p.D:p.L)[r.key]=Object.assign({date:r.key},r.data)});
-  SQUAD=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name))}
+  SQUAD=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name));
+  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes()}
+function attachNotes(){SQUAD.forEach(p=>{p.notes=NOTES.filter(n=>n.player_id===p.id);p._di={}})}
 async function selectTeam(id){TEAM=TEAMS.find(t=>t.team_id===id)||TEAMS[0];try{localStorage.setItem('keelCoachTeam',TEAM.team_id)}catch(e){}LOADING=true;render();
-  try{await loadSquad(TEAM)}catch(e){toast('Could not load the squad: '+(e.message||e),5000);SQUAD=[]}LOADING=false;render()}
+  try{await loadSquad(TEAM)}catch(e){toast('Could not load the squad: '+(e.message||e),5000);SQUAD=[];NOTES=[]}LOADING=false;render()}
 
 // ================= views =================
-const VIEWS=[['today','Today','today'],['trends','Squad trends','trends'],['load','Training load','load'],['wellness','Wellness','wellness'],['avail','Availability','avail'],['setup','Team','setup']];
-function route(){const h=location.hash.slice(1).split('/');return {v:VIEWS.some(v=>v[0]===h[0])||h[0]==='player'?h[0]:'today',id:decodeURIComponent(h[1]||'')}}
+const VIEWS=[['today','Overview','today','Squad'],['sc','S&C','load','Backroom'],['physio','Physio','avail','Backroom'],['nutrition','Nutrition','food','Backroom'],['mindset','Mindset','mind','Backroom'],['trends','Squad trends','trends','Tools'],['setup','Team','setup','Tools']];
+function route(){const h=location.hash.slice(1).split('/');const v=h[0];return {v:VIEWS.some(x=>x[0]===v)||v==='player'?v:(v?'today':homeView()),id:decodeURIComponent(h[1]||'')}}
 const isDemo=()=>TEAM&&TEAM.team_id===DEMO_ID;
-
-function shell(body,title){const rt=route();const cur=rt.v==='player'?'':rt.v;
-  const nav=VIEWS.map(([v,l,ic])=>`<a href="#${v}" ${cur===v?'aria-current="page"':''}>${ico(ic)}<span>${l}</span></a>`).join('');
+function shell(body,title){const rt=route();const cur=rt.v==='player'?'':rt.v;const mine=homeView();
+  let grp='';const nav=VIEWS.map(([v,l,ic,g])=>{const h=g!==grp?`<div class="navh">${g}</div>`:'';grp=g;return h+`<a href="#${v}" ${cur===v?'aria-current="page"':''}>${ico(ic)}<span>${l}</span>${v===mine?'<em>You</em>':''}</a>`}).join('');
   const teamSel=`<select class="sel" id="teamSel" aria-label="Team">${TEAMS.map(t=>`<option value="${esc(t.team_id)}" ${TEAM&&t.team_id===TEAM.team_id?'selected':''}>${esc(t.name)}</option>`).join('')}</select>`;
-  const canFwd=S.k<todayK();
-  return `<div class="shell"><aside class="side"><div class="logo"><img src="/keel-wordmark.svg" alt="keel"><span>Coach</span></div><nav class="nav">${nav}</nav>
-    <div class="foot"><span>${esc(SESSION&&SESSION.user.email||'')}</span><button id="signOut">Sign out</button></div></aside>
+  const canFwd=S.k<todayK();const ms=myStaff();
+  const demo=isDemo()?`<div class="demo-note">${ico('zap','width:16px;height:16px;flex:none')}<span style="flex:1"><b>Demo squad.</b> Made-up players to show what each member of the backroom team sees.</span>
+    <label class="small" style="display:flex;align-items:center;gap:8px;white-space:nowrap">Viewing as <select class="sel" id="demoAs" style="padding:5px 8px">${Object.keys(STAFF_LONG).filter(s=>s!=='coach').map(s=>`<option value="${s}" ${S.demoAs===s?'selected':''}>${esc(STAFF_LONG[s])}</option>`).join('')}</select></label></div>`:'';
+  const ask=!isDemo()&&TEAM&&!ms&&ERR!=='upgrade'?`<div class="demo-note"><span style="flex:1"><b>What's your role on the team?</b> It decides which page you land on. Everyone on the staff can see every page.</span>${roleSelect('myRole','')}</div>`:'';
+  const upg=ERR==='upgrade'?`<div class="demo-note" style="border-color:var(--caution)"><span><b>One more database step.</b> Run the updated <b>supabase/teams.sql</b> in Supabase once (same as before) to switch on staff roles, food sharing and notes.</span></div>`:'';
+  return `<div class="shell"><aside class="side"><div class="logo"><img src="/keel-wordmark.svg" alt="keel"><span>Staff</span></div><nav class="nav">${nav}</nav>
+    <div class="foot">${ms?`<span class="chip" style="align-self:flex-start">${esc(STAFF_LONG[ms]||'Staff')}</span>`:''}<span>${esc(SESSION&&SESSION.user.email||'')}</span><button id="signOut">Sign out</button></div></aside>
   <div class="main"><div class="top"><img class="mlogo" src="/keel-wordmark.svg" alt="keel"><h1>${esc(title)}</h1><span class="sp"></span>${teamSel}
     <div class="datenav"><button id="dPrev" aria-label="Day before">‹</button><b>${S.k===todayK()?'Today':esc(fmtK(S.k))}</b><button id="dNext" aria-label="Day after" ${canFwd?'':'disabled'}>›</button></div>
     <button class="btn ghost sm" id="reload" aria-label="Refresh" title="Refresh">${ico('refresh','width:16px;height:16px')}</button></div>
-  <main class="page">${isDemo()?`<div class="demo-note">${ico('zap','width:16px;height:16px;flex:none')}<span><b>Demo squad.</b> Made-up players to show what the dashboard does. Pick your own team at the top once players have joined.</span></div>`:''}${body}</main></div>
-  <nav class="tabs">${VIEWS.map(([v,l,ic])=>`<a href="#${v}" ${cur===v?'aria-current="page"':''}>${ico(ic)}<span>${{trends:'Trends',load:'Load'}[v]||l}</span></a>`).join('')}</nav></div>`}
-
+  <main class="page">${upg}${demo}${ask}${body}</main></div>
+  <nav class="tabs">${VIEWS.filter(v=>v[0]!=='trends').map(([v,l,ic])=>`<a href="#${v}" ${cur===v?'aria-current="page"':''}>${ico(ic)}<span>${l}</span></a>`).join('')}</nav></div>`}
+const roleSelect=(id,cur)=>`<select class="sel" id="${id}">${cur?'':'<option value="">Choose…</option>'}${Object.entries(STAFF_LONG).filter(([s])=>s!=='manager'||cur==='manager'||isManager()).map(([s,l])=>`<option value="${s}" ${cur===s?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
 function needTeam(){return `<div class="card"><div class="empty"><h2 style="margin-bottom:8px">No players sharing yet</h2><p>Hand out your team's player code on the <a href="#setup">Team</a> page. Players appear here as soon as they join.</p></div></div>`}
+const seg=(key,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button data-set="${key}" data-val="${v}" aria-pressed="${String(S[key])===String(v)}">${l}</button>`).join('')}</div>`;
+const kpiTile=(v,l,o)=>{o=o||{};return `<div class="kpi">${o.ic?`<div class="ic" style="color:${o.col||'var(--blue)'}">${ico(o.ic)}</div>`:''}<div style="min-width:0"><div class="v">${v}</div><div class="l">${l}</div>${o.d?`<div class="d">${o.d}</div>`:''}</div></div>`};
+const kpiRow=(tiles)=>`<div class="kpis" style="--n:${tiles.length}">${tiles.join('')}</div>`;
+const painChip=v=>`<span class="chip ${v>=5?'alert':v>=3?'caution':''}">${v}/10</span>`;
+const sevChip=(v,good,warn,txt)=>`<span class="chip ${v==null?'':v>=good?'good':v>=warn?'caution':'alert'}">${txt}</span>`;
 
 function viewToday(){const k=S.k,ps=sharing();if(!ps.length)return needTeam();
   const inf=ps.map(p=>({p,i:dayInfo(p,k)}));const cin=inf.filter(x=>x.i.ci);const sc=cin.map(x=>x.i.s).filter(s=>s!=null);
@@ -264,6 +295,7 @@ function viewToday(){const k=S.k,ps=sharing();if(!ps.length)return needTeam();
   list.sort((a,b)=>S.sort==='name'?a.p.name.localeCompare(b.p.name):S.sort==='pos'?(a.p.pos||'zz').localeCompare(b.p.pos||'zz')||a.p.name.localeCompare(b.p.name):(aord[a.i.av]-aord[b.i.av])||(ord[a.i.st]-ord[b.i.st])||((a.i.s??999)-(b.i.s??999)));
   const tile=({p,i})=>{const [c,l]=ST[i.st];const chips=[];
     if(i.av!=='avail'&&(i.pain>=3||i.sick))chips.push(`<span class="chip ${i.av==='out'?'alert':'caution'}">${ico(i.sick?'sick':'niggle')}${i.sick?'Unwell':esc(i.nig.d.niggles[0].area.split(' ')[0])+' '+i.pain}</span>`);
+    if(i.rs&&i.rs.length&&!(i.pain>=3||i.sick))chips.push(`<span class="chip caution">${ico('clock')}Restricted</span>`);
     if(i.sleep!=null)chips.push(`<span class="chip">${ico('moon')}${i.sleep} h</span>`);
     const a=p.E.acwr(k);if(a!=null&&a>1.5)chips.push(`<span class="chip alert">${ico('spike')}Load</span>`);
     return `<button class="pt ${i.ci?'':'none'}" data-player="${esc(p.id)}"><span class="bar" style="background:${c}"></span><div class="row">${ring(i.s,52,i.st)}<div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="ps">${esc(p.pos||'')}</div><div class="ps" style="color:${i.ci?c:'var(--muted)'};font-weight:500;margin-top:2px">${i.av==='out'?'Unavailable':l}</div></div></div><div class="chips">${chips.join('')}</div></button>`};
@@ -295,7 +327,7 @@ function viewTrends(){const ps=sharing();if(!ps.length)return needTeam();const n
 
 function acwrChip(a){if(a==null)return '<span class="chip">Building up</span>';const pc=Math.round(a*100);
   if(a>1.5)return `<span class="chip alert">${ico('spike')}${pc}% spike</span>`;if(a>1.3)return `<span class="chip caution">${pc}% rising</span>`;if(a<.8)return `<span class="chip">${pc}% light</span>`;return `<span class="chip good">${pc}% steady</span>`}
-function viewLoad(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;
+function viewLoad(noKpi){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;
   const rows=ps.map(p=>{const w=p.E.load7(k),c=p.E.chronicWeek(k),a=p.E.acwr(k);let done=0,miss=0;for(let i=0;i<7;i++){const kk=addK(k,-i),l=p.L[kk],d=p.D[kk];if(l){l.status==='missed'?miss++:done++}done+=(d&&d.extras||[]).length}
     const fb=[];for(let i=0;i<7;i++){const d=p.D[addK(k,-i)];if(d&&d.sfb&&isNum(d.sfb.feel))fb.push(+d.sfb.feel)}return {p,w,c,a,done,miss,fb:fb.length?avg(fb):null}}).sort((x,y)=>(y.a||0)-(x.a||0));
   const mx=Math.max(1,...rows.map(r=>Math.max(r.w,r.c||0)));
@@ -306,10 +338,10 @@ function viewLoad(){const ps=sharing();if(!ps.length)return needTeam();const k=S
   const weeks=[];for(let w=7;w>=0;w--){const end=addK(k,-7*w);const v=ps.map(p=>p.E.load7(end));weeks.push({k:end,lab:fmtK(addK(end,-6),{day:'numeric',month:'short'}),y:avg(v)})}
   const days=[];for(let i=27;i>=0;i--){const kk=addK(k,-i);days.push({k:kk,y:avg(ps.map(p=>p.E.load(kk)))})}
   const spikes=rows.filter(r=>r.a!=null&&r.a>1.5).length,steady=rows.filter(r=>r.a!=null&&r.a>=.8&&r.a<=1.3).length;
-  return `<div class="kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="kpi"><div class="ic" style="color:var(--blue)">${ico('load')}</div><div><div class="v">${Math.round(avg(rows.map(r=>r.w)))}</div><div class="l">Average load, last 7 days</div></div></div>
+  return (noKpi?'':`<div class="kpis" style="--n:3"><div class="kpi"><div class="ic" style="color:var(--blue)">${ico('load')}</div><div><div class="v">${Math.round(avg(rows.map(r=>r.w)))}</div><div class="l">Average load, last 7 days</div></div></div>
     <div class="kpi"><div class="ic" style="color:var(--good)">${ico('check')}</div><div><div class="v">${steady}<small>/ ${rows.length}</small></div><div class="l">In the steady zone (80–130% of usual)</div></div></div>
     <div class="kpi"><div class="ic" style="color:var(--alert)">${ico('spike')}</div><div><div class="v">${spikes}</div><div class="l">Spiking (over 150% of usual)</div></div></div></div>
-   <div class="grid g2"><section class="card"><header><div><h2>Squad load by week</h2><p>Average per player: minutes × effort, from sessions, club training, matches and heavy work days</p></div></header>${barChart(weeks,{label:'Weekly load',tip:p=>`Average ${Math.round(p.y)} per player`})}</section>
+   `)+`<div class="grid g2"><section class="card"><header><div><h2>Squad load by week</h2><p>Average per player: minutes × effort, from sessions, club training, matches and heavy work days</p></div></header>${barChart(weeks,{label:'Weekly load',tip:p=>`Average ${Math.round(p.y)} per player`})}</section>
     <section class="card"><header><div><h2>Day by day, last 4 weeks</h2><p>Average per player each day</p></div></header>${barChart(days,{label:'Daily load',tip:p=>`Average ${Math.round(p.y)} per player`})}</section></div>
    <section class="card"><header><div><h2>Each player this week</h2><p>Bar: last 7 days. White line: their usual week (4-week average). Big jumps above usual are when injuries tend to happen.</p></div></header>
     <div class="lrow h"><span>Player</span><span>Load</span><span>Against usual</span><span class="ss">Sessions</span><span class="fl">How it felt</span></div>${list}</section>`}
@@ -329,7 +361,7 @@ function viewWellness(){const ps=sharing();if(!ps.length)return needTeam();const
    <section class="card"><header><div><h2>Check-ins each day</h2><p>How many players filled in the morning check-in. The dashboard is only as good as this number.</p></div></header>${barChart(keys.map(kk=>({k:kk,y:ps.filter(p=>checkedIn(p.D[kk])).length})),{max:ps.length,w:1100,h:190,ref:ps.length,refLabel:`Squad of ${ps.length}`,tip:p=>`${p.y} of ${ps.length} checked in`,label:'Check-ins'})}</section>`}
 
 function viewAvail(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;const inf=ps.map(p=>({p,i:dayInfo(p,k)}));
-  const why=i=>i.sick?`Unwell${i.sick.sev?' · '+i.sick.sev:''}`:i.pain>=3?`${i.nig.d.niggles[0].area} ${i.pain}/10`:i.s!=null&&i.s<55?`Balance ${i.s}`:i.ci?`Balance ${i.s??'–'}`:'No check-in';
+  const why=i=>i.rs&&i.rs.length&&i.av!=='out'?'Restriction: '+i.rs[0].body:i.sick?`Unwell${i.sick.sev?' · '+i.sick.sev:''}`:i.pain>=3?`${i.nig.d.niggles[0].area} ${i.pain}/10`:i.s!=null&&i.s<55?`Balance ${i.s}`:i.ci?`Balance ${i.s??'–'}`:'No check-in';
   const col=key=>{const [c,l,ic]=AV[key];const xs=inf.filter(x=>x.i.av===key).sort((a,b)=>a.p.name.localeCompare(b.p.name));
     return `<div class="avcol" style="border-top:3px solid ${c}"><h3><span style="color:${c};display:flex">${ico(ic,'width:17px;height:17px')}</span>${l}<span class="num">${xs.length}</span></h3>${xs.length?xs.map(({p,i})=>`<button class="avp" data-player="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc(why(i))}</small></button>`).join(''):'<div class="small muted">Nobody</div>'}</div>`};
   const areas={};ps.forEach(p=>{for(let i=0;i<28;i++){const kk=addK(k,-i),d=p.D[kk];(d&&d.niggles||[]).forEach(n=>{if(!n.area)return;const a=areas[n.area]||(areas[n.area]={who:{},days:0,max:0});a.days++;a.max=Math.max(a.max,+n.pain||0);const w=a.who[p.id]||(a.who[p.id]={p,max:0,last:kk});w.max=Math.max(w.max,+n.pain||0)})}});
@@ -342,60 +374,228 @@ function viewAvail(){const ps=sharing();if(!ps.length)return needTeam();const k=
    <div class="legend"><span>Unavailable: pain 5/10 or more, or badly unwell.</span><span>Modify: a niggle of 3–4/10, feeling unwell, or balance under 55.</span><span>Niggles and sickness carry over for 3 days if a player skips the check-in.</span></div>
    <section class="card"><header><div><h2>Niggles by body area</h2><p>Last 4 weeks. Patterns here are worth a word with the physio.</p></div></header>${body}</section>`}
 
-function viewPlayer(id){const p=SQUAD.find(x=>x.id===id);if(!p)return `<div class="card"><div class="empty">Player not found. <a href="#today">Back to today</a></div></div>`;
-  if(!p.share)return `<a class="back" href="#today">${ico('back','width:15px;height:15px')}Squad</a><div class="card"><div class="empty"><h2>${esc(p.name)}</h2><p style="margin-top:6px">${esc(first(p.name))} has paused sharing, so there's nothing to show.</p></div></div>`;
-  const k=S.k,i=dayInfo(p,k),E=p.E;const keys=[];for(let j=27;j>=0;j--)keys.push(addK(k,-j));
-  const bs=keys.map(kk=>({k:kk,y:dayInfo(p,kk).s}));const b7=bs.slice(-7).map(x=>x.y).filter(v=>v!=null);const sl7=keys.slice(-7).map(kk=>E.sleep(kk)).filter(v=>v!=null);
-  const fl=flagsFor(p,k);const a=E.acwr(k);const [c,l]=ST[i.st];const age=p.about&&p.about.age;
-  const kpi=(v,lab,sub)=>`<div class="kpi" style="flex-direction:column;align-items:flex-start;gap:0"><div class="v">${v}</div><div class="l">${lab}</div>${sub?`<div class="d">${sub}</div>`:''}</div>`;
-  const sess=[];for(let j=0;j<28;j++){const kk=addK(k,-j),lg=p.L[kk],d=p.D[kk];const fb=d&&d.sfb;const FE=['','Awful','Tough','OK','Good','Brilliant'];
-    if(lg)sess.push({k:kk,what:{S:'Strength',E:'Easy run',H:'Hyrox class',T:'Threshold',X:'Speed + long run',O:'Other training',R:'Rest'}[lg.type]||'Session',dur:lg.dur,rpe:lg.rpe,st:lg.status,fb:fb&&FE[fb.feel]});
-    (d&&d.extras||[]).forEach(x=>sess.push({k:kk,what:x.kind||'Extra',dur:x.dur,rpe:x.rpe,st:'done',fb:fb&&FE[fb.feel]}))}
-  const nigs=[];for(let j=0;j<28;j++){const kk=addK(k,-j),d=p.D[kk];(d&&d.niggles||[]).forEach(n=>nigs.push({k:kk,...n}))}
-  return `<a class="back" href="#today">${ico('back','width:15px;height:15px')}Squad</a>
-   <div class="phead">${ring(i.s,92,i.st)}<div class="who"><h1>${esc(p.name)}</h1><div class="muted">${esc([p.pos,age?age+' years':null].filter(Boolean).join(' · '))}</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><span class="chip" style="color:${c}">${i.ci?esc(l):'No check-in '+(k===todayK()?'today':'that day')}</span><span class="chip ${i.av==='out'?'alert':i.av==='mod'?'caution':'good'}">${AV[i.av][1]}</span></div></div></div>
-   <div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">${kpi(b7.length?Math.round(avg(b7)):'–','Balance, 7-day average',E.usualBal(k)!=null?`Usual ${Math.round(E.usualBal(k))}`:'')}${kpi(sl7.length?r1(avg(sl7))+'<small>h</small>':'–','Sleep, 7-day average',E.debt(k)!=null?`${E.debt(k)} h short over the week`:'')}${kpi(Math.round(E.load7(k)),'Load, last 7 days',E.chronicWeek(k)!=null?`Usual ${Math.round(E.chronicWeek(k))}`:'')}<div class="kpi" style="flex-direction:column;align-items:flex-start;gap:6px"><div>${acwrChip(a)}</div><div class="l">This week against usual</div></div></div>
-   ${fl.length?`<section class="card"><header><div><h2>Worth knowing</h2></div></header><div class="flags">${fl.map(f=>`<div class="flag"><span class="ic" style="background:color-mix(in srgb,${f.col} 15%,transparent);color:${f.col}">${ico(f.ic)}</span><span class="who"><b>${esc(f.t)}</b><span>${esc(f.s)}</span></span></div>`).join('')}</div></section>`:''}
-   <div class="grid g2"><section class="card"><header><div><h2>Balance</h2><p>Last 4 weeks, from their own check-ins</p></div></header>${lineChart(bs,{min:0,max:100,ticks:[0,55,75,100],fmt:Math.round,bands:[[75,100,'var(--good)'],[55,75,'var(--caution)'],[0,55,'var(--alert)']],dotColor:v=>v>=75?'var(--good)':v>=55?'var(--caution)':'var(--alert)',color:'var(--text-body)',label:'Balance'})}</section>
-    <section class="card"><header><div><h2>Sleep</h2><p>Hours each night against what they need</p></div></header>${barChart(keys.map(kk=>({k:kk,y:E.sleep(kk)})),{max:10,fmt:v=>r1(v),ref:E.need(k),refLabel:`Needs about ${E.need(k)} h`,tip:p=>p.y?p.y+' h':'No entry',label:'Sleep'})}</section>
-    <section class="card"><header><div><h2>Training load</h2><p>Minutes × effort each day</p></div></header>${barChart(keys.map(kk=>({k:kk,y:E.load(kk)})),{tip:p=>`Load ${Math.round(p.y||0)}`,label:'Load'})}</section>
-    <section class="card"><header><div><h2>How they feel</h2><p>Energy, 1 to 5</p></div></header>${lineChart(keys.map(kk=>({k:kk,y:p.D[kk]&&isNum(p.D[kk].energy)?+p.D[kk].energy:null})),{min:1,max:5,ticks:[1,3,5],label:'Energy'})}</section></div>
-   <div class="grid g2"><section class="card"><header><div><h2>Sessions</h2><p>Last 4 weeks</p></div></header>${sess.length?`<table class="list"><tr><th>Day</th><th>What</th><th>Min</th><th>Effort</th><th>Felt</th></tr>${sess.slice(0,14).map(s=>`<tr><td>${esc(fmtK(s.k))}</td><td>${esc(s.what)}${s.st==='missed'?' <span class="chip alert">Missed</span>':''}</td><td class="num">${s.dur||'–'}</td><td class="num">${s.rpe||'–'}</td><td>${esc(s.fb||'–')}</td></tr>`).join('')}</table>`:'<div class="empty">No sessions logged.</div>'}</section>
-    <section class="card"><header><div><h2>Niggles</h2><p>Last 4 weeks</p></div></header>${nigs.length?`<table class="list"><tr><th>Day</th><th>Where</th><th>Side</th><th>Pain</th></tr>${nigs.slice(0,14).map(n=>`<tr><td>${esc(fmtK(n.k))}</td><td>${esc(n.area)}</td><td>${esc(n.side||'')}</td><td><span class="chip ${n.pain>=5?'alert':n.pain>=3?'caution':''}">${n.pain}/10</span></td></tr>`).join('')}</table>`:'<div class="empty">None logged. Good.</div>'}</section></div>
-   <p class="tiny muted">Food, drinks, notes and cycle tracking are private to ${esc(first(p.name))} and never shown here.</p>`}
+// ================= backroom hubs =================
+const FEEL=['','Awful','Tough','OK','Good','Brilliant'];
+const TYPE_NAMES={S:'Strength',E:'Easy run',H:'Hyrox class',T:'Threshold',X:'Speed + long run',O:'Other training',R:'Rest'};
+const lastN=(k,n)=>{const a=[];for(let i=n-1;i>=0;i--)a.push(addK(k,-i));return a};
+const avgOf=(arr)=>{const v=arr.filter(x=>x!=null);return v.length?avg(v):null};
+const fx=(v,d)=>v==null?'–':(d?r1(v):Math.round(v));
+const fu=(v,u,d)=>v==null?'–':fx(v,d)+' '+u;
+function sessionsOn(p,k){const out=[],lg=p.L[k],d=p.D[k];const fb=d&&d.sfb;
+  if(lg)out.push({k,what:TYPE_NAMES[lg.type]||'Session',dur:+lg.dur||0,rpe:+lg.rpe||0,st:lg.status||'done',fb});
+  (d&&d.extras||[]).forEach(x=>out.push({k,what:x.kind||'Extra',dur:+x.dur||0,rpe:+x.rpe||0,st:'done',fb}));return out}
+function spark(vals,o){o=o||{};const W=o.w||110,H=o.h||26,mx=o.max!=null?o.max:Math.max(1,...vals.filter(v=>v!=null)),mn=o.min||0;let d='',pen=false;
+  vals.forEach((v,i)=>{if(v==null){pen=false;return}const x=2+(W-4)*i/Math.max(1,vals.length-1),y=H-2-(H-4)*(v-mn)/Math.max(1e-6,mx-mn);d+=(pen?'L':'M')+x.toFixed(1)+' '+y.toFixed(1);pen=true});
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${d}" fill="none" stroke="${o.col||'var(--blue)'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
+const trendArrow=(now,before,goodUp)=>{if(now==null||before==null)return '<span class="muted">–</span>';const d=now-before;if(Math.abs(d)<.3)return '<span class="muted">steady</span>';
+  const good=goodUp?d>0:d<0;return `<span style="color:${good?'var(--good)':'var(--caution)'}">${d>0?'▲':'▼'} ${r1(Math.abs(d))}</span>`};
 
+// ---------- S&C ----------
+function sessionCall(p,k){const i=dayInfo(p,k),a=p.E.acwr(k),rs=activeRestr(p,k);
+  if(i.av==='out')return ['hold','Unavailable'];
+  if(rs.length)return ['hold','Restriction: '+rs[0].body];
+  if(i.pain>=3)return ['hold',`${i.nig.d.niggles[0].area} ${i.pain}/10`];
+  if(i.sick)return ['hold','Unwell'];
+  if(a!=null&&a>1.5)return ['hold',`Load spike ${Math.round(a*100)}%`];
+  if(!i.ci)return ['none','No check-in'];
+  if(i.s<55)return ['hold',`Balance ${i.s}`];
+  if(i.s>=80&&(a==null||a<=1.2)&&i.pain<2)return ['push',`Balance ${i.s}${a!=null?` · load ${Math.round(a*100)}%`:''}`];
+  return ['normal',`Balance ${i.s}${a!=null?` · load ${Math.round(a*100)}%`:''}`]}
+function viewSC(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;
+  const calls=ps.map(p=>({p,c:sessionCall(p,k)}));
+  const col=(key,title,colr,sub)=>{const xs=calls.filter(x=>x.c[0]===key).sort((a,b)=>a.p.name.localeCompare(b.p.name));
+    return `<div class="avcol" style="border-top:3px solid ${colr}"><h3>${title}<span class="num">${xs.length}</span></h3><div class="tiny muted" style="margin:-6px 0 4px">${sub}</div>${xs.length?xs.map(({p,c})=>`<button class="avp" data-player="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc(c[1])}</small></button>`).join(''):'<div class="small muted">Nobody</div>'}</div>`};
+  const rows=ps.map(p=>{const w=p.E.load7(k),c=p.E.chronicWeek(k),a=p.E.acwr(k);let done=0,miss=0;lastN(k,7).forEach(kk=>sessionsOn(p,kk).forEach(s=>s.st==='missed'?miss++:done++));return {a,w,c,done,miss}});
+  const spikes=rows.filter(r=>r.a!=null&&r.a>1.5).length,under=rows.filter(r=>r.a!=null&&r.a<.8).length,steady=rows.filter(r=>r.a!=null&&r.a>=.8&&r.a<=1.3).length;
+  const tot=rows.reduce((a,r)=>a+r.done+r.miss,0),done=rows.reduce((a,r)=>a+r.done,0);
+  const types={};ps.forEach(p=>lastN(k,14).forEach(kk=>sessionsOn(p,kk).forEach(s=>{if(s.st==='missed')return;const t=types[s.what]||(types[s.what]={n:0,rpe:[],feel:[],hard:0,min:[]});t.n++;if(s.rpe)t.rpe.push(s.rpe);if(s.dur)t.min.push(s.dur);if(s.fb&&isNum(s.fb.feel))t.feel.push(+s.fb.feel);if(s.fb&&s.fb.effort==='harder')t.hard++})));
+  const tt=Object.entries(types).sort((a,b)=>b[1].n-a[1].n);
+  return kpiRow([kpiTile(Math.round(avg(rows.map(r=>r.w))),'Average load, last 7 days',{ic:'load'}),kpiTile(`${steady}<small>/ ${rows.length}</small>`,'In the steady zone',{ic:'check',col:'var(--good)',d:'80–130% of their usual week'}),
+     kpiTile(spikes,'Spiking',{ic:'spike',col:'var(--alert)',d:'Over 150% of usual'}),kpiTile(under,'Under-loaded',{ic:'down',col:'var(--caution)',d:'Under 80% of usual'}),kpiTile(tot?Math.round(done/tot*100)+'<small>%</small>':'–','Sessions done, last 7 days',{ic:'check',d:`${done} done of ${tot}`})])
+   +`<section class="card"><header><div><h2>Today's session</h2><p>Who to push, who trains as normal and who to hold back, from this morning's balance, recent load, niggles and staff restrictions</p></div></header>
+     <div class="av" style="grid-template-columns:repeat(4,minmax(0,1fr))">${col('push','Push on','var(--good)','Fresh and load is steady')}${col('normal','As planned','var(--blue)','Nothing stands out')}${col('hold','Hold back','var(--caution)','Lighter, modified or off')}${col('none','Not checked in','var(--faint)','Ask before training')}</div></section>`
+   +viewLoad(true)
+   +`<section class="card"><header><div><h2>How sessions are landing</h2><p>Last 2 weeks, by type of session. Effort is what players rated it out of 10.</p></div></header>
+     ${tt.length?`<div style="overflow-x:auto"><table class="list"><tr><th>Session</th><th>Done</th><th>Average minutes</th><th>Average effort</th><th>How it felt</th><th>Harder than planned</th></tr>${tt.map(([n,t])=>`<tr><td><b style="color:var(--text)">${esc(n)}</b></td><td class="num">${t.n}</td><td class="num">${fx(avgOf(t.min))}</td><td class="num">${fx(avgOf(t.rpe),1)}</td><td>${t.feel.length?esc(FEEL[Math.round(avg(t.feel))]):'–'}</td><td>${t.hard?`<span class="chip caution">${t.hard}</span>`:'<span class="muted">0</span>'}</td></tr>`).join('')}</table></div>`:'<div class="empty">No sessions logged in the last 2 weeks.</div>'}</section>`}
+
+// ---------- Physio ----------
+function viewPhysio(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;
+  const act=[];ps.forEach(p=>{const i=dayInfo(p,k);if(!i.nig)return;i.nig.d.niggles.forEach(n=>{if(!n.area)return;const hist=lastN(k,14).map(kk=>{const d=p.D[kk];const m=d&&(d.niggles||[]).find(x=>x.area===n.area);return m?+m.pain||0:(checkedIn(d)?0:null)});
+    let first=null;for(let j=0;j<28;j++){const d=p.D[addK(k,-j)];if(d&&(d.niggles||[]).some(x=>x.area===n.area))first=addK(k,-j);else if(checkedIn(d)&&first)break}
+    const b=hist.slice(0,-3).filter(v=>v!=null).pop();act.push({p,n,hist,pain:+n.pain||0,before:b,first,rs:activeRestr(p,k)})})});
+  act.sort((a,b)=>b.pain-a.pain);
+  const sick=ps.map(p=>({p,i:dayInfo(p,k)})).filter(x=>x.i.sick);
+  const rs=[];ps.forEach(p=>activeRestr(p,k).forEach(n=>rs.push({p,n})));
+  const inf=ps.map(p=>dayInfo(p,k));
+  return kpiRow([kpiTile(inf.filter(i=>i.av==='out').length,'Unavailable',{ic:'sick',col:'var(--alert)'}),kpiTile(inf.filter(i=>i.av==='mod').length,'Modified training',{ic:'niggle',col:'var(--caution)'}),
+     kpiTile(act.length,'Active niggles',{ic:'niggle',d:'Logged in the last 3 days'}),kpiTile(rs.length,'Restrictions in place',{ic:'clock'}),kpiTile(sick.length,'Unwell',{ic:'sick',col:'var(--alert)'})])
+   +`<section class="card"><header><div><h2>Active niggles</h2><p>Pain out of 10, with the last 2 weeks of each one. Arrows compare with 3 days ago.</p></div></header>
+     ${act.length?`<div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Where</th><th>Pain now</th><th>Last 2 weeks</th><th>Change</th><th>Since</th><th>Restriction</th></tr>${act.map(a=>`<tr><td><button data-player="${esc(a.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(a.p.name)}</b><div class="tiny muted">${esc(a.p.pos||'')}</div></button></td>
+       <td>${esc(a.n.area)}${a.n.side&&a.n.side!=='Both'?` <span class="muted">(${esc(a.n.side.toLowerCase())})</span>`:''}</td><td>${painChip(a.pain)}</td><td ${tipAttr(`<b>${esc(a.p.name)} · ${esc(a.n.area)}</b>${a.hist.map(v=>v==null?'–':v).join(' · ')}`)}>${spark(a.hist,{max:10,col:a.pain>=5?'var(--alert)':'var(--caution)'})}</td>
+       <td>${trendArrow(a.pain,a.before,false)}</td><td class="small">${a.first?esc(fmtK(a.first,{day:'numeric',month:'short'})):'–'}</td><td class="small">${a.rs.length?esc(a.rs[0].body):'<span class="muted">None</span>'}</td></tr>`).join('')}</table></div>`:'<div class="empty">No active niggles.</div>'}</section>`
+   +(sick.length?`<section class="card"><header><div><h2>Unwell</h2><p>What it is stays private to the player; you see how bad.</p></div></header><div style="display:flex;gap:8px;flex-wrap:wrap">${sick.map(({p,i})=>`<button class="chip ${i.sick.sev==='bad'?'alert':'caution'}" data-player="${esc(p.id)}">${ico('sick')}${esc(p.name)} · ${esc(i.sick.sev||'mild')}</button>`).join('')}</div></section>`:'')
+   +viewAvail()
+   +`<section class="card"><header><div><h2>Squad soreness</h2><p>Average body soreness, 1 fresh to 5 very sore. Watch the day after matches.</p></div></header>${lineChart(lastN(k,28).map(kk=>{const v=ps.map(p=>p.D[kk]&&isNum(p.D[kk].sore)?+p.D[kk].sore:null).filter(x=>x!=null);return {k:kk,y:v.length?avg(v):null,n:v.length}}),{w:1100,h:200,min:1,max:5,ticks:[1,3,5],color:'var(--caution)',label:'Squad soreness',tip:p=>`${r1(p.y)} average from ${p.n}`})}</section>`}
+
+// ---------- Nutrition ----------
+const NUT_TGT=[['protein','Protein',null,'g'],['fibre','Fibre 30 g+',30,'g'],['iron','Iron 8 mg+',8,'mg'],['calcium','Calcium 1000 mg+',1000,'mg'],['vitD','Vitamin D 15 µg+',15,'µg'],['omega3','Omega-3 1 g+',1,'g']];
+const foodOn=(p,k)=>{const d=p.D[k];return d&&d.food&&d.food.n?d.food:null};
+const isTrainDay=(p,k)=>sessionsOn(p,k).some(s=>s.st!=='missed');
+function plantsWeek(p,k){const s=new Set();lastN(k,7).forEach(kk=>{const f=foodOn(p,kk);(f&&f.plants||[]).forEach(x=>s.add(x))});return s.size}
+function viewNutrition(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;const fs=ps.filter(p=>p.food);
+  if(!fs.length)return `<section class="card"><header><div><h2>No one is sharing food yet</h2><p>Food is opt-in, separate from the rest of a player's sharing.</p></div></header>
+    <ol class="steps"><li>Players open Keel › profile › <b>Your team</b>.</li><li>They turn on <b>Share food totals with the staff</b>.</li><li>You then see daily totals: calories, protein, carbs, fat, fibre, plants, water and a few key vitamins. Never meals or photos, and drinks with alcohol are left out.</li></ol></section>`;
+  const wk=lastN(k,7);
+  const rows=fs.map(p=>{const days=wk.map(kk=>({kk,f:foodOn(p,kk),t:isTrainDay(p,kk)}));const lg=days.filter(x=>x.f);const m=f=>avgOf(lg.map(x=>x.f[f]!=null?+x.f[f]:null));
+    const tk=avgOf(lg.filter(x=>x.t).map(x=>x.f.kcal)),rk=avgOf(lg.filter(x=>!x.t).map(x=>x.f.kcal));
+    return {p,n:lg.length,kcal:m('kcal'),protein:m('protein'),carbs:m('carbs'),fibre:m('fibre'),water:m('water'),plants:plantsWeek(p,k),tk,rk}}).sort((a,b)=>a.p.name.localeCompare(b.p.name));
+  const logged=rows.reduce((a,r)=>a+r.n,0);
+  const series=f=>lastN(k,28).map(kk=>{const v=fs.map(p=>{const x=foodOn(p,kk);return x&&x[f]!=null?+x[f]:null}).filter(v=>v!=null);return {k:kk,y:v.length?avg(v):null,n:v.length}});
+  const hits=NUT_TGT.filter(t=>t[2]!=null).map(([f,l,tg])=>{let n=0,h=0;fs.forEach(p=>wk.forEach(kk=>{const x=foodOn(p,kk);if(x&&x[f]!=null){n++;if(+x[f]>=tg)h++}}));return {l,n,pc:n?h/n:null}});
+  const gapP=rows.filter(r=>r.tk!=null&&r.rk!=null&&r.tk<=r.rk);
+  return kpiRow([kpiTile(`${fs.length}<small>/ ${ps.length}</small>`,'Sharing food',{ic:'food'}),kpiTile(Math.round(logged/(fs.length*7)*100)+'<small>%</small>','Days logged, last 7',{ic:'check',d:`${logged} days across the group`}),
+     kpiTile(fx(avgOf(rows.map(r=>r.protein)))+'<small>g</small>','Average protein a day',{ic:'food'}),kpiTile(fx(avgOf(rows.map(r=>r.plants))),'Plants a week, average',{ic:'food',col:'var(--good)',d:'30 a week is a good target'}),kpiTile(fx(avgOf(rows.map(r=>r.water)),1)+'<small>L</small>','Water a day',{ic:'wellness'})])
+   +`<section class="card"><header><div><h2>Each player, last 7 days</h2><p>Daily averages on the days they logged. Fuelling compares calories on training days with rest days.</p></div></header><div style="overflow-x:auto"><table class="list">
+     <tr><th>Player</th><th>Days logged</th><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fibre</th><th>Plants (week)</th><th>Water</th><th>Fuelling</th></tr>
+     ${rows.map(r=>`<tr><td><button data-player="${esc(r.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(r.p.name)}</b></button></td><td>${sevChip(r.n,5,3,r.n+'/7')}</td><td class="num">${fx(r.kcal)}</td><td class="num">${fu(r.protein,'g')}</td><td class="num">${fu(r.carbs,'g')}</td><td class="num">${fu(r.fibre,'g')}</td><td>${sevChip(r.plants,30,15,r.plants)}</td><td class="num">${fu(r.water,'L',1)}</td>
+       <td class="small">${r.tk!=null&&r.rk!=null?(r.tk>r.rk?`<span style="color:var(--good)">+${Math.round(r.tk-r.rk)} on training days</span>`:`<span style="color:var(--caution)">No more on training days</span>`):'<span class="muted">Not enough yet</span>'}</td></tr>`).join('')}</table></div>
+     ${gapP.length?`<p class="small" style="margin-top:12px;color:var(--caution)">${gapP.length} player${gapP.length>1?"s aren't":" isn't"} eating more on training days than rest days. Worth a chat about fuelling around sessions.</p>`:''}</section>
+   <div class="grid g2"><section class="card"><header><div><h2>Protein</h2><p>Group average, grams a day</p></div></header>${lineChart(series('protein'),{min:0,label:'Protein',tip:p=>`${Math.round(p.y)} g average from ${p.n}`,fmt:Math.round})}</section>
+    <section class="card"><header><div><h2>Key nutrients</h2><p>Share of logged days hitting each target, last 7 days</p></div></header>
+     ${hits.map(h=>`<div class="bodyrow" style="grid-template-columns:150px minmax(0,1fr) 44px"><span class="small">${esc(h.l)}</span><div class="lbar" style="height:10px" ${tipAttr(`<b>${esc(h.l)}</b>${h.pc==null?'No data':Math.round(h.pc*100)+'% of '+h.n+' logged days'}`)}><i style="width:${(h.pc||0)*100}%;background:${h.pc>=.7?'var(--good)':h.pc>=.4?'var(--caution)':'var(--alert)'}"></i></div><span class="num small">${h.pc==null?'–':Math.round(h.pc*100)+'%'}</span></div>`).join('')}</section></div>
+   <p class="tiny muted">Totals only, from players who turned food sharing on. Meals, photos and drinks with alcohol are never shared.</p>`}
+
+// ---------- Mindset ----------
+function viewMindset(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;
+  const g=(p,kk,f)=>{const d=p.D[kk];return d&&isNum(d[f])?+d[f]:null};
+  const rows=ps.map(p=>{const w=lastN(k,7),pw=lastN(addK(k,-7),7);const m=(ks,f)=>avgOf(ks.map(kk=>g(p,kk,f)));
+    let hs=0;for(let j=0;j<3;j++)if((g(p,addK(k,-j),'stress')||0)>=4)hs++;
+    const today=p.D[k];const why=[];if(today&&isNum(today.mood)&&+today.mood<=2)why.push('Low mood today');if(hs===3)why.push('Stressed 3 days running');
+    const mw=m(w,'mood'),mp=m(pw,'mood');if(mw!=null&&mp!=null&&mp-mw>=1)why.push('Mood down on last week');const sl=avgOf(w.map(kk=>sleepHours(p.D[kk])));if(sl!=null&&sl<6.2)why.push('Sleeping under 6¼ h');
+    return {p,mood:mw,mp,stress:m(w,'stress'),sp:m(pw,'stress'),energy:m(w,'energy'),sleep:sl,why}}).sort((a,b)=>b.why.length-a.why.length||a.p.name.localeCompare(b.p.name));
+  const flagged=rows.filter(r=>r.why.length);
+  const ser=f=>lastN(k,28).map(kk=>{const v=ps.map(p=>g(p,kk,f)).filter(x=>x!=null);return {k:kk,y:v.length?avg(v):null,n:v.length}});
+  const td=f=>avgOf(ps.map(p=>g(p,k,f)));
+  return kpiRow([kpiTile(fx(td('mood'),1),'Average mood today',{ic:'mind',d:'1 low, 5 great'}),kpiTile(fx(td('stress'),1),'Average stress today',{ic:'zap',col:'var(--caution)',d:'1 calm, 5 very stressed'}),
+     kpiTile(fx(avgOf(rows.map(r=>r.sleep)),1)+'<small>h</small>','Sleep, 7-day average',{ic:'moon'}),kpiTile(flagged.length,'Worth a quiet word',{ic:'frown',col:'var(--caution)'})])
+   +`<div class="grid g-today"><section class="card"><header><div><h2>Mood and stress</h2><p>Squad averages over 4 weeks</p></div></header><div class="grid g2" style="gap:12px">
+      <div><h3 class="small muted" style="margin-bottom:6px">Mood</h3>${lineChart(ser('mood'),{w:380,h:170,min:1,max:5,ticks:[1,3,5],label:'Mood',tip:p=>`${r1(p.y)} from ${p.n}`})}</div>
+      <div><h3 class="small muted" style="margin-bottom:6px">Stress</h3>${lineChart(ser('stress'),{w:380,h:170,min:1,max:5,ticks:[1,3,5],color:'var(--caution)',label:'Stress',tip:p=>`${r1(p.y)} from ${p.n}`})}</div>
+      <div><h3 class="small muted" style="margin-bottom:6px">Energy</h3>${lineChart(ser('energy'),{w:380,h:170,min:1,max:5,ticks:[1,3,5],label:'Energy',tip:p=>`${r1(p.y)} from ${p.n}`})}</div>
+      <div><h3 class="small muted" style="margin-bottom:6px">Sleep (hours)</h3>${lineChart(lastN(k,28).map(kk=>{const v=ps.map(p=>sleepHours(p.D[kk])).filter(x=>x!=null);return {k:kk,y:v.length?avg(v):null,n:v.length}}),{w:380,h:170,min:5,max:9,ticks:[5,7,9],fmt:v=>r1(v),label:'Sleep',tip:p=>`${r1(p.y)} h from ${p.n}`})}</div></div></section>
+    <section class="card"><header><div><h2>Worth a quiet word</h2><p>Patterns, not a diagnosis. A chat often does more than any change to training.</p></div></header>
+     <div class="flags">${flagged.length?flagged.map(r=>`<button class="flag" data-player="${esc(r.p.id)}"><span class="ic" style="background:color-mix(in srgb,var(--caution) 15%,transparent);color:var(--caution)">${ico('mind')}</span><span class="who"><b>${esc(r.p.name)}</b><span>${esc(r.why.join(' · '))}</span></span></button>`).join(''):`<div class="empty">Nobody stands out this week.</div>`}</div>
+     <p class="tiny muted" style="margin-top:12px">If someone tells you they're struggling, Samaritans are on 116 123 any time, and text 50808 is free, 24/7.</p></section></div>
+   <section class="card"><header><div><h2>Each player, last 7 days</h2><p>Averages, with the change on the week before</p></div></header><div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Mood</th><th>vs last week</th><th>Stress</th><th>vs last week</th><th>Energy</th><th>Sleep</th></tr>
+     ${rows.map(r=>`<tr><td><button data-player="${esc(r.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(r.p.name)}</b></button></td><td class="num">${fx(r.mood,1)}</td><td class="small">${trendArrow(r.mood,r.mp,true)}</td><td class="num">${fx(r.stress,1)}</td><td class="small">${trendArrow(r.stress,r.sp,false)}</td><td class="num">${fx(r.energy,1)}</td><td class="num">${r.sleep!=null?r1(r.sleep)+' h':'–'}</td></tr>`).join('')}</table></div></section>`}
+
+// ---------- notes (shared by the staff) ----------
+function notesCard(p){const k=todayK();const ns=(p.notes||[]).slice().sort((a,b)=>b.created_at.localeCompare(a.created_at));const me=SESSION&&SESSION.user.id;
+  return `<section class="card"><header><div><h2>Staff notes</h2><p>Seen by the whole backroom team, never by ${esc(first(p.name))}</p></div></header>
+   <form id="noteForm" data-pid="${esc(p.id)}" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+    <div class="toolbar">${seg('noteKind',[['note','Note'],['restriction','Restriction']])}${S.noteKind==='restriction'?`<label class="small muted" style="display:flex;align-items:center;gap:8px">Until <input class="in" type="date" id="noteUntil" min="${k}" value="${addK(k,7)}" style="width:auto;padding:6px 10px"></label>`:''}</div>
+    <textarea class="in" id="noteBody" rows="2" maxlength="1000" placeholder="${S.noteKind==='restriction'?'e.g. No sprinting or contact. Bike and upper body only.':'e.g. Swapped Tuesday for bike intervals. Talked to him about sleep.'}"></textarea>
+    <button class="btn sm" type="submit" style="align-self:flex-start">Add ${S.noteKind==='restriction'?'restriction':'note'}</button></form>
+   ${ns.length?ns.map(n=>{const live=n.kind==='restriction'&&(!n.until_day||n.until_day>=k);return `<div class="flag" style="align-items:flex-start"><span class="ic" style="background:${n.kind==='restriction'?(live?'color-mix(in srgb,var(--caution) 15%,transparent)':'var(--raised)'):'var(--raised)'};color:${n.kind==='restriction'&&live?'var(--caution)':'var(--muted)'}">${ico(n.kind==='restriction'?'clock':'note')}</span>
+     <span class="who"><b style="font-weight:500">${esc(n.body)}</b><span>${esc(n.author_name||'Staff')} · ${esc(staffLabel(n.author_staff))} · ${esc(fmtK(n.created_at.slice(0,10),{day:'numeric',month:'short'}))}${n.kind==='restriction'?(live?` · until ${n.until_day?esc(fmtK(n.until_day,{day:'numeric',month:'short'})):'further notice'}`:' · ended'):''}</span></span>
+     ${n.author_id===me||isManager()||isDemo()?`<button class="btn ghost sm" data-delnote="${esc(n.id)}">Delete</button>`:''}</div>`}).join(''):'<div class="small muted">No notes yet.</div>'}</section>`}
+
+// ---------- player page: one page, a tab per discipline ----------
+function viewPlayer(id){const p=SQUAD.find(x=>x.id===id);if(!p)return `<div class="card"><div class="empty">Player not found. <a href="#today">Back to the squad</a></div></div>`;
+  if(!p.share)return `<a class="back" href="javascript:history.back()">${ico('back','width:15px;height:15px')}Back</a><div class="card"><div class="empty"><h2>${esc(p.name)}</h2><p style="margin-top:6px">${esc(first(p.name))} has paused sharing, so there's nothing to show.</p></div></div>`;
+  const k=S.k,i=dayInfo(p,k),E=p.E;const keys=lastN(k,28);const tab=S.ptab=S.ptab||({sc:'sc',physio:'physio',nutrition:'nutrition',mindset:'mindset'}[myStaff()]||'overview');
+  const fl=flagsFor(p,k);const a=E.acwr(k);const [c,l]=ST[i.st];const age=p.about&&p.about.age;const rs=activeRestr(p,k);
+  const kpi=(v,lab,sub)=>`<div class="kpi" style="flex-direction:column;align-items:flex-start;gap:0"><div class="v">${v}</div><div class="l">${lab}</div>${sub?`<div class="d">${sub}</div>`:''}</div>`;
+  const b7=keys.slice(-7).map(kk=>dayInfo(p,kk).s).filter(v=>v!=null),sl7=keys.slice(-7).map(kk=>E.sleep(kk)).filter(v=>v!=null);
+  const head=`<a class="back" href="javascript:history.back()">${ico('back','width:15px;height:15px')}Back</a>
+   <div class="phead">${ring(i.s,92,i.st)}<div class="who"><h1>${esc(p.name)}</h1><div class="muted">${esc([p.pos,age?age+' years':null].filter(Boolean).join(' · '))}</div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><span class="chip" style="color:${c}">${i.ci?esc(l):'No check-in '+(k===todayK()?'today':'that day')}</span><span class="chip ${i.av==='out'?'alert':i.av==='mod'?'caution':'good'}">${AV[i.av][1]}</span>${rs.map(n=>`<span class="chip caution">${ico('clock')}${esc(n.body.length>40?n.body.slice(0,40)+'…':n.body)}</span>`).join('')}</div></div></div>
+   ${kpiRow([kpi(b7.length?Math.round(avg(b7)):'–','Balance, 7-day average',E.usualBal(k)!=null?`Usual ${Math.round(E.usualBal(k))}`:''),kpi(sl7.length?r1(avg(sl7))+'<small>h</small>':'–','Sleep, 7-day average',E.debt(k)!=null?`${E.debt(k)} h short over the week`:''),kpi(Math.round(E.load7(k)),'Load, last 7 days',E.chronicWeek(k)!=null?`Usual ${Math.round(E.chronicWeek(k))}`:''),`<div class="kpi" style="flex-direction:column;align-items:flex-start;gap:6px"><div>${acwrChip(a)}</div><div class="l">This week against usual</div></div>`])}
+   <div class="toolbar">${seg('ptab',[['overview','Overview'],['sc','S&C'],['physio','Physio'],['nutrition','Nutrition'],['mindset','Mindset']])}</div>`;
+  const bal=`<section class="card"><header><div><h2>Balance</h2><p>Last 4 weeks, from their own check-ins</p></div></header>${lineChart(keys.map(kk=>({k:kk,y:dayInfo(p,kk).s})),{min:0,max:100,ticks:[0,55,75,100],fmt:Math.round,bands:[[75,100,'var(--good)'],[55,75,'var(--caution)'],[0,55,'var(--alert)']],dotColor:v=>v>=75?'var(--good)':v>=55?'var(--caution)':'var(--alert)',color:'var(--text-body)',label:'Balance'})}</section>`;
+  const sleep=`<section class="card"><header><div><h2>Sleep</h2><p>Hours each night against what they need</p></div></header>${barChart(keys.map(kk=>({k:kk,y:E.sleep(kk)})),{max:10,fmt:v=>r1(v),ref:E.need(k),refLabel:`Needs about ${E.need(k)} h`,tip:p=>p.y?p.y+' h':'No entry',label:'Sleep'})}</section>`;
+  const load=`<section class="card"><header><div><h2>Training load</h2><p>Minutes × effort each day</p></div></header>${barChart(keys.map(kk=>({k:kk,y:E.load(kk)})),{tip:p=>`Load ${Math.round(p.y||0)}`,label:'Load'})}</section>`;
+  const line=(f,t,sub,col)=>`<section class="card"><header><div><h2>${t}</h2><p>${sub}</p></div></header>${lineChart(keys.map(kk=>({k:kk,y:p.D[kk]&&isNum(p.D[kk][f])?+p.D[kk][f]:null})),{min:1,max:5,ticks:[1,3,5],color:col,label:t})}</section>`;
+  const sess=[];keys.slice().reverse().forEach(kk=>sess.push(...sessionsOn(p,kk)));
+  const sessT=`<section class="card"><header><div><h2>Sessions</h2><p>Last 4 weeks</p></div></header>${sess.length?`<table class="list"><tr><th>Day</th><th>What</th><th>Min</th><th>Effort</th><th>Felt</th></tr>${sess.slice(0,16).map(s=>`<tr><td>${esc(fmtK(s.k))}</td><td>${esc(s.what)}${s.st==='missed'?' <span class="chip alert">Missed</span>':''}</td><td class="num">${s.dur||'–'}</td><td class="num">${s.rpe||'–'}</td><td>${esc(s.fb&&isNum(s.fb.feel)?FEEL[s.fb.feel]:'–')}${s.fb&&s.fb.effort==='harder'?' <span class="chip caution">Harder than planned</span>':''}</td></tr>`).join('')}</table>`:'<div class="empty">No sessions logged.</div>'}</section>`;
+  const nigs=[];keys.slice().reverse().forEach(kk=>{const d=p.D[kk];(d&&d.niggles||[]).forEach(n=>nigs.push({k:kk,...n}))});
+  const nigT=`<section class="card"><header><div><h2>Niggles</h2><p>Last 4 weeks</p></div></header>${nigs.length?`<table class="list"><tr><th>Day</th><th>Where</th><th>Side</th><th>Pain</th></tr>${nigs.slice(0,16).map(n=>`<tr><td>${esc(fmtK(n.k))}</td><td>${esc(n.area)}</td><td>${esc(n.side||'')}</td><td>${painChip(+n.pain||0)}</td></tr>`).join('')}</table>`:'<div class="empty">None logged. Good.</div>'}</section>`;
+  const pain=(()=>{const areas=[...new Set(nigs.map(n=>n.area))];if(!areas.length)return '';return `<section class="card"><header><div><h2>Pain over time</h2><p>${areas.map(esc).join(', ')}</p></div></header>${lineChart(keys.map(kk=>{const d=p.D[kk];return {k:kk,y:d?(d.niggles&&d.niggles.length?maxPain(d):(checkedIn(d)?0:null)):null}}),{min:0,max:10,ticks:[0,3,5,10],color:'var(--caution)',label:'Pain',tip:p=>`Worst pain ${p.y}/10`})}</section>`})();
+  let foodBody;if(!p.food)foodBody=`<section class="card"><div class="empty">${esc(first(p.name))} hasn't turned on food sharing.</div></section>`;
+  else{const fk=keys.map(kk=>({k:kk,f:foodOn(p,kk)}));const lg=fk.filter(x=>x.f);
+    foodBody=kpiRow([kpi(lg.filter(x=>keys.slice(-7).includes(x.k)).length+'<small>/ 7</small>','Days logged this week'),kpi(fx(avgOf(lg.map(x=>x.f.protein)))+'<small>g</small>','Protein a day'),kpi(plantsWeek(p,k),'Plants this week'),kpi(fx(avgOf(lg.map(x=>x.f.water!=null?+x.f.water:null)),1)+'<small>L</small>','Water a day')])
+     +`<div class="grid g2"><section class="card"><header><div><h2>Calories</h2><p>Bars in blue are training days</p></div></header>${barChart(fk.map(x=>({k:x.k,y:x.f?x.f.kcal:0,c:isTrainDay(p,x.k)?'var(--blue)':'var(--line-2)'})),{tip:q=>q.y?`${Math.round(q.y)} kcal${isTrainDay(p,q.k)?' · training day':''}`:'Not logged',label:'Calories'})}</section>
+      <section class="card"><header><div><h2>Protein</h2><p>Grams a day</p></div></header>${barChart(fk.map(x=>({k:x.k,y:x.f?x.f.protein:0})),{tip:q=>q.y?`${Math.round(q.y)} g`:'Not logged',label:'Protein'})}</section></div>`}
+  const body={overview:(fl.length?`<section class="card"><header><div><h2>Worth knowing</h2></div></header><div class="flags">${fl.map(f=>`<div class="flag"><span class="ic" style="background:color-mix(in srgb,${f.col} 15%,transparent);color:${f.col}">${ico(f.ic)}</span><span class="who"><b>${esc(f.t)}</b><span>${esc(f.s)}</span></span></div>`).join('')}</div></section>`:'')+`<div class="grid g2">${bal}${sleep}${load}${line('energy','How they feel','Energy, 1 to 5')}</div>`,
+    sc:`<div class="grid g2">${load}${bal}</div>${sessT}`,
+    physio:`<div class="grid g2">${pain||nigT}${line('sore','Body soreness','1 fresh to 5 very sore','var(--caution)')}</div>${pain?nigT:''}`,
+    nutrition:foodBody,
+    mindset:`<div class="grid g2">${line('mood','Mood','1 low to 5 great')}${line('stress','Stress','1 calm to 5 very stressed','var(--caution)')}${line('energy','Energy','1 drained to 5 full of it')}${sleep}</div>`}[tab];
+  return head+body+notesCard(p)+`<p class="tiny muted">${p.food?'Food is shared as daily totals only. ':''}Notes, cycle tracking and${p.food?'':' food,'} drinks with alcohol stay private to ${esc(first(p.name))}.</p>`}
+
+// ---------- team ----------
 let SETUP={busy:false};
 function viewSetup(){const real=TEAMS.filter(t=>t.team_id!==DEMO_ID);
-  const create=`<section class="card"><header><div><h2>${real.length?'Add another team':'Create your team'}</h2><p>You'll get a code to hand out to players.</p></div></header>
+  const create=`<section class="card"><header><div><h2>${real.length?'Add another team':'Create your team'}</h2><p>You'll be its manager, with a player code and a staff code to hand out.</p></div></header>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="in" id="tName" placeholder="e.g. Glencar/Manorhamilton Seniors" style="flex:1;min-width:220px"><button class="btn" id="tCreate" ${SETUP.busy?'disabled':''}>${SETUP.busy?'Creating…':'Create team'}</button></div></section>`;
   if(ERR==='setup')return `<section class="card"><header><div><h2>One-off database step</h2><p>Teams aren't switched on in the database yet.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/teams.sql</b> in the GitHub repo and click Run.</li><li>Come back here and refresh.</li></ol></section>`;
-  if(!TEAM||isDemo())return create+(real.length?'':`<p class="small muted">Until then, the demo squad shows what you'll see.</p>`);
-  const ms=SQUAD.slice().sort((a,b)=>(a.role===b.role?0:a.role==='coach'?-1:1)||a.name.localeCompare(b.name));
-  return `<div class="grid g2"><section class="card"><header><div><h2>Player code</h2><p>Players type this in the Keel app</p></div><button class="btn ghost sm" data-newcode="player">New code</button></header>
-     <div style="display:flex;align-items:center;gap:14px"><span class="code">${esc(TEAM.code||'')}</span><button class="btn ghost sm" data-copy="${esc(TEAM.code||'')}">${ico('copy','width:15px;height:15px')}Copy</button></div>
-     <ol class="steps" style="margin-top:18px"><li>Open Keel at training-log-lac-iota.vercel.app/p2/ and sign in.</li><li>Tap your profile (top right), then <b>Your team</b>.</li><li>Type the code, read what's shared, tap <b>Join and share</b>.</li></ol></section>
-   <section class="card"><header><div><h2>Coach code</h2><p>For other coaches, the physio or S&amp;C. Don't give this to players.</p></div><button class="btn ghost sm" data-newcode="coach">New code</button></header>
-     <div style="display:flex;align-items:center;gap:14px"><span class="code">${esc(TEAM.coach_code||'')}</span><button class="btn ghost sm" data-copy="${esc(TEAM.coach_code||'')}">${ico('copy','width:15px;height:15px')}Copy</button></div>
-     <p class="small muted" style="margin-top:18px">They join the same way in the app, then open this dashboard at /coach/.</p></section></div>
-   <section class="card"><header><div><h2>${esc(TEAM.name)}</h2><p>${players().length} players · ${sharing().length} sharing</p></div></header>
-    ${ms.length?`<table class="list"><tr><th>Name</th><th>Position</th><th>Status</th><th></th></tr>${ms.map(m=>`<tr><td><b style="color:var(--text)">${esc(m.name)}</b></td>
-      <td>${m.role==='coach'?'<span class="muted">Coach</span>':`<input class="in" data-pos="${esc(m.id)}" value="${esc(m.pos||'')}" placeholder="Add position" style="max-width:200px;padding:7px 10px">`}</td>
-      <td>${m.role==='coach'?'':m.share?`<span class="chip good">Sharing</span>`:'<span class="chip">Paused</span>'}${m.role!=='coach'&&m.share&&!lastCheckin(m,todayK())?' <span class="chip">No check-ins yet</span>':''}</td>
-      <td style="text-align:right">${m.id!==(SESSION&&SESSION.user.id)?`<button class="btn danger sm" data-remove="${esc(m.id)}">Remove</button>`:''}</td></tr>`).join('')}</table>`:'<div class="empty">No one yet.</div>'}</section>${create}`}
+  if(!TEAM||isDemo())return create+(real.length?'':`<p class="small muted">Until then, the demo squad shows what each of the staff will see.</p>`);
+  const ps=players().sort((a,b)=>a.name.localeCompare(b.name)),st=staffList().sort((a,b)=>a.name.localeCompare(b.name));const me=SESSION&&SESSION.user.id;
+  const codeCard=(t,sub,code,which,steps)=>`<section class="card"><header><div><h2>${t}</h2><p>${sub}</p></div>${isManager()?`<button class="btn ghost sm" data-newcode="${which}">New code</button>`:''}</header>
+     <div style="display:flex;align-items:center;gap:14px"><span class="code">${esc(code||'')}</span><button class="btn ghost sm" data-copy="${esc(code||'')}">${ico('copy','width:15px;height:15px')}Copy</button></div><ol class="steps" style="margin-top:18px">${steps}</ol></section>`;
+  return `<section class="card"><header><div><h2>Your role</h2><p>Decides which page you land on. Everyone on the staff can see every page.</p></div>${roleSelect('myRole',myStaff()||'')}</header></section>
+   <div class="grid g2">${codeCard('Player code','For players. They choose what to share.',TEAM.code,'player',`<li>Open Keel at training-log-lac-iota.vercel.app/p2/ and sign in.</li><li>Tap the profile button (top right), then <b>Your team</b>.</li><li>Type the code, read what's shared, tap <b>Join and share</b>. Food sharing is a separate switch.</li>`)}
+    ${codeCard('Staff code','For coaches, S&C, physio, nutritionist and mindset coach. Never give this to players.',TEAM.coach_code,'coach',`<li>Open training-log-lac-iota.vercel.app/coach/</li><li>Tap <b>New staff? Join with a staff code</b>.</li><li>Enter their details, the code and their role.</li>`)}</div>
+   <section class="card"><header><div><h2>Backroom team</h2><p>${st.length} staff</p></div></header>
+    <table class="list"><tr><th>Name</th><th>Role</th><th></th></tr>${st.map(m=>`<tr><td><b style="color:var(--text)">${esc(m.name)}</b>${m.id===me?' <span class="muted small">(you)</span>':''}</td><td>${esc(STAFF_LONG[m.staff]||'Not set')}</td>
+      <td style="text-align:right">${isManager()&&m.id!==me?`<button class="btn danger sm" data-remove="${esc(m.id)}">Remove</button>`:''}</td></tr>`).join('')}</table></section>
+   <section class="card"><header><div><h2>Players</h2><p>${ps.length} players · ${ps.filter(p=>p.share).length} sharing · ${ps.filter(p=>p.food).length} sharing food</p></div></header>
+    ${ps.length?`<div style="overflow-x:auto"><table class="list"><tr><th>Name</th><th>Position</th><th>Sharing</th><th></th></tr>${ps.map(m=>`<tr><td><b style="color:var(--text)">${esc(m.name)}</b></td>
+      <td><input class="in" data-pos="${esc(m.id)}" value="${esc(m.pos||'')}" placeholder="Add position" style="max-width:200px;padding:7px 10px"></td>
+      <td>${m.share?`<span class="chip good">Sharing</span>`:'<span class="chip">Paused</span>'} ${m.food?'<span class="chip">Food</span>':''}${m.share&&!lastCheckin(m,todayK())?' <span class="chip">No check-ins yet</span>':''}</td>
+      <td style="text-align:right">${isManager()?`<button class="btn danger sm" data-remove="${esc(m.id)}">Remove</button>`:''}</td></tr>`).join('')}</table></div>`:'<div class="empty">No players yet. Send them the player code.</div>'}</section>${isManager()?create:''}`}
+
+// ---------- overview: the manager's page ----------
+function hubStrip(){const ps=sharing();if(!ps.length)return '';const k=S.k;
+  const calls=ps.map(p=>sessionCall(p,k)[0]);const inf=ps.map(p=>dayInfo(p,k));const fs=ps.filter(p=>p.food);
+  const nig=inf.filter(i=>i.pain>=1).length,out=inf.filter(i=>i.av==='out').length;
+  const mood=ps.filter(p=>{const d=p.D[k];let hs=0;for(let j=0;j<3;j++){const x=p.D[addK(k,-j)];if(x&&+x.stress>=4)hs++}return (d&&+d.mood<=2)||hs===3}).length;
+  const flog=fs.filter(p=>lastN(k,7).filter(kk=>foodOn(p,kk)).length>=4).length;
+  const t=(v,ic,title,line,col)=>`<a class="kpi hub" href="#${v}"><div class="ic" style="color:${col}">${ico(ic)}</div><div style="min-width:0"><div class="l" style="margin:0;color:var(--text);font-weight:600">${title}</div><div class="d" style="font-size:13px">${line}</div></div></a>`;
+  return `<div class="kpis" style="--n:4">${t('sc','load','S&C',`${calls.filter(c=>c==='hold').length} to hold back · ${calls.filter(c=>c==='push').length} to push`,'var(--blue)')}
+   ${t('physio','avail','Physio',`${out} unavailable · ${nig} with a niggle`,'var(--caution)')}
+   ${t('nutrition','food','Nutrition',fs.length?`${flog} of ${fs.length} logging most days`:'No one sharing food yet','var(--good)')}
+   ${t('mindset','mind','Mindset',mood?`${mood} worth a quiet word`:'Nobody stands out','var(--blue)')}</div>`}
+function restrCard(){const k=S.k;const rs=[];sharing().forEach(p=>activeRestr(p,k).forEach(n=>rs.push({p,n})));if(!rs.length)return '';
+  return `<section class="card"><header><div><h2>Restrictions in place</h2><p>Set by the staff. They count towards availability.</p></div></header><div class="flags">${rs.map(({p,n})=>`<button class="flag" data-player="${esc(p.id)}"><span class="ic" style="background:color-mix(in srgb,var(--caution) 15%,transparent);color:var(--caution)">${ico('clock')}</span><span class="who"><b>${esc(p.name)} · ${esc(n.body)}</b><span>${esc(staffLabel(n.author_staff))} · ${n.until_day?'until '+esc(fmtK(n.until_day,{weekday:'short',day:'numeric',month:'short'})):'until further notice'}</span></span></button>`).join('')}</div></section>`}
+function viewOverview(){const h=viewToday();const i=h.indexOf('<div class="grid g-today">');if(i<0)return h;return h.slice(0,i)+hubStrip()+restrCard()+h.slice(i)}
 
 function render(){TIPS={};tipN=0;const rt=route();const root=$('#root');
   if(!SESSION){root.innerHTML=gateHTML();return}
   const title=rt.v==='player'?'Player':(VIEWS.find(v=>v[0]===rt.v)||VIEWS[0])[1];
-  let body;if(LOADING)body='<div class="spin"></div>';else if(rt.v==='setup')body=viewSetup();else if(rt.v==='player')body=viewPlayer(rt.id);else if(rt.v==='trends')body=viewTrends();else if(rt.v==='load')body=viewLoad();else if(rt.v==='wellness')body=viewWellness();else if(rt.v==='avail')body=viewAvail();else body=viewToday();
+  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,sc:viewSC,physio:viewPhysio,nutrition:viewNutrition,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
   const sy=scrollY;root.innerHTML=shell(body,title);if(render._v===location.hash)scrollTo(0,sy);else scrollTo(0,0);render._v=location.hash}
-function gateHTML(){return `<div class="gate"><form class="gcard" id="login"><img src="/keel-wordmark.svg" alt="keel"><div><h1>Coach dashboard</h1><p class="muted small" style="margin-top:4px">Sign in with your Keel account.</p></div>
+let GATE={mode:'in',msg:''};
+function gateHTML(){if(GATE.mode==='up')return `<div class="gate"><form class="gcard" id="signup"><img src="/keel-wordmark.svg" alt="keel"><div><h1>Join the backroom team</h1><p class="muted small" style="margin-top:4px">For coaches, S&amp;C, physios, nutritionists and mindset coaches. You need the staff code from your team's manager.</p></div>
+  <div class="field"><label for="su-name">Your name</label><input class="in" id="su-name" autocomplete="name" required></div>
+  <div class="field"><label for="su-role">Your role</label><select class="in" id="su-role" required><option value="">Choose…</option>${Object.entries(STAFF_LONG).filter(([s])=>s!=='manager').map(([s,l])=>`<option value="${s}">${esc(l)}</option>`).join('')}</select></div>
+  <div class="field"><label for="su-code">Staff code</label><input class="in" id="su-code" autocomplete="off" required style="text-transform:uppercase;letter-spacing:.12em" placeholder="6 letters"></div>
+  <div class="field"><label for="em">Email</label><input class="in" id="em" type="email" autocomplete="email" required></div>
+  <div class="field"><label for="pw">Password</label><input class="in" id="pw" type="password" autocomplete="new-password" minlength="6" required></div>
+  <button class="btn" type="submit">Create account and join</button><button type="button" class="small muted" data-gate="in" style="text-align:left">Already have a Keel account? Sign in</button></form></div>`;
+  return `<div class="gate"><form class="gcard" id="login"><img src="/keel-wordmark.svg" alt="keel"><div><h1>Team dashboard</h1><p class="muted small" style="margin-top:4px">Sign in with your Keel account.</p></div>
+  ${GATE.msg?`<div class="demo-note">${esc(GATE.msg)}</div>`:''}
   <div class="field"><label for="em">Email</label><input class="in" id="em" type="email" autocomplete="email" required></div>
   <div class="field"><label for="pw">Password</label><input class="in" id="pw" type="password" autocomplete="current-password" required></div>
-  <button class="btn" type="submit">Sign in</button><a class="small muted" href="/p2/">Forgot your password, or no account yet? Use the Keel app.</a></form></div>`}
+  <button class="btn" type="submit">Sign in</button><button type="button" class="btn ghost" data-gate="up">New staff? Join with a staff code</button><a class="small muted" href="/p2/">Forgot your password? Reset it in the Keel app.</a></form></div>`}
+async function joinPending(){let pj=null;try{pj=JSON.parse(localStorage.getItem('keelStaffJoin')||'null')}catch(e){}if(!pj)return;
+  const {error}=await sb.rpc('keel_join_team',{join_code:pj.code,my_name:pj.name,my_staff:pj.staff});try{localStorage.removeItem('keelStaffJoin')}catch(e){}
+  toast(error?error.message:'You\'ve joined the team',4000)}
 
 // ================= events =================
-window.addEventListener('hashchange',render);
+window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#player'))S.ptab=null;render()});
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-gate]')){GATE={mode:x.dataset.gate,msg:''};render();return}
   if(x=c('[data-player]')){location.hash='player/'+encodeURIComponent(x.dataset.player);return}
   if(x=c('[data-go]')){location.hash=x.dataset.go;return}
   if(x=c('[data-set]')){const v=x.dataset.val;S[x.dataset.set]=isNaN(+v)?v:+v;render();return}
@@ -412,21 +612,42 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
     const {data,error}=await sb.rpc('keel_new_code',{t:TEAM.team_id,which:x.dataset.newcode});if(error){toast(error.message);return}if(x.dataset.newcode==='coach')TEAM.coach_code=data;else TEAM.code=data;toast('New code ready');render();return}
   if(x=c('[data-remove]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Tap again to remove';return}
     const {error}=await sb.from('team_members').delete().eq('team_id',TEAM.team_id).eq('user_id',x.dataset.remove);if(error){toast(error.message);return}toast('Removed');await selectTeam(TEAM.team_id);return}
+  if(x=c('[data-delnote]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Sure?';return}
+    if(!isDemo()){const {error}=await sb.from('team_notes').delete().eq('id',x.dataset.delnote);if(error){toast(error.message);return}}
+    NOTES=NOTES.filter(n=>n.id!==x.dataset.delnote);attachNotes();render();return}
 });
 document.addEventListener('change',async e=>{const t=e.target;
   if(t.id==='teamSel'){await selectTeam(t.value);return}
+  if(t.id==='demoAs'){S.demoAs=t.value;S.ptab=null;location.hash=homeView();render();return}
+  if(t.id==='myRole'&&t.value){if(isDemo()){S.demoAs=t.value;render();return}
+    const {error}=await sb.from('team_members').update({staff:t.value}).eq('team_id',TEAM.team_id).eq('user_id',SESSION.user.id);if(error){toast(error.message,4000);return}
+    TEAM.staff=t.value;const me=SQUAD.find(x=>x.id===SESSION.user.id);if(me)me.staff=t.value;toast('Saved. This is now your home page.');location.hash=homeView();render();return}
   if(t.dataset.pos){const {error}=await sb.from('team_members').update({pos:t.value.trim()||null}).eq('team_id',TEAM.team_id).eq('user_id',t.dataset.pos);if(error){toast(error.message);return}const p=SQUAD.find(x=>x.id===t.dataset.pos);if(p)p.pos=t.value.trim();toast('Saved')}});
-document.addEventListener('submit',async e=>{if(e.target.id!=='login')return;e.preventDefault();const {error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error){toast(error.message,4000);return}location.reload()});
-const demoTeam=()=>({team_id:DEMO_ID,name:'Demo squad',role:'coach'});
+document.addEventListener('submit',async e=>{const f=e.target;
+  if(f.id==='login'){e.preventDefault();const {error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error){toast(error.message,4000);return}location.reload();return}
+  if(f.id==='signup'){e.preventDefault();const pj={name:$('#su-name').value.trim(),staff:$('#su-role').value,code:$('#su-code').value.replace(/\s/g,'').toUpperCase()};
+    if(pj.code.length<6){toast('The staff code has 6 letters');return}try{localStorage.setItem('keelStaffJoin',JSON.stringify(pj))}catch(err){}
+    const {data,error}=await sb.auth.signUp({email:$('#em').value.trim(),password:$('#pw').value,options:{emailRedirectTo:location.origin+'/coach/',data:{name:pj.name}}});
+    if(error){toast(error.message,5000);return}if(!data.session){GATE={mode:'in',msg:'Check your email for a confirmation link, then sign in here. You\'ll join the team straight away.'};render();return}
+    location.reload();return}
+  if(f.id==='noteForm'){e.preventDefault();const body=($('#noteBody').value||'').trim();if(!body){toast('Write the note first');return}
+    const n={team_id:TEAM.team_id,player_id:f.dataset.pid,author_name:myName(),author_staff:myStaff()||'coach',kind:S.noteKind,body,until_day:S.noteKind==='restriction'?(($('#noteUntil')||{}).value||null):null};
+    if(isDemo()){NOTES.unshift(Object.assign({id:'n'+Date.now(),author_id:SESSION.user.id,created_at:new Date().toISOString()},n))}
+    else{const {data,error}=await sb.from('team_notes').insert(n).select().single();if(error){toast(error.message,4000);return}NOTES.unshift(data)}
+    attachNotes();S.noteKind='note';toast('Saved for the staff');render();return}
+});
+const demoTeam=()=>({team_id:DEMO_ID,name:'Demo squad',role:'coach',staff:null});
 
 // ================= start =================
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
-  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];SQUAD=buildDemo();render();return}
+  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();render();return}
     $('#root').innerHTML='<div class="gate"><div class="gcard"><h1>Not set up yet</h1><p class="muted">The dashboard can\'t reach the database settings.</p></div></div>';return}
   const {data:{session}}=await sb.auth.getSession();SESSION=session;if(!session){render();return}
+  await joinPending();
   TEAMS=await loadTeams();TEAMS.push(demoTeam());let want=null;try{want=localStorage.getItem('keelCoachTeam')}catch(e){}
   if(!TEAMS.some(t=>t.team_id===want))want=TEAMS[0].team_id;if(ERR==='setup')location.hash='setup';
+  const real=TEAMS.find(t=>t.team_id!==DEMO_ID&&t.staff);if(real)S.demoAs=real.staff;
   await selectTeam(want);
 })();
 })();
