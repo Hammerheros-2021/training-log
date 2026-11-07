@@ -4522,6 +4522,61 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
   if(x=c('[data-teamleave]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Tap again to leave';return}
     const {error}=await sb.from('team_members').delete().eq('team_id',x.dataset.teamleave).eq('user_id',UID);if(error){toast('Could not leave. Try again.');return}toast('You have left the team');TEAM.list=null;render();return}
 });
+// ================= P2: S&C programme from your team (see supabase/sc.sql) =================
+// The team's S&C coach builds a programme in the staff dashboard and puts players on it.
+// Players see today's session here with videos, at the load % their coach set, and log it back.
+const MYP={list:null,loading:false,urls:{}};
+const MYP_DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+async function mypLoad(){if(!sb||!UID||MYP.loading)return;MYP.loading=true;try{const {data,error}=await sb.rpc('keel_my_programmes');MYP.list=error?[]:(data||[])}catch(e){MYP.list=[]}MYP.loading=false;render()}
+function mypAt(a,k){const s=a.start;const wk=Math.floor((parse(k)-parse(s))/(7*864e5))+1;const W=(a.programme.plan&&a.programme.plan.weeks)||[];const dow=(parse(k).getDay()+6)%7+1;
+  const week=W[wk-1];return {wk,dow,started:k>=s,finished:wk>W.length,days:week?(week.days||[]).filter(d=>d.dow===dow):[],W}}
+const mypLogged=(a,wk,dow)=>(a.logs||[]).find(l=>l.week===wk&&l.dow===dow);
+function mypNext(a,k){for(let i=1;i<=14;i++){const kk=iso(addD(parse(k),i));const t=mypAt(a,kk);if(t.finished)return null;if(t.started&&t.days.length)return {k:kk,d:t.days[0]}}return null}
+function mypLoadNote(pct){if(pct===100)return '';const d=100-pct;return d>0?`Your coach has you at ${pct}% today: go about ${d}% lighter than written${pct<=85?' and drop a set where there are 4 or more':''}.`:`Your coach has you at ${pct}%: you can push about ${-d}% more than written if it feels good.`}
+const mypSets=(sets,pct)=>{const n=+sets;return n&&pct<=85&&n>=4?n-1:sets};
+function mypSession(a,d,k,t){const ex=id=>(a.exercises||[]).find(e=>e.id===id)||{name:'Exercise'};const lg=mypLogged(a,t.wk,t.dow);
+  return `<div class="cmp" style="gap:10px"><div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><b style="font-size:17px">${esc(d.title||'Session')}</b><span class="ds">${d.min?d.min+' min':''}${d.rpe?' · effort '+d.rpe+'/10':''} · week ${t.wk} of ${t.W.length}</span></div>
+   ${a.load!==100?`<div class="ds" style="color:var(--accent)">${esc(mypLoadNote(a.load))}</div>`:''}
+   <div style="display:flex;flex-direction:column;gap:6px">${(d.items||[]).map(it=>{const e=ex(it.ex);return `<div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line,#262935);border-radius:10px">
+     ${e.video?`<button type="button" class="ghost" data-mypvid="${esc(e.id)}" data-mypa="${esc(a.assignment)}" aria-label="Watch ${esc(e.name)}" style="flex:none;width:38px;height:38px;border-radius:50%;padding:0;color:var(--fg)">▶</button>`:''}
+     <div style="flex:1;min-width:0"><b style="font-size:15px">${esc(e.name)}</b><div class="ds">${esc([it.sets?mypSets(it.sets,a.load)+' × '+(it.reps||''):it.reps,it.load,it.rest?'rest '+it.rest:''].filter(Boolean).join(' · '))}</div>${it.note?`<div class="ds" style="font-style:italic">${esc(it.note)}</div>`:''}${e.cues&&!it.note?`<div class="ds">${esc(e.cues)}</div>`:''}</div></div>`}).join('')}</div>
+   ${lg?`<div class="ds">${lg.done?`Logged: ${lg.dur||'?'} min, effort ${lg.rpe||'?'}/10.`:'Marked as missed.'} <button type="button" class="linkbtn" data-myplog="${esc(a.assignment)}" data-k="${k}">Change</button></div>`
+     :k===iso(todayDate())||k<iso(todayDate())?`<button type="button" class="primary" data-myplog="${esc(a.assignment)}" data-k="${k}">Log this session</button>`:''}</div>`}
+function mypCard(where){if(sampleMode)return '';if(MYP.list==null){setTimeout(mypLoad,0);return ''}if(!MYP.list.length)return '';const k=iso(todayDate());
+  return MYP.list.map(a=>{const t=mypAt(a,k);if(t.finished)return '';const nx=mypNext(a,k);
+    let body;if(!t.started)body=`<div class="ds">Starts ${esc(fmtD(parse(a.start),{weekday:'long',day:'numeric',month:'short'}))}.</div>`;
+    else if(t.days.length)body=t.days.map(d=>mypSession(a,d,k,t)).join('');
+    else body=`<div class="ds">No S&amp;C session today.${nx?` Next: <b>${esc(nx.d.title||'Session')}</b> on ${esc(fmtD(parse(nx.k),{weekday:'long'}))}.`:''}</div>`;
+    const week=where==='plan'&&t.started?`<div style="display:flex;gap:6px;flex-wrap:wrap">${[1,2,3,4,5,6,7].map(dw=>{const kk=iso(addD(parse(k),dw-t.dow));const tt=mypAt(a,kk);const d=tt.days[0];if(!d)return '';const lg=mypLogged(a,tt.wk,dw);
+      return `<span class="chip" style="padding:4px 10px;border-radius:99px;border:1px solid var(--line,#262935);font-size:13px;${kk===k?'border-color:var(--accent);':''}">${MYP_DOW[dw-1]} · ${esc(d.title||'')}${lg?(lg.done?' ✓':' ✕'):''}</span>`}).join('')}</div>`:'';
+    return `<section class="panel" id="mypCard"><h3>From your team · S&amp;C</h3><div class="ds">${esc(a.programme.name)}${a.team?' · '+esc(a.team):''}</div>${week}${body}</section>`}).join('')}
+async function mypVideo(aid,eid){const a=(MYP.list||[]).find(x=>x.assignment===aid);const e=a&&(a.exercises||[]).find(x=>x.id===eid);if(!e||!e.video)return;
+  let u=MYP.urls[e.video];if(!u){const {data,error}=await sb.storage.from('keel-videos').createSignedUrl(e.video,3600);if(error){toast('Could not load the video');return}u=MYP.urls[e.video]=data.signedUrl}
+  openSheet(`<div class="vh"><b>${esc(e.name)}</b><span>${esc(e.equipment||'')}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
+   <video src="${esc(u)}" controls autoplay playsinline muted loop style="width:100%;border-radius:12px;background:#000;max-height:60vh"></video>${e.cues?`<div class="ds">${esc(e.cues)}</div>`:''}`)}
+function mypLogSheet(aid,k){const a=(MYP.list||[]).find(x=>x.assignment===aid);if(!a)return;const t=mypAt(a,k);const d=t.days[0];if(!d)return;const lg=mypLogged(a,t.wk,t.dow)||{};
+  openSheet(`<div class="vh"><b>${esc(d.title||'Session')}</b><span>${esc(fmtD(parse(k),{weekday:'long',day:'numeric',month:'short'}))}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
+   <div class="seg" role="group"><button type="button" data-mypdone="1" aria-pressed="${lg.done!==false}">Done</button><button type="button" data-mypdone="0" aria-pressed="${lg.done===false}">Missed it</button></div>
+   <div class="field"><label class="label" for="mypDur">Minutes</label><input id="mypDur" type="number" inputmode="numeric" min="5" max="240" value="${lg.dur||d.min||45}"></div>
+   <div class="field"><label class="label" for="mypRpe">How hard was it? (1 easy, 10 flat out)</label><select id="mypRpe">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<option ${v===(lg.rpe||d.rpe||6)?'selected':''}>${v}</option>`).join('')}</select></div>
+   <div class="field"><label class="label" for="mypNote">Note for your coach (optional)</label><input id="mypNote" type="text" maxlength="300" placeholder="e.g. Hamstring felt tight on the Nordics"></div>
+   <button type="button" class="primary" data-mypsave="${esc(aid)}" data-k="${k}">Save</button>`)}
+async function mypSave(aid,k){const a=(MYP.list||[]).find(x=>x.assignment===aid);const t=mypAt(a,k);const d=t.days[0];
+  const done=!document.querySelector('[data-mypdone="0"][aria-pressed="true"]');const dur=done?Math.max(5,Math.min(240,+($('#mypDur')||{}).value||d.min||45)):null;const rpe=done?+($('#mypRpe')||{}).value||6:null;
+  const row={assignment_id:aid,team_id:a.team_id,player_id:UID,day:k,week:t.wk,dow:t.dow,title:d.title||'Session',done,dur,rpe,note:(($('#mypNote')||{}).value||'').trim()||null};
+  const {error}=await sb.from('sc_logs').upsert(row,{onConflict:'assignment_id,week,dow'});if(error){toast('Could not save. Try again.',3500);return}
+  // count it in your day's load (and so your balance) like any other session
+  const cur=(D()[k]&&D()[k].extras)||[];const keep=cur.filter(x=>x.sc!==aid);if(done)keep.push({kind:'S&C',desc:d.title||'Session',dur,rpe,sc:aid});await persistDay(k,{extras:keep});
+  const L=(a.logs||[]).filter(l=>!(l.week===t.wk&&l.dow===t.dow));L.push({week:t.wk,dow:t.dow,day:k,done,dur,rpe});a.logs=L;
+  closeSheet();toast(done?'Logged. Your coach can see it.':'Marked as missed',3000);render()}
+const _mypDash=viewDashboard;viewDashboard=function(){const h=_mypDash();const c=mypCard('today');return c+h};
+const _mypTrain=viewTrainingTab;viewTrainingTab=function(){const h=_mypTrain();const c=mypCard('plan');return c+h};
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-mypvid]')){await mypVideo(x.dataset.mypa,x.dataset.mypvid);return}
+  if(x=c('[data-myplog]')){mypLogSheet(x.dataset.myplog,x.dataset.k);return}
+  if(x=c('[data-mypdone]')){document.querySelectorAll('[data-mypdone]').forEach(b=>b.setAttribute('aria-pressed',b===x?'true':'false'));return}
+  if(x=c('[data-mypsave]')){x.disabled=true;await mypSave(x.dataset.mypsave,x.dataset.k);return}
+});
 const P2REC=/type=recovery/.test(location.hash+location.search);
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}

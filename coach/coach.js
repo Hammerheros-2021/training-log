@@ -233,14 +233,14 @@ function buildDemo(){
 async function loadTeams(){const {data,error}=await sb.rpc('keel_my_teams');if(error){ERR=/keel_my_teams|function|schema/i.test(error.message||'')?'setup':error.message;return []}
   ERR='';const all=data||[];if(all.length&&!('staff' in all[0]))ERR='upgrade';return all.filter(t=>t.role==='coach')}
 async function loadSquad(t){
-  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();return}
+  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();await loadSC(t);return}
   const from=addK(todayK(),-80),to=todayK();
   const {data:sq,error:e1}=await sb.rpc('keel_team_squad',{t:t.team_id});if(e1)throw e1;
   const rows=[];for(let off=0;off<50000;off+=1000){const {data,error}=await sb.rpc('keel_team_data',{t:t.team_id,from_day:from,to_day:to}).range(off,off+999);if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break}
   const by={};(sq||[]).forEach(m=>{by[m.user_id]=mkPlayer({id:m.user_id,name:m.display_name||(m.about&&m.about.name)||'Player',pos:m.pos||'',role:m.role,staff:m.staff,share:m.share,food:!!m.share_food,joined:m.joined_at,about:m.about||{}})});
   rows.forEach(r=>{const p=by[r.user_id];if(!p)return;(r.kind==='day'?p.D:p.L)[r.key]=Object.assign({date:r.key},r.data)});
   SQUAD=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name));
-  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes()}
+  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes();await loadSC(t)}
 function attachNotes(){SQUAD.forEach(p=>{p.notes=NOTES.filter(n=>n.player_id===p.id);p._di={}})}
 async function selectTeam(id){TEAM=TEAMS.find(t=>t.team_id===id)||TEAMS[0];try{localStorage.setItem('keelCoachTeam',TEAM.team_id)}catch(e){}LOADING=true;render();
   try{await loadSquad(TEAM)}catch(e){toast('Could not load the squad: '+(e.message||e),5000);SQUAD=[];NOTES=[]}LOADING=false;render()}
@@ -527,7 +527,7 @@ function viewPlayer(id){const p=SQUAD.find(x=>x.id===id);if(!p)return `<div clas
      +`<div class="grid g2"><section class="card"><header><div><h2>Calories</h2><p>Bars in blue are training days</p></div></header>${barChart(fk.map(x=>({k:x.k,y:x.f?x.f.kcal:0,c:isTrainDay(p,x.k)?'var(--blue)':'var(--line-2)'})),{tip:q=>q.y?`${Math.round(q.y)} kcal${isTrainDay(p,q.k)?' · training day':''}`:'Not logged',label:'Calories'})}</section>
       <section class="card"><header><div><h2>Protein</h2><p>Grams a day</p></div></header>${barChart(fk.map(x=>({k:x.k,y:x.f?x.f.protein:0})),{tip:q=>q.y?`${Math.round(q.y)} g`:'Not logged',label:'Protein'})}</section></div>`}
   const body={overview:(fl.length?`<section class="card"><header><div><h2>Worth knowing</h2></div></header><div class="flags">${fl.map(f=>`<div class="flag"><span class="ic" style="background:color-mix(in srgb,${f.col} 15%,transparent);color:${f.col}">${ico(f.ic)}</span><span class="who"><b>${esc(f.t)}</b><span>${esc(f.s)}</span></span></div>`).join('')}</div></section>`:'')+`<div class="grid g2">${bal}${sleep}${load}${line('energy','How they feel','Energy, 1 to 5')}</div>`,
-    sc:`<div class="grid g2">${load}${bal}</div>${sessT}`,
+    sc:playerSC(p)+`<div class="grid g2">${load}${bal}</div>${sessT}`,
     physio:`<div class="grid g2">${pain||nigT}${line('sore','Body soreness','1 fresh to 5 very sore','var(--caution)')}</div>${pain?nigT:''}`,
     nutrition:foodBody,
     mindset:`<div class="grid g2">${line('mood','Mood','1 low to 5 great')}${line('stress','Stress','1 calm to 5 very stressed','var(--caution)')}${line('energy','Energy','1 drained to 5 full of it')}${sleep}</div>`}[tab];
@@ -573,7 +573,7 @@ function viewOverview(){const h=viewToday();const i=h.indexOf('<div class="grid 
 function render(){TIPS={};tipN=0;const rt=route();const root=$('#root');
   if(!SESSION){root.innerHTML=gateHTML();return}
   const title=rt.v==='player'?'Player':(VIEWS.find(v=>v[0]===rt.v)||VIEWS[0])[1];
-  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,sc:viewSC,physio:viewPhysio,nutrition:viewNutrition,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
+  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,sc:viewSCHub,physio:viewPhysio,nutrition:viewNutrition,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
   const sy=scrollY;root.innerHTML=shell(body,title);if(render._v===location.hash)scrollTo(0,sy);else scrollTo(0,0);render._v=location.hash}
 let GATE={mode:'in',msg:''};
 function gateHTML(){if(GATE.mode==='up')return `<div class="gate"><form class="gcard" id="signup"><img src="/keel-wordmark.svg" alt="keel"><div><h1>Join the backroom team</h1><p class="muted small" style="margin-top:4px">For coaches, S&amp;C, physios, nutritionists and mindset coaches. You need the staff code from your team's manager.</p></div>
@@ -593,7 +593,7 @@ async function joinPending(){let pj=null;try{pj=JSON.parse(localStorage.getItem(
   toast(error?error.message:'You\'ve joined the team',4000)}
 
 // ================= events =================
-window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#player'))S.ptab=null;render()});
+window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#player'))S.ptab=null;if(!location.hash.startsWith('#sc')){S.progEdit=null;S.draft=null;S.exEdit=null}render()});
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(x=c('[data-gate]')){GATE={mode:x.dataset.gate,msg:''};render();return}
   if(x=c('[data-player]')){location.hash='player/'+encodeURIComponent(x.dataset.player);return}
@@ -638,10 +638,250 @@ document.addEventListener('submit',async e=>{const f=e.target;
 });
 const demoTeam=()=>({team_id:DEMO_ID,name:'Demo squad',role:'coach',staff:null});
 
+// ================= S&C workspace: library, programmes, assigning, Koach load suggestions =================
+const SC={ex:[],progs:[],assigns:[],logs:[],missing:false,urls:{}};
+const SC_CATS=[['strength','Strength'],['power','Power'],['speed','Speed'],['conditioning','Conditioning'],['core','Core'],['mobility','Mobility'],['prehab','Prehab'],['recovery','Recovery']];
+const KIND=[['strength','Gym'],['conditioning','Conditioning'],['speed','Speed'],['mobility','Mobility'],['recovery','Recovery']];
+const DOWS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const exById=id=>SC.ex.find(e=>e.id===id);
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():'x'+Math.random().toString(36).slice(2));
+const mondayAfter=k=>{let d=parse(k);const w=(d.getDay()+6)%7;return iso(addD(d,w===0?0:7-w))};
+async function loadSC(t){SC.missing=false;SC.urls={};
+  if(t.team_id===DEMO_ID){Object.assign(SC,buildDemoSC());return}
+  const q=async(tb,f)=>{let r=sb.from(tb).select('*').eq('team_id',t.team_id);if(f)r=f(r);const {data,error}=await r;if(error){if(/relation|does not exist|schema cache/i.test(error.message))SC.missing=true;return []}return data||[]};
+  SC.ex=(await q('sc_exercises',r=>r.order('name')));if(SC.missing){SC.progs=SC.assigns=SC.logs=[];return}
+  SC.progs=await q('sc_programmes',r=>r.order('updated_at',{ascending:false}));SC.assigns=await q('sc_assignments',r=>r.eq('active',true));
+  SC.logs=await q('sc_logs',r=>r.gte('day',addK(todayK(),-70)).order('day',{ascending:false}))}
+async function videoUrl(path){if(!path)return null;if(SC.urls[path])return SC.urls[path];if(isDemo())return null;
+  const {data,error}=await sb.storage.from('keel-videos').createSignedUrl(path,3600);if(error)return null;return SC.urls[path]=data.signedUrl}
+// where a player is in their programme
+function progPos(a,k){const p=SC.progs.find(x=>x.id===a.programme_id);if(!p)return null;const wk=Math.floor((parse(k)-parse(a.start_day))/(7*864e5))+1;const weeks=(p.plan&&p.plan.weeks)||[];
+  return {p,wk,weeks,started:k>=a.start_day,finished:wk>weeks.length,week:weeks[wk-1]||null}}
+function adherence(a,k){const pos=progPos(a,k);if(!pos||!pos.started)return {due:0,done:0};let due=0,done=0;
+  for(let i=0;i<7;i++){const kk=addK(k,-i);if(kk<a.start_day)break;const pp=progPos(a,kk);if(!pp.week)continue;const dow=(parse(kk).getDay()+6)%7+1;
+    pp.week.days.filter(d=>d.dow===dow).forEach(()=>{due++;if(SC.logs.some(l=>l.assignment_id===a.id&&l.week===pp.wk&&l.dow===dow&&l.done))done++})}
+  return {due,done}}
+// Koach: suggested load % for each player on a programme, from readiness, load and injuries
+function koachLoad(p,k){const i=dayInfo(p,k),a=p.E.acwr(k),rs=activeRestr(p,k);const b=lastN(k,7).map(kk=>dayInfo(p,kk).s).filter(v=>v!=null);const b7=b.length?avg(b):null;const debt=p.E.debt(k);
+  if(i.sick&&i.sick.sev==='bad')return [40,'Unwell. Pause the gym until 24 hours clear'];
+  if(i.pain>=5)return [60,`${i.nig.d.niggles[0].area} ${i.pain}/10. Upper body and rehab only, follow the physio`];
+  if(i.sick)return [70,'Unwell. Light work only'];
+  if(i.pain>=3||rs.length)return [80,`${rs.length?'Restriction: '+rs[0].body.replace(/\.\s*$/,''):i.nig.d.niggles[0].area+' '+i.pain+'/10'}. Swap out anything that aggravates it`];
+  if(a!=null&&a>1.5)return [80,`Load spike: this week is ${Math.round(a*100)}% of usual`];
+  if(b7!=null&&b7<55)return [85,`Balance averaging ${Math.round(b7)} this week`];
+  if(a!=null&&a>1.3)return [90,`Load rising: ${Math.round(a*100)}% of usual`];
+  if(debt!=null&&debt>=5)return [90,`About ${Math.round(debt)} h short on sleep this week`];
+  if(a!=null&&a<.8&&b7!=null&&b7>=70)return [110,`Fresh and under-loaded (${Math.round(a*100)}% of usual)`];
+  if(!i.ci)return [100,'No check-in today. Ask how they are before the session'];
+  return [100,'Readiness and load look steady']}
+const playerName=id=>{const p=SQUAD.find(x=>x.id===id);return p?p.name:'Player'};
+
+function viewSCHub(){const t=route().id||'squad';
+  const tabs=`<div class="toolbar"><div class="seg">${[['squad','Squad load'],['koach','Koach suggestions'],['programmes','Programmes'],['library','Exercise library']].map(([v,l])=>`<a href="#sc/${v}" aria-pressed="${t===v}" class="segl">${l}</a>`).join('')}</div></div>`;
+  if(SC.missing&&t!=='squad')return tabs+`<section class="card"><header><div><h2>One more database step</h2><p>Programmes and the exercise library need their own tables.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/sc.sql</b> and click Run, then confirm.</li><li>Refresh this page.</li></ol></section>`;
+  return tabs+({squad:viewSC,koach:viewKoach,programmes:()=>S.progEdit?viewProgEditor():viewProgrammes(),library:viewLibrary}[t]||viewSC)()}
+
+function viewKoach(){const k=S.k;const rows=SC.assigns.map(a=>{const p=SQUAD.find(x=>x.id===a.player_id);if(!p||!p.share)return null;const [pct,why]=koachLoad(p,k);return {a,p,pct,why}}).filter(Boolean).sort((x,y)=>Math.abs(y.pct-y.a.load_pct)-Math.abs(x.pct-x.a.load_pct));
+  if(!rows.length)return `<section class="card"><div class="empty"><h2 style="margin-bottom:6px">No one is on a programme yet</h2><p>Build or draft one under <b>Programmes</b>, then assign it to players. Koach then suggests a load for each of them every day.</p></div></section>`;
+  const ch=rows.filter(r=>r.pct!==r.a.load_pct);
+  return `<section class="card"><header><div><h2>Koach's load suggestions</h2><p>For ${esc(S.k===todayK()?'today':fmtK(S.k))}, from each player's balance, sleep, load against usual, niggles, sickness and staff restrictions. You decide; nothing changes until you apply it.</p></div>${ch.length?`<button class="btn sm" data-koachall="1">Apply all ${ch.length}</button>`:''}</header>
+    <div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Programme</th><th>Now</th><th>Koach suggests</th><th>Why</th><th></th></tr>${rows.map(r=>{const pr=SC.progs.find(x=>x.id===r.a.programme_id);const d=r.pct-r.a.load_pct;
+      return `<tr><td><button data-player="${esc(r.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(r.p.name)}</b></button></td><td class="small">${esc(pr?pr.name:'')}</td><td class="num">${r.a.load_pct}%</td>
+      <td>${d===0?'<span class="chip good">Keep</span>':`<span class="chip ${d<0?'caution':'good'}">${r.pct}%</span>`}</td><td class="small">${esc(r.why)}</td><td style="text-align:right">${d!==0?`<button class="btn ghost sm" data-koach="${esc(r.a.id)}" data-pct="${r.pct}">Apply</button>`:''}</td></tr>`}).join('')}</table></div>
+    <p class="tiny muted" style="margin-top:12px">Load % scales the weights and volume players see in their app: at 80% they're told to go about 20% lighter and drop a set where there are 4 or more.</p></section>`}
+
+function viewProgrammes(){const k=S.k;
+  const card=p=>{const as=SC.assigns.filter(a=>a.programme_id===p.id);const weeks=(p.plan&&p.plan.weeks)||[];const spw=weeks.length?Math.round(avg(weeks.map(w=>(w.days||[]).length))*10)/10:0;
+    const ad=as.map(a=>adherence(a,k));const due=ad.reduce((x,y)=>x+y.due,0),done=ad.reduce((x,y)=>x+y.done,0);
+    return `<section class="card"><header><div><h2>${esc(p.name)}</h2><p>${esc(p.goal||'')}</p></div><button class="btn ghost sm" data-progopen="${esc(p.id)}">Open</button></header>
+     <div class="kpis" style="--n:4;gap:10px">${[[weeks.length,'weeks'],[spw,'sessions a week'],[as.length,'players on it'],[due?Math.round(done/due*100)+'%':'–','done this week']].map(([v,l])=>`<div class="kpi" style="padding:12px 14px;flex-direction:column;align-items:flex-start;gap:0"><div class="v" style="font-size:24px">${v}</div><div class="l">${l}</div></div>`).join('')}</div></section>`};
+  return `<section class="card"><header><div><h2>Programmes</h2><p>Build one yourself, or let Koach draft it from your exercise library and edit before anyone sees it.</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-prognew="1">New programme</button><button class="btn sm" data-koachdraft="1">${ico('zap','width:15px;height:15px')}Draft with Koach</button></div></header>
+    ${S.koachForm?`<form id="koachForm" class="grid" style="gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px">
+      <div class="grid g3" style="gap:12px"><div class="field"><label>What's it for?</label><select class="in" id="kfPhase"><option>In-season (matches most weekends)</option><option>Pre-season build</option><option>Off-season</option><option>Return from injury</option><option>Older or newer players: gentle start</option></select></div>
+      <div class="field"><label>Gym sessions a week</label><select class="in" id="kfDays"><option>1</option><option selected>2</option><option>3</option></select></div><div class="field"><label>Weeks</label><select class="in" id="kfWeeks"><option>2</option><option selected>4</option><option>6</option><option>8</option></select></div></div>
+      <div class="field"><label>Anything Koach should know</label><input class="in" id="kfNote" placeholder="e.g. Tuesday and Thursday pitch sessions, match Sunday, limited kit: barbell, dumbbells, bands"></div>
+      <div style="display:flex;gap:8px"><button class="btn" type="submit" ${S.koachBusy?'disabled':''}>${S.koachBusy?'Koach is drafting…':'Draft it'}</button><button class="btn ghost" type="button" data-koachdraft="0">Cancel</button></div></form>`:''}</section>
+   ${SC.progs.length?`<div class="grid g2">${SC.progs.map(card).join('')}</div>`:'<div class="card"><div class="empty">No programmes yet.</div></div>'}`}
+
+function blankProg(){return {id:null,name:'New programme',goal:'',plan:{weeks:[{days:[{dow:1,title:'Lower body',kind:'strength',min:50,rpe:7,items:[]},{dow:4,title:'Upper body',kind:'strength',min:45,rpe:7,items:[]}]}]}}}
+function viewProgEditor(){const d=S.draft;if(!d)return '';const W=d.plan.weeks;const wi=Math.min(S.wk||0,W.length-1);const w=W[wi]||{days:[]};
+  const as=d.id?SC.assigns.filter(a=>a.programme_id===d.id):[];const ps=players().filter(p=>p.share).sort((a,b)=>a.name.localeCompare(b.name));
+  const exOpts=sel=>`<option value="">Choose exercise…</option>${SC_CATS.map(([c,l])=>{const xs=SC.ex.filter(e=>e.category===c);return xs.length?`<optgroup label="${l}">${xs.map(e=>`<option value="${esc(e.id)}" ${sel===e.id?'selected':''}>${esc(e.name)}${e.video_path?' ▶':''}</option>`).join('')}</optgroup>`:''}).join('')}`;
+  const item=(it,di,ii)=>`<div class="pitem" data-di="${di}" data-ii="${ii}">
+    ${it.ex||!it.name?`<select class="in" data-f="ex">${exOpts(it.ex)}</select>`:`<div class="in" style="display:flex;align-items:center;gap:6px"><span class="chip caution">New</span>${esc(it.name)}</div>`}
+    <input class="in" data-f="sets" value="${esc(it.sets??'')}" placeholder="Sets" inputmode="numeric"><input class="in" data-f="reps" value="${esc(it.reps??'')}" placeholder="Reps / time">
+    <input class="in" data-f="load" value="${esc(it.load??'')}" placeholder="Load, e.g. RPE 7"><input class="in" data-f="rest" value="${esc(it.rest??'')}" placeholder="Rest">
+    <input class="in pnote" data-f="note" value="${esc(it.note??'')}" placeholder="Coaching note"><button type="button" class="btn ghost sm" data-itemdel="1" aria-label="Remove">✕</button></div>`;
+  const day=(dd,di)=>`<section class="card pday" data-di="${di}"><header style="flex-wrap:wrap">
+     <select class="in" data-d="dow" style="width:auto">${DOWS.map((n,j)=>`<option value="${j+1}" ${dd.dow===j+1?'selected':''}>${n}</option>`).join('')}</select>
+     <input class="in" data-d="title" value="${esc(dd.title||'')}" style="flex:1;min-width:160px;font-weight:600">
+     <select class="in" data-d="kind" style="width:auto">${KIND.map(([v,l])=>`<option value="${v}" ${dd.kind===v?'selected':''}>${l}</option>`).join('')}</select>
+     <label class="small muted" style="display:flex;align-items:center;gap:6px">Min <input class="in" data-d="min" value="${esc(dd.min??'')}" style="width:64px" inputmode="numeric"></label>
+     <label class="small muted" style="display:flex;align-items:center;gap:6px">Effort <input class="in" data-d="rpe" value="${esc(dd.rpe??'')}" style="width:56px" inputmode="numeric"></label>
+     <button type="button" class="btn ghost sm" data-daydel="${di}">Remove session</button></header>
+     ${(dd.items||[]).length?'<div class="pitem phead2"><span>Exercise</span><span>Sets</span><span>Reps / time</span><span>Load</span><span>Rest</span><span>Note</span><span></span></div>':''}<div class="pitems">${(dd.items||[]).map((it,ii)=>item(it,di,ii)).join('')||'<div class="small muted">No exercises yet.</div>'}</div>
+     <button type="button" class="btn ghost sm" data-itemadd="${di}" style="margin-top:10px">+ Add exercise</button></section>`;
+  const nextMon=mondayAfter(todayK());
+  return `<a class="back" href="javascript:void 0" data-progclose="1">${ico('back','width:15px;height:15px')}All programmes</a>
+   ${S.draftFromKoach?`<div class="demo-note" style="border-color:var(--blue-2)">${ico('zap','width:16px;height:16px;flex:none')}<span><b>Koach's draft.</b> Check every session, change what you like, then save. Exercises marked <b>New</b> aren't in your library yet and are added when you save.</span></div>`:''}
+   <section class="card"><div class="grid g2" style="gap:12px"><div class="field"><label>Name</label><input class="in" id="pName" value="${esc(d.name)}"></div><div class="field"><label>Goal</label><input class="in" id="pGoal" value="${esc(d.goal||'')}" placeholder="e.g. In-season strength, 2 gym days around Tue/Thu training"></div></div>
+     <div class="toolbar" style="margin-top:14px">${W.map((x,j)=>`<button class="btn ${j===wi?'':'ghost'} sm" data-wk="${j}">Week ${j+1}</button>`).join('')}<button class="btn ghost sm" data-wkadd="copy">+ Copy week ${wi+1}</button><button class="btn ghost sm" data-wkadd="blank">+ Empty week</button>${W.length>1?`<button class="btn ghost sm" data-wkdel="${wi}">Remove week ${wi+1}</button>`:''}
+     <span style="flex:1"></span><button class="btn" data-progsave="1">${d.id?'Save changes':'Save programme'}</button></div></section>
+   ${w.days.map(day).join('')}<button class="btn ghost" data-dayadd="1" style="align-self:flex-start">+ Add a session to week ${wi+1}</button>
+   ${d.id?`<section class="card"><header><div><h2>Who's on it</h2><p>Players see their session in Keel on the day, with videos, and log it back here.</p></div></header>
+     ${as.length?`<table class="list"><tr><th>Player</th><th>Started</th><th>Week</th><th>Load</th><th>This week</th><th></th></tr>${as.map(a=>{const pos=progPos(a,todayK());const ad=adherence(a,todayK());return `<tr><td><button data-player="${esc(a.player_id)}" style="text-align:left"><b style="color:var(--text)">${esc(playerName(a.player_id))}</b></button></td><td class="small">${esc(fmtK(a.start_day,{day:'numeric',month:'short'}))}</td><td class="small">${!pos.started?'Not started':pos.finished?'Finished':'Week '+pos.wk+' of '+pos.weeks.length}</td>
+       <td><select class="in" data-assignload="${esc(a.id)}" style="width:auto;padding:5px 8px">${[40,50,60,70,80,85,90,95,100,105,110,120].map(v=>`<option ${v===a.load_pct?'selected':''}>${v}</option>`).join('')}</select></td><td class="small">${ad.due?`${ad.done} of ${ad.due} done`:'–'}</td><td style="text-align:right"><button class="btn danger sm" data-unassign="${esc(a.id)}">Take off</button></td></tr>`}).join('')}</table>`:'<div class="small muted" style="margin-bottom:12px">Nobody yet.</div>'}
+     <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)"><h3 style="margin-bottom:10px">Add players</h3>
+      <div class="toolbar" style="margin-bottom:10px"><button class="btn ghost sm" data-pickall="1">Select everyone</button><button class="btn ghost sm" data-pickall="0">Clear</button>
+       <label class="small muted" style="display:flex;align-items:center;gap:6px">Start <input class="in" type="date" id="asStart" value="${nextMon}" style="width:auto;padding:6px 10px"></label>
+       <label class="small muted" style="display:flex;align-items:center;gap:6px">Load <select class="in" id="asLoad" style="width:auto;padding:5px 8px">${[70,80,90,100,110].map(v=>`<option ${v===100?'selected':''}>${v}</option>`).join('')}</select>%</label></div>
+      <div class="pickgrid">${ps.filter(p=>!as.some(a=>a.player_id===p.id)).map(p=>`<label class="pick"><input type="checkbox" data-pick="${esc(p.id)}"><span>${esc(p.name)}<small>${esc(p.pos||'')}</small></span></label>`).join('')||'<div class="small muted">Everyone sharing is already on it.</div>'}</div>
+      <button class="btn" data-assign="1" style="margin-top:12px">Put them on this programme</button></div></section>`:`<p class="small muted">Save the programme, then you can put players on it.</p>`}
+   ${d.id?`<button class="btn danger sm" data-progdel="1" style="align-self:flex-start">Delete programme</button>`:''}`}
+
+function viewLibrary(){const f=S.libCat||'all',q=(S.libQ||'').toLowerCase();const xs=SC.ex.filter(e=>(f==='all'||e.category===f)&&(!q||e.name.toLowerCase().includes(q)));
+  const withV=SC.ex.filter(e=>e.video_path).length;
+  return `<section class="card"><header><div><h2>Exercise library</h2><p>${SC.ex.length} exercises · ${withV} with a video. Players see the video for every exercise in their session.</p></div><button class="btn sm" data-exnew="1">+ Add exercise</button></header>
+   ${S.exEdit?exForm(S.exEdit):''}
+   <div class="toolbar" style="margin-bottom:14px">${seg('libCat',[['all','All'],...SC_CATS])}<input class="in" id="libQ" value="${esc(S.libQ||'')}" placeholder="Search" style="max-width:220px"></div>
+   ${xs.length?`<div class="exgrid">${xs.map(e=>`<div class="excard"><button class="exvid" data-play="${esc(e.id)}" ${e.video_path?'':'disabled'} aria-label="Play ${esc(e.name)}">${e.video_path?`<span class="play">▶</span>`:'<span class="tiny muted">No video yet</span>'}</button>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:4px"><b style="color:var(--text)">${esc(e.name)}</b><span class="tiny muted">${esc((SC_CATS.find(c=>c[0]===e.category)||['',''])[1])}${e.equipment?' · '+esc(e.equipment):''}</span>${e.cues?`<span class="small" style="color:var(--text-body)">${esc(e.cues)}</span>`:''}
+      <div style="margin-top:6px"><button class="btn ghost sm" data-exedit="${esc(e.id)}">Edit</button></div></div></div>`).join('')}</div>`:'<div class="empty">Nothing here yet. Add your first exercise and its video.</div>'}</section>`}
+function exForm(e){return `<form id="exForm" data-id="${esc(e.id||'')}" style="display:flex;flex-direction:column;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px">
+  <div class="grid g3" style="gap:12px"><div class="field"><label>Name</label><input class="in" id="exName" value="${esc(e.name||'')}" required maxlength="80"></div>
+   <div class="field"><label>Type</label><select class="in" id="exCat">${SC_CATS.map(([v,l])=>`<option value="${v}" ${e.category===v?'selected':''}>${l}</option>`).join('')}</select></div>
+   <div class="field"><label>Equipment</label><input class="in" id="exEq" value="${esc(e.equipment||'')}" placeholder="e.g. Barbell"></div></div>
+  <div class="field"><label>Coaching cues</label><input class="in" id="exCues" value="${esc(e.cues||'')}" placeholder="e.g. Chest up, knees out, drive through the whole foot"></div>
+  <div class="field"><label>Video ${e.video_path?'(uploading a new one replaces it)':''}</label><input class="in" id="exVid" type="file" accept="video/mp4,video/quicktime,video/webm"><span class="tiny muted">MP4 or MOV, up to 50 MB. Short clips (10–30 seconds, filmed side-on) work best on phones.</span></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="submit" ${S.exBusy?'disabled':''}>${S.exBusy?esc(S.exBusy):'Save exercise'}</button><button class="btn ghost" type="button" data-exnew="0">Cancel</button>${e.id?`<span style="flex:1"></span><button class="btn danger" type="button" data-exdel="${esc(e.id)}">Delete</button>`:''}</div></form>`}
+
+// player page: their S&C programme
+function playerSC(p){const as=SC.assigns.filter(a=>a.player_id===p.id);if(!as.length)return `<section class="card"><header><div><h2>Programme</h2><p>Not on a programme. Add them from S&C › Programmes.</p></div></header></section>`;
+  return as.map(a=>{const pos=progPos(a,todayK());const ad=adherence(a,todayK());const [pct,why]=koachLoad(p,S.k);const lg=SC.logs.filter(l=>l.assignment_id===a.id).slice(0,8);
+    return `<section class="card"><header><div><h2>${esc(pos?pos.p.name:'Programme')}</h2><p>${!pos?'':!pos.started?'Starts '+esc(fmtK(a.start_day)):pos.finished?'Finished':'Week '+pos.wk+' of '+pos.weeks.length} · load ${a.load_pct}% · ${ad.due?ad.done+' of '+ad.due+' done this week':'nothing due this week'}</p></div></header>
+     <div class="flag"><span class="ic" style="background:color-mix(in srgb,var(--blue-2) 18%,transparent);color:var(--blue)">${ico('zap')}</span><span class="who"><b>Koach suggests ${pct}%</b><span>${esc(why)}</span></span>${pct!==a.load_pct?`<button class="btn ghost sm" data-koach="${esc(a.id)}" data-pct="${pct}">Apply</button>`:''}</div>
+     ${lg.length?`<table class="list" style="margin-top:10px"><tr><th>Day</th><th>Session</th><th>Min</th><th>Effort</th></tr>${lg.map(l=>`<tr><td>${esc(fmtK(l.day))}</td><td>${esc(l.title||'')}${l.done?'':' <span class="chip alert">Missed</span>'}</td><td class="num">${l.dur||'–'}</td><td class="num">${l.rpe||'–'}</td></tr>`).join('')}</table>`:'<div class="small muted" style="margin-top:10px">No sessions logged yet.</div>'}</section>`}).join('')}
+
+// demo content
+function buildDemoSC(){const E=(id,name,category,equipment,cues)=>({id,name,category,equipment,cues,video_path:null});
+  const ex=[E('e1','Trap bar deadlift','strength','Trap bar','Hips back, chest proud, push the floor away'),E('e2','Back squat','strength','Barbell','Brace, knees out, sit between your hips'),E('e3','Rear-foot elevated split squat','strength','Dumbbells','Tall torso, front knee tracks the toes'),
+    E('e4','Bench press','strength','Barbell','Shoulder blades back, bar to lower chest'),E('e5','Chin-up','strength','Bar','Full hang to chin over'),E('e6','Single-arm dumbbell row','strength','Dumbbell','Elbow to hip, no twisting'),
+    E('e7','Nordic hamstring curl','prehab','Partner or strap','Slow on the way down, hips straight'),E('e8','Copenhagen plank','prehab','Bench','Top leg on the bench, hips high'),E('e9','Box jump','power','Box','Land soft and quiet, step down'),
+    E('e10','Med ball rotational throw','power','Med ball','Load the back hip, throw through the wall'),E('e11','Pallof press','core','Band','Resist the turn, ribs down'),E('e12','Tibialis raise','prehab','Wall','Heels down, toes to shins'),
+    E('e13','30-15 shuttles','conditioning','Cones','30 s on, 15 s easy jog back'),E('e14','Hip 90/90 switches','mobility','None','Tall spine, slow switches'),E('e15','Foam roll: quads and calves','recovery','Foam roller','Slow, 60 s each area'),E('e16','Easy spin bike','recovery','Bike','Conversational pace')];
+  const it=(ex,sets,reps,load,rest)=>({ex,sets,reps,load,rest,note:''});
+  const wk=v=>({days:[{dow:1,title:'Lower body strength',kind:'strength',min:50,rpe:7,items:[it('e1',v+2,'5','RPE 7','2–3 min'),it('e3',3,'6 each side','RPE 7','90 s'),it('e7',3,'4','Bodyweight','2 min'),it('e8',2,'20 s each side','','60 s'),it('e11',2,'10 each side','','45 s')]},
+    {dow:3,title:'Recovery and mobility',kind:'recovery',min:25,rpe:3,items:[it('e16',1,'15 min','Easy',''),it('e14',2,'8 each side','',''),it('e15',1,'5 min','','')]},
+    {dow:5,title:'Upper body and power',kind:'strength',min:45,rpe:6,items:[it('e9',3,'3','Bodyweight','90 s'),it('e10',3,'4 each side','4 kg','60 s'),it('e4',v+1,'6','RPE 7','2 min'),it('e5',3,'Max -2','','90 s'),it('e6',3,'8 each side','RPE 7','60 s'),it('e12',2,'15','','45 s')]}]});
+  const progs=[{id:'p1',name:'In-season: 2 gym days + recovery',goal:'Hold strength and power through the league; matches Sunday, pitch Tue/Thu',plan:{weeks:[wk(1),wk(1),wk(2),wk(0)]},updated_at:new Date().toISOString()}];
+  const start=addK(mondayAfter(addK(todayK(),-21)),0);const assigns=[],logs=[];const R=rng(77);
+  players().forEach((p,ix)=>{if(ix%6===5)return;const a={id:'a'+ix,team_id:DEMO_ID,programme_id:'p1',player_id:p.id,start_day:start,load_pct:ix===10?100:ix===2?100:[100,100,90,100][ix%4],active:true};assigns.push(a);
+    for(let d=0;d<28;d++){const k=addK(start,d);if(k>=todayK())break;const wkn=Math.floor(d/7)+1,dow=(parse(k).getDay()+6)%7+1;const day=progs[0].plan.weeks[wkn-1]&&progs[0].plan.weeks[wkn-1].days.find(x=>x.dow===dow);if(!day)continue;
+      const miss=R()<(ix===19||ix===21?.6:.12);logs.push({id:'l'+ix+'-'+d,assignment_id:a.id,team_id:DEMO_ID,player_id:p.id,day:k,week:wkn,dow,title:day.title,done:!miss,dur:miss?null:day.min+Math.round(R()*10-5),rpe:miss?null:Math.max(2,Math.min(10,day.rpe+Math.round(R()*2-1)))})}});
+  logs.sort((a,b)=>b.day.localeCompare(a.day));return {ex,progs,assigns,logs,missing:false}}
+
+// ---------- S&C events ----------
+async function setLoad(id,pct){const a=SC.assigns.find(x=>x.id===id);if(!a)return false;
+  if(!isDemo()){const {error}=await sb.from('sc_assignments').update({load_pct:pct,updated_at:new Date().toISOString()}).eq('id',id);if(error){toast(error.message,4000);return false}}a.load_pct=pct;return true}
+function fallbackDraft(nDays,nWeeks,phase){const pick=(cat,n)=>SC.ex.filter(e=>e.category===cat).slice(0,n);const it=(e,sets,reps,load,rest)=>({ex:e.id,sets,reps,load,rest,note:''});
+  const A=[...pick('power',1).map(e=>it(e,3,'3','Bodyweight','90 s')),...pick('strength',2).map(e=>it(e,3,'5','RPE 7','2 min')),...pick('prehab',2).map(e=>it(e,2,'6','','60 s')),...pick('core',1).map(e=>it(e,2,'10 each side','','45 s'))];
+  const B=[...pick('power',2).slice(1).map(e=>it(e,3,'4','','60 s')),...pick('strength',4).slice(2).map(e=>it(e,3,'8','RPE 7','90 s')),...pick('prehab',3).slice(2).map(e=>it(e,2,'15','','45 s'))];
+  const Rc=[...pick('recovery',2).map(e=>it(e,1,'10 min','Easy','')),...pick('mobility',1).map(e=>it(e,2,'8 each side','',''))];
+  const days=[{dow:1,title:'Lower body strength',kind:'strength',min:50,rpe:7,items:A},{dow:3,title:'Recovery and mobility',kind:'recovery',min:25,rpe:3,items:Rc},{dow:5,title:'Upper body and power',kind:'strength',min:45,rpe:6,items:B}];
+  const use=nDays>=3?[days[0],{...days[0],dow:3,title:'Full body'},days[2],{...days[1],dow:6,title:'Recovery and mobility'}]:nDays===2?[days[0],days[1],days[2]]:[days[0],days[1]];
+  return {name:phase.split('(')[0].trim()+': '+nDays+' gym day'+(nDays>1?'s':''),goal:phase,plan:{weeks:Array.from({length:nWeeks},(_,w)=>({days:JSON.parse(JSON.stringify(use))}))}}}
+async function koachDraft(){const phase=$('#kfPhase').value,n=+$('#kfDays').value,w=+$('#kfWeeks').value,note=$('#kfNote').value.trim();
+  S.koachBusy=true;render();let out=null;
+  if(!isDemo()&&SESSION&&SESSION.access_token){const lib=SC.ex.map(e=>`${e.id}|${e.name}|${e.category}`).join('\n');
+    const prompt=`You are Koach, the strength and conditioning assistant inside Keel, drafting a programme for a GAA football squad's S&C coach to review and edit.
+Programme: ${phase}. ${n} gym session(s) a week for ${w} weeks. ${note?'Coach notes: '+note:''}
+Rules: keep gym sessions away from the day before a match (assume matches Sunday and pitch training Tuesday and Thursday unless the notes say otherwise). Add one short recovery or mobility session a week. Include hamstring and groin prehab (e.g. Nordics, Copenhagens) every week. Progress gently week to week; if there are 4 or more weeks, make the last one a lighter deload. Use RPE for load. Keep sessions 30 to 60 minutes.
+Use exercises from this library wherever possible, giving their id in "ex" (format id|name|category):
+${lib||'(library is empty)'}
+If you need an exercise that isn't in the library, leave out "ex" and give "name" and "category" (one of strength, power, speed, conditioning, core, mobility, prehab, recovery).
+Reply with JSON only, no prose, in this shape:
+{"name":"...","goal":"...","weeks":[{"days":[{"dow":1,"title":"...","kind":"strength|conditioning|speed|mobility|recovery","min":45,"rpe":7,"items":[{"ex":"<id>","sets":3,"reps":"5","load":"RPE 7","rest":"2 min","note":"short coaching note"}]}]}]}
+dow is 1 = Monday to 7 = Sunday.`;
+    try{const r=await fetch('/api/claude',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+SESSION.access_token},body:JSON.stringify({prompt,maxTokens:12000})});const j=await r.json();
+      const m=(j.text||'').match(/\{[\s\S]*\}/);if(m){const o=JSON.parse(m[0]);if(o&&Array.isArray(o.weeks)&&o.weeks.length)out={name:o.name||phase,goal:o.goal||phase,plan:{weeks:o.weeks.map(x=>({days:(x.days||[]).map(d=>({dow:+d.dow||1,title:d.title||'Session',kind:KIND.some(k=>k[0]===d.kind)?d.kind:'strength',min:+d.min||45,rpe:+d.rpe||6,
+        items:(d.items||[]).map(i=>{const ok=i.ex&&exById(i.ex);return {ex:ok?i.ex:null,name:ok?null:(i.name||(i.ex&&String(i.ex))||'Exercise'),category:ok?null:(SC_CATS.some(c=>c[0]===i.category)?i.category:'strength'),sets:i.sets??'',reps:i.reps??'',load:i.load??'',rest:i.rest??'',note:i.note??''}})}))}))}}}}
+    catch(e){}}
+  if(!out){out=fallbackDraft(n,w,phase);if(!isDemo())toast('Koach couldn\'t be reached, so here\'s a starter template from your library',4500)}
+  S.koachBusy=false;S.koachForm=false;S.draft=Object.assign({id:null},out);S.draftFromKoach=true;S.wk=0;S.progEdit='new';render()}
+async function saveProgramme(){const d=S.draft;d.name=($('#pName')||{}).value||d.name;d.goal=($('#pGoal')||{}).value||'';
+  // add any new exercises Koach suggested to the library first
+  for(const w of d.plan.weeks)for(const day of w.days)for(const it of day.items){if(it.ex||!it.name)continue;
+    let ex=SC.ex.find(e=>e.name.toLowerCase()===it.name.toLowerCase());
+    if(!ex){const row={team_id:TEAM.team_id,name:it.name.slice(0,80),category:it.category||'strength'};
+      if(isDemo())ex=Object.assign({id:uid(),video_path:null},row);else{const {data,error}=await sb.from('sc_exercises').insert(row).select().single();if(error){toast(error.message,4000);return}ex=data}SC.ex.push(ex)}
+    it.ex=ex.id;delete it.name;delete it.category}
+  d.plan.weeks.forEach(w=>w.days.forEach(day=>{day.items=day.items.filter(i=>i.ex);day.min=+day.min||null;day.rpe=+day.rpe||null}));
+  const row={name:d.name.slice(0,100),goal:d.goal,plan:d.plan,updated_at:new Date().toISOString()};
+  if(isDemo()){if(d.id){Object.assign(SC.progs.find(p=>p.id===d.id),row)}else{d.id=uid();SC.progs.unshift(Object.assign({id:d.id,team_id:DEMO_ID},row))}}
+  else if(d.id){const {error}=await sb.from('sc_programmes').update(row).eq('id',d.id);if(error){toast(error.message,4000);return}Object.assign(SC.progs.find(p=>p.id===d.id)||{},row)}
+  else{const {data,error}=await sb.from('sc_programmes').insert(Object.assign({team_id:TEAM.team_id},row)).select().single();if(error){toast(error.message,4000);return}d.id=data.id;SC.progs.unshift(data)}
+  S.draftFromKoach=false;S.progEdit=d.id;toast('Programme saved');render()}
+function draftDay(el){const di=+el.closest('[data-di]').dataset.di;return S.draft.plan.weeks[Math.min(S.wk||0,S.draft.plan.weeks.length-1)].days[di]}
+document.addEventListener('input',e=>{const t=e.target;if(!S.draft)return;
+  if(t.id==='pName')S.draft.name=t.value;else if(t.id==='pGoal')S.draft.goal=t.value;
+  else if(t.dataset.f){const di=t.closest('.pitem');const day=draftDay(di);day.items[+di.dataset.ii][t.dataset.f]=t.value}
+  else if(t.dataset.d){draftDay(t)[t.dataset.d]=t.dataset.d==='dow'?+t.value:t.value}});
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='libQ'){S.libQ=t.value;render();return}
+  if(t.dataset.assignload){if(await setLoad(t.dataset.assignload,+t.value))toast('Load set to '+t.value+'%');return}});
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-koach]')){if(await setLoad(x.dataset.koach,+x.dataset.pct)){toast('Load set to '+x.dataset.pct+'%');render()}return}
+  if(c('[data-koachall]')){let n=0;for(const a of SC.assigns){const p=SQUAD.find(y=>y.id===a.player_id);if(!p||!p.share)continue;const [pct]=koachLoad(p,S.k);if(pct!==a.load_pct&&await setLoad(a.id,pct))n++}toast(`Updated ${n} players`);render();return}
+  if(x=c('[data-koachdraft]')){S.koachForm=x.dataset.koachdraft==='1';render();return}
+  if(c('[data-prognew]')){S.draft=blankProg();S.draftFromKoach=false;S.wk=0;S.progEdit='new';render();return}
+  if(x=c('[data-progopen]')){const p=SC.progs.find(y=>y.id===x.dataset.progopen);S.draft=JSON.parse(JSON.stringify({id:p.id,name:p.name,goal:p.goal,plan:p.plan&&p.plan.weeks?p.plan:{weeks:[{days:[]}]}}));S.draftFromKoach=false;S.wk=0;S.progEdit=p.id;render();return}
+  if(c('[data-progclose]')){S.progEdit=null;S.draft=null;render();return}
+  if(c('[data-progsave]')){await saveProgramme();return}
+  if(x=c('[data-progdel]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Players on it lose it too. Sure?';return}
+    if(!isDemo()){const {error}=await sb.from('sc_programmes').delete().eq('id',S.draft.id);if(error){toast(error.message);return}}SC.progs=SC.progs.filter(p=>p.id!==S.draft.id);SC.assigns=SC.assigns.filter(a=>a.programme_id!==S.draft.id);S.progEdit=null;S.draft=null;toast('Deleted');render();return}
+  if(x=c('[data-wk]')){S.wk=+x.dataset.wk;render();return}
+  if(x=c('[data-wkadd]')){const W=S.draft.plan.weeks;W.push(x.dataset.wkadd==='copy'?JSON.parse(JSON.stringify(W[Math.min(S.wk||0,W.length-1)])):{days:[]});S.wk=W.length-1;render();return}
+  if(x=c('[data-wkdel]')){S.draft.plan.weeks.splice(+x.dataset.wkdel,1);S.wk=0;render();return}
+  if(c('[data-dayadd]')){const W=S.draft.plan.weeks;W[Math.min(S.wk||0,W.length-1)].days.push({dow:2,title:'New session',kind:'strength',min:45,rpe:6,items:[]});render();return}
+  if(x=c('[data-daydel]')){const W=S.draft.plan.weeks;W[Math.min(S.wk||0,W.length-1)].days.splice(+x.dataset.daydel,1);render();return}
+  if(x=c('[data-itemadd]')){draftDay(x.closest('.pday')).items.push({ex:'',sets:3,reps:'',load:'',rest:'',note:''});render();return}
+  if(x=c('[data-itemdel]')){const it=x.closest('.pitem');draftDay(it).items.splice(+it.dataset.ii,1);render();return}
+  if(x=c('[data-pickall]')){document.querySelectorAll('[data-pick]').forEach(b=>b.checked=x.dataset.pickall==='1');return}
+  if(c('[data-assign]')){const ids=[...document.querySelectorAll('[data-pick]:checked')].map(b=>b.dataset.pick);if(!ids.length){toast('Tick the players first');return}
+    const start=$('#asStart').value||mondayAfter(todayK()),load=+$('#asLoad').value||100;const rows=ids.map(pid=>({team_id:TEAM.team_id,programme_id:S.draft.id,player_id:pid,start_day:start,load_pct:load}));
+    if(isDemo())rows.forEach(r=>SC.assigns.push(Object.assign({id:uid(),active:true},r)));else{const {data,error}=await sb.from('sc_assignments').insert(rows).select();if(error){toast(error.message,4000);return}SC.assigns.push(...data)}
+    toast(`${ids.length} player${ids.length>1?'s':''} added. They'll see it in Keel from ${fmtK(start,{weekday:'long',day:'numeric',month:'short'})}`,4500);render();return}
+  if(x=c('[data-unassign]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Sure?';return}
+    if(!isDemo()){const {error}=await sb.from('sc_assignments').update({active:false}).eq('id',x.dataset.unassign);if(error){toast(error.message);return}}SC.assigns=SC.assigns.filter(a=>a.id!==x.dataset.unassign);render();return}
+  if(x=c('[data-exnew]')){S.exEdit=x.dataset.exnew==='1'?{}:null;render();return}
+  if(x=c('[data-exedit]')){S.exEdit=Object.assign({},exById(x.dataset.exedit));render();scrollTo(0,0);return}
+  if(x=c('[data-exdel]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Sure?';return}const ex=exById(x.dataset.exdel);
+    if(!isDemo()){const {error}=await sb.from('sc_exercises').delete().eq('id',ex.id);if(error){toast(error.message);return}if(ex.video_path)await sb.storage.from('keel-videos').remove([ex.video_path])}
+    SC.ex=SC.ex.filter(y=>y.id!==ex.id);S.exEdit=null;toast('Deleted');render();return}
+  if(x=c('[data-play]')){const ex=exById(x.dataset.play);const u=await videoUrl(ex.video_path);if(!u){toast('Could not load the video');return}
+    const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="mbox"><header style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><h2 style="flex:1">${esc(ex.name)}</h2><button class="btn ghost sm" data-modalclose="1">Close</button></header><video src="${esc(u)}" controls autoplay playsinline style="width:100%;border-radius:12px;background:#000;max-height:70vh"></video>${ex.cues?`<p class="small" style="margin-top:10px">${esc(ex.cues)}</p>`:''}</div>`;document.body.appendChild(m);return}
+  if(c('[data-modalclose]')||(e.target.classList&&e.target.classList.contains('modal'))){document.querySelectorAll('.modal').forEach(m=>m.remove());return}
+});
+document.addEventListener('submit',async e=>{const f=e.target;
+  if(f.id==='koachForm'){e.preventDefault();await koachDraft();return}
+  if(f.id==='exForm'){e.preventDefault();const id=f.dataset.id;const row={name:$('#exName').value.trim().slice(0,80),category:$('#exCat').value,equipment:$('#exEq').value.trim()||null,cues:$('#exCues').value.trim()||null};if(!row.name)return;
+    const file=$('#exVid').files[0];const old=id?exById(id):null;
+    if(file){if(file.size>52428800){toast('That video is over 50 MB. Trim it or export it smaller.',5000);return}
+      const path=`${TEAM.team_id}/${uid()}.${(file.name.split('.').pop()||'mp4').toLowerCase()}`;
+      if(isDemo()){SC.urls[path]=URL.createObjectURL(file)}else{S.exBusy='Uploading video…';render();const {error}=await sb.storage.from('keel-videos').upload(path,file,{contentType:file.type||'video/mp4'});if(error){S.exBusy=null;toast('Upload failed: '+error.message,5000);render();return}
+        if(old&&old.video_path)sb.storage.from('keel-videos').remove([old.video_path])}
+      row.video_path=path}
+    S.exBusy='Saving…';render();
+    if(isDemo()){if(old)Object.assign(old,row);else SC.ex.push(Object.assign({id:uid(),team_id:DEMO_ID,video_path:null},row))}
+    else if(old){const {error}=await sb.from('sc_exercises').update(row).eq('id',id);if(error){S.exBusy=null;toast(error.message,4000);render();return}Object.assign(old,row)}
+    else{const {data,error}=await sb.from('sc_exercises').insert(Object.assign({team_id:TEAM.team_id},row)).select().single();if(error){S.exBusy=null;toast(error.message,4000);render();return}SC.ex.push(data)}
+    SC.ex.sort((a,b)=>a.name.localeCompare(b.name));S.exBusy=null;S.exEdit=null;toast('Exercise saved');render();return}});
+
 // ================= start =================
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
-  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();render();return}
+  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());render();return}
     $('#root').innerHTML='<div class="gate"><div class="gcard"><h1>Not set up yet</h1><p class="muted">The dashboard can\'t reach the database settings.</p></div></div>';return}
   const {data:{session}}=await sb.auth.getSession();SESSION=session;if(!session){render();return}
   await joinPending();
