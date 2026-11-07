@@ -60,6 +60,10 @@ textarea.in{resize:vertical;min-height:60px;font:inherit}
 .pday>header{gap:8px;align-items:center}.pday>header .in{padding:8px 10px}
 .nmeal{display:grid;grid-template-columns:110px 70px minmax(160px,1.3fr) minmax(200px,2fr) repeat(4,70px) auto;gap:6px;align-items:center}
 .nmeal .in{padding:8px 10px;font-size:14px}
+.rhsteps{display:flex;gap:4px}.rhstep{flex:1;height:8px;border-radius:99px;background:var(--line-2)}.rhstep.done{background:var(--good)}.rhstep.now{background:var(--caution)}
+.rhcal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.rhcal span{aspect-ratio:1;border-radius:8px;display:grid;place-items:center;background:var(--none);font:500 12px var(--f-mono);color:var(--faint)}
+.rhcal span.d{background:color-mix(in srgb,var(--good) 70%,var(--surface));color:var(--on-text)}.rhcal span.m{background:color-mix(in srgb,var(--alert) 60%,var(--surface));color:var(--on-text)}
+.rhitem{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(150px,1.3fr) 60px minmax(90px,1fr) minmax(110px,1fr) minmax(110px,1.2fr) auto;gap:6px;align-items:center}.rhitem .in{padding:8px 10px;font-size:14px}
 .pickgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px}
 .pick{display:flex;gap:10px;align-items:center;padding:8px 10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;cursor:pointer}
 .pick span{display:flex;flex-direction:column;font-size:14px;color:var(--text)}.pick small{font-size:12px;color:var(--muted)}
@@ -257,6 +261,7 @@ table.list{width:100%;border-collapse:collapse;font-size:14px}
   .phead2{display:none}
   .nmeal{grid-template-columns:1fr 1fr 1fr 1fr;padding:10px;border:1px solid var(--line);border-radius:12px}
   .nmeal [data-nm=name],.nmeal .nitems{grid-column:1/-1}
+  .rhitem{grid-template-columns:1fr 1fr 1fr;padding:10px;border:1px solid var(--line);border-radius:12px}.rhitem>:nth-child(1),.rhitem>:nth-child(2){grid-column:1/-1}
 }
 @media (max-width:680px){
   h1{font-size:22px}
@@ -282,6 +287,6 @@ table.list{width:100%;border-collapse:collapse;font-size:14px}
 <body>
 <div id="root"><div class="spin"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/coach/coach.js?v=c4"></script>
+<script src="/coach/coach.js?v=c5"></script>
 </body>
 </html>

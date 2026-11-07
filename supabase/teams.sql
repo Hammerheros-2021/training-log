@@ -1,5 +1,6 @@
 -- Keel teams and the staff dashboard (/coach/).
 -- Run in Supabase: SQL Editor > New query > paste all of this > Run. Safe to run again, and it never deletes data.
+-- Version 3 (7 November 2026): recovery sessions, mobility and heat/cold shared for the Recovery page.
 -- Version 2 (7 November 2026): staff roles (manager, S&C, physio, nutritionist, mindset), food sharing opt-in,
 -- staff notes and restrictions, and staff sign-up with the staff code.
 --
@@ -8,6 +9,7 @@
 --   a player code and a staff code (for the rest of the backroom team).
 -- - A player joins in the app (Profile > Your team) with the player code, after a screen that lists exactly
 --   what the staff will and won't see. They can pause sharing, turn food sharing on or off, or leave at any time.
+-- - Recovery sessions, mobility follow-alongs and heat/cold (type and minutes only) are shared for the Recovery page.
 -- - Staff never read the entries table directly. They go through keel_team_data(), which only returns players
 --   who joined that team and have sharing on, and only the fields listed there.
 -- - Food is only sent if the player also turned on "Share food totals", and only as daily totals.
@@ -265,7 +267,13 @@ language sql stable security definer set search_path = public as $$
                      then jsonb_build_object('on', true, 'sev', e.data->'sick'->'sev') end,
         'sfb', case when e.data ? 'sfb' then jsonb_build_object('feel', e.data->'sfb'->'feel', 'energy', e.data->'sfb'->'energy',
                      'effort', e.data->'sfb'->'effort', 'trend', e.data->'sfb'->'trend') end,
-        'food', case when m.share_food then keel_food_totals(e.data) end))
+        'food', case when m.share_food then keel_food_totals(e.data) end,
+        'recovery', (select jsonb_agg(jsonb_build_object('kind', x->'kind', 'min', x->'min'))
+                     from jsonb_array_elements(case when jsonb_typeof(e.data->'recovery') = 'array' then e.data->'recovery' else '[]'::jsonb end) x),
+        'mobility', (select jsonb_agg(jsonb_build_object('name', x->'name', 'min', x->'min'))
+                     from jsonb_array_elements(case when jsonb_typeof(e.data->'mobility') = 'array' then e.data->'mobility' else '[]'::jsonb end) x),
+        'hc', (select jsonb_agg(jsonb_build_object('type', x->'type', 'min', x->'min'))
+               from jsonb_array_elements(case when jsonb_typeof(e.data->'hc') = 'array' then e.data->'hc' else '[]'::jsonb end) x)))
       else jsonb_strip_nulls(jsonb_build_object(
         'date', e.data->'date', 'type', e.data->'type', 'status', e.data->'status', 'dur', e.data->'dur', 'rpe', e.data->'rpe'))
     end

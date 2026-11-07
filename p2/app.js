@@ -4490,7 +4490,7 @@ document.addEventListener('click',async e=>{
 // Joining uses the team's player code. Before anything is shared, the person sees exactly what the coach
 // will and won't see. Sharing can be paused or the team left at any time. See supabase/teams.sql.
 const TEAM={list:null,busy:false,err:'',ask:null,loading:false};
-const TEAM_SEES=['Your balance each day and how it is trending','Sleep times and sleep quality','The check-in sliders: energy, mood, stress and how your body feels','Niggles: where, which side and how sore (not your notes)','Sessions: type, minutes, effort, done or missed, and how they felt','That you\'re unwell and how badly (not what it is)','Morning pulse and HRV if you log them','Your name, age, sport and goal from sign-up'];
+const TEAM_SEES=['Your balance each day and how it is trending','Sleep times and sleep quality','The check-in sliders: energy, mood, stress and how your body feels','Niggles: where, which side and how sore (not your notes)','Sessions: type, minutes, effort, done or missed, and how they felt','That you\'re unwell and how badly (not what it is)','Morning pulse and HRV if you log them','Recovery: sessions, mobility, sauna and cold water (type and minutes)','Your name, age, sport and goal from sign-up'];
 const TEAM_NEVER=['Food, unless you turn on food sharing below (and then only daily totals)','Drinks with alcohol, notes and photos','Cycle tracking','Your weight, Koach\'s chats and overview'];
 async function teamLoad(){if(!sb||TEAM.loading)return;TEAM.loading=true;try{const {data,error}=await sb.rpc('keel_my_teams');if(error)throw error;TEAM.list=data||[];TEAM.err=''}catch(e){TEAM.list=[];TEAM.err=/keel_my_teams|function|schema/i.test(String(e&&e.message))?'Teams are not switched on for this app yet.':''}TEAM.loading=false;render()}
 function teamPanel(){
@@ -4596,6 +4596,41 @@ function mynCard(){if(sampleMode)return '';if(MYN.d==null){setTimeout(mynLoad,0)
   return `<section class="panel" id="mynCard"><h3>From your team · Nutrition</h3>${tl}${notes.map(n=>`<div class="ds" style="font-style:italic">“${esc(n)}”</div>`).join('')}${days}</section>`}
 const _mynFood=viewFood;viewFood=function(){const h=_mynFood();return mynCard()+h};
 const _mynDash=viewDashboard;viewDashboard=function(){if(MYN.d==null&&!sampleMode)setTimeout(mynLoad,0);return _mynDash()};
+// ================= P2: rehab plan from your team's physio (see supabase/rehab.sql) =================
+const MYR={list:null,loading:false};
+async function myrLoad(){if(!sb||!UID||MYR.loading||sampleMode)return;MYR.loading=true;try{const {data,error}=await sb.rpc('keel_my_rehab');MYR.list=error?[]:(data||[])}catch(e){MYR.list=[]}MYR.loading=false;render()}
+function myrCard(){if(sampleMode)return '';if(MYR.list==null){setTimeout(myrLoad,0);return ''}if(!MYR.list.length)return '';const k=iso(todayDate());
+  return MYR.list.map(r=>{const st=(r.stages||[])[r.stage]||{};const n=(r.stages||[]).length;const lg=(r.logs||[]).find(l=>l.day===k);const ex=id=>(r.exercises||[]).find(e=>e.id===id);
+    return `<section class="panel" id="myrCard"><h3>From your team · Rehab</h3><div class="ds">${esc(r.area)}${r.side?' ('+esc(String(r.side).toLowerCase())+')':''}${r.by?' · '+esc(r.by):''}${r.target_day?' · aiming to be back '+esc(fmtD(parse(r.target_day),{weekday:'short',day:'numeric',month:'short'})):''}</div>
+     <div style="display:flex;gap:4px">${(r.stages||[]).map((s,i)=>`<span style="flex:1;height:7px;border-radius:99px;background:${i<r.stage?'var(--ok)':i===r.stage?'var(--warn)':'var(--line,#323646)'}"></span>`).join('')}</div>
+     <div class="cmp" style="gap:8px"><b style="font-size:17px">Stage ${r.stage+1} of ${n}: ${esc(st.name||'')}</b>${st.goal?`<div class="ds">${esc(st.goal)}</div>`:''}${st.criteria?`<div class="ds"><b>To move on:</b> ${esc(st.criteria)}</div>`:''}
+      ${r.pain_rule?`<div class="ds" style="color:var(--warn)">${esc(r.pain_rule)}</div>`:''}${r.note?`<div class="ds" style="font-style:italic">“${esc(r.note)}”</div>`:''}
+      <div style="display:flex;flex-direction:column;gap:6px">${(st.items||[]).map(it=>{const e=it.ex&&ex(it.ex);return `<div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line,#262935);border-radius:10px">
+        ${e&&e.video?`<button type="button" class="ghost" data-myrvid="${esc(e.id)}" data-myrr="${esc(r.id)}" aria-label="Watch ${esc(e.name)}" style="flex:none;width:38px;height:38px;border-radius:50%;padding:0;color:var(--fg)">▶</button>`:''}
+        <div style="flex:1;min-width:0"><b style="font-size:15px">${esc(e?e.name:it.name)}</b><div class="ds">${esc([it.sets&&it.reps?it.sets+' × '+it.reps:it.reps,it.freq].filter(Boolean).join(' · '))}</div>${it.note?`<div class="ds" style="font-style:italic">${esc(it.note)}</div>`:e&&e.cues?`<div class="ds">${esc(e.cues)}</div>`:''}</div></div>`}).join('')}</div>
+      ${lg?`<div class="ds">Today: ${lg.done?'done':'missed'}${lg.pain!=null?', pain '+lg.pain+'/10':''}. <button type="button" class="linkbtn" data-myrlog="${esc(r.id)}">Change</button></div>`:`<button type="button" class="primary" data-myrlog="${esc(r.id)}">Log today's rehab</button>`}</div></section>`}).join('')}
+async function myrVideo(rid,eid){const r=(MYR.list||[]).find(x=>x.id===rid);const e=r&&(r.exercises||[]).find(x=>x.id===eid);if(!e||!e.video)return;
+  let u=MYP.urls[e.video];if(!u){const {data,error}=await sb.storage.from('keel-videos').createSignedUrl(e.video,3600);if(error){toast('Could not load the video');return}u=MYP.urls[e.video]=data.signedUrl}
+  openSheet(`<div class="vh"><b>${esc(e.name)}</b><span>${esc(e.equipment||'')}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div><video src="${esc(u)}" controls autoplay playsinline muted loop style="width:100%;border-radius:12px;background:#000;max-height:60vh"></video>${e.cues?`<div class="ds">${esc(e.cues)}</div>`:''}`)}
+function myrSheet(rid){const r=(MYR.list||[]).find(x=>x.id===rid);if(!r)return;const k=iso(todayDate());const lg=(r.logs||[]).find(l=>l.day===k)||{};
+  openSheet(`<div class="vh"><b>Today's rehab</b><span>${esc(r.area)}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
+   <div class="seg" role="group"><button type="button" data-myrdone="1" aria-pressed="${lg.done!==false}">Done</button><button type="button" data-myrdone="0" aria-pressed="${lg.done===false}">Didn't get to it</button></div>
+   <div class="field"><label class="label" for="myrPain">Pain during it (0 none, 10 worst)</label><select id="myrPain">${[0,1,2,3,4,5,6,7,8,9,10].map(v=>`<option ${v===(lg.pain!=null?lg.pain:2)?'selected':''}>${v}</option>`).join('')}</select></div>
+   <div class="field"><label class="label" for="myrNote">Note for the physio (optional)</label><input id="myrNote" type="text" maxlength="300" placeholder="e.g. Tight on the last set, fine after"></div>
+   <button type="button" class="primary" data-myrsave="${esc(rid)}">Save</button>`)}
+async function myrSave(rid){const r=(MYR.list||[]).find(x=>x.id===rid);const k=iso(todayDate());const done=!document.querySelector('[data-myrdone="0"][aria-pressed="true"]');const pain=+($('#myrPain')||{}).value;
+  const row={plan_id:rid,team_id:r.team_id,player_id:UID,day:k,stage:r.stage,done,pain:isNaN(pain)?null:pain,note:(($('#myrNote')||{}).value||'').trim()||null};
+  const {error}=await sb.from('rehab_logs').upsert(row,{onConflict:'plan_id,day'});if(error){toast('Could not save. Try again.',3500);return}
+  r.logs=(r.logs||[]).filter(l=>l.day!==k);r.logs.unshift({day:k,stage:r.stage,done,pain:row.pain});closeSheet();
+  toast(pain>3&&done?'Saved. That\'s above 3/10, so let your physio know how it felt.':'Saved. Your physio can see it.',4000);render()}
+const _myrDash=viewDashboard;viewDashboard=function(){return myrCard()+_myrDash()};
+const _myrRec=viewRecover;viewRecover=function(){return myrCard()+_myrRec()};
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-myrvid]')){await myrVideo(x.dataset.myrr,x.dataset.myrvid);return}
+  if(x=c('[data-myrlog]')){myrSheet(x.dataset.myrlog);return}
+  if(x=c('[data-myrdone]')){document.querySelectorAll('[data-myrdone]').forEach(b=>b.setAttribute('aria-pressed',b===x?'true':'false'));return}
+  if(x=c('[data-myrsave]')){x.disabled=true;await myrSave(x.dataset.myrsave);return}
+});
 const P2REC=/type=recovery/.test(location.hash+location.search);
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}

@@ -109,9 +109,9 @@ function dayInfo(p,k){
   const d=p.D[k];const ci=checkedIn(d);const s=ci?p.E.bal(k):null;
   const nig=latest(p,k,3,x=>x.niggles&&x.niggles.length);const sick=latest(p,k,2,x=>(x.sick&&x.sick.on)||has(x,'Sick / run down'));
   const pain=nig?maxPain(nig.d):0;const sev=sick?(sick.d.sick&&sick.d.sick.sev)||'mild':null;
-  const rs=activeRestr(p,k);let av='avail';if(pain>=5||sev==='bad')av='out';else if(pain>=3||sick||rs.length||(s!=null&&s<55))av='mod';
+  const rs=activeRestr(p,k);const rh=typeof rehabOf==='function'?rehabOf(p.id):null;let av='avail';if(pain>=5||sev==='bad'||(rh&&rh.stage<Math.max(1,rh.stages.length-2)))av='out';else if(pain>=3||sick||rs.length||rh||(s!=null&&s<55))av='mod';
   const st=s==null?'none':s>=75?'good':s>=55?'caution':'alert';
-  return {d,ci,s,st,pain,nig,sick:sick?{k:sick.k,sev}:null,av,rs,sleep:ci?sleepHours(d):null}})());
+  return {d,ci,s,st,pain,nig,sick:sick?{k:sick.k,sev}:null,av,rs,rh,sleep:ci?sleepHours(d):null}})());
 }
 const ST={good:['var(--good)','Ready'],caution:['var(--caution)','Cap the effort'],alert:['var(--alert)','Back off'],none:['var(--faint)','No check-in']};
 const AV={avail:['var(--good)','Available','check'],mod:['var(--caution)','Modify','niggle'],out:['var(--alert)','Unavailable','sick']};
@@ -205,7 +205,7 @@ function buildDemo(){
       if(ix===4&&i<=2){st=5;m=2;sl-=.6}
       if(ix===12&&i<=6){e-=.8}
       if(ix===18&&i===0)sl=5.6;
-      const skip=(ix===19&&i<=3)||(ix===23&&i===0)||(ix===10&&i===0)||R()>ci;
+      const skip0=R()>ci;const skip=(ix===19&&i<=3)||(ix===23&&i===0)||(ix===10&&i===0)||(skip0&&!(i<=1&&[2,4,6,8,12,14,16,18].includes(ix)));
       const extras=[];
       if(dow===1||dow===3)extras.push({kind:'Club training',dur:ri(70,85),rpe:ri(6,8)});
       if(dow===5&&i>0)extras.push({kind:'Club training',dur:ri(50,60),rpe:ri(4,5)});
@@ -218,6 +218,9 @@ function buildDemo(){
         if(nig)d.niggles=[nig];if(sick)d.sick={on:true,sev};if(R()<.25&&ix%2===0)d.rhr=ri(50,58)+(sick?7:0)}
       if(!skip&&p.food&&R()<flog){const tr=extras.length||(i>0&&((gym&&dow===0)||(run&&dow===2)));const pool=['oats','spinach','broccoli','carrot','onion','garlic','tomato','pepper','apple','banana','blueberries','lentils','chickpeas','potato','sweet potato','kale','rice','peas','beans','mushroom','avocado','walnuts','almonds','cabbage','leek','orange','berries','quinoa','pumpkin seeds','beetroot'];const np=ix===5?ri(2,4):ri(3,9),pl=[];for(let j=0;j<np;j++)pl.push(pool[Math.floor(R()*pool.length)]);
         d.food={n:ri(3,7),kcal:Math.round(kc+(tr&&ix!==9?rnd(250,600):0)+rnd(-300,300)),protein:Math.round(pro+rnd(-25,20)),carbs:Math.round(rnd(180,340)+(tr?60:0)),fat:Math.round(rnd(70,120)),fibre:Math.round(rnd(14,40)),iron:r1(rnd(7,16)),calcium:Math.round(rnd(550,1300)),vitD:r1(rnd(2,16)),omega3:Math.round(rnd(.1,2.4)*100)/100,plants:[...new Set(pl)],water:r1(rnd(1.2,3.2))}}
+      if(!skip&&ix%7!==3&&R()<(ix%3===0?.45:.2)){const kinds=['Foam roll','Stretching','Walk','Massage gun','Yoga'];d.recovery=[{kind:kinds[Math.floor(R()*kinds.length)],min:ri(10,30)}]}
+      if(!skip&&dow===0&&R()<.4)d.hc=[{type:R()<.5?'Cold plunge or ice bath':'Sea or lake swim',min:ri(3,10)}];
+      if(!skip&&R()<.12)d.mobility=[{name:'Hips and hamstrings',min:ri(8,15)}];
       if(extras.length)d.extras=extras;if(farm&&dow<5){d.farm=ri(1,3);d.farmHrs=ri(3,7)}
       if(i>0&&((gym&&dow===0)||(run&&dow===2))){const miss=R()<.12;L[k]={date:k,type:gym&&dow===0?'S':'E',status:miss?'missed':'done',dur:gym&&dow===0?ri(45,60):ri(30,45),rpe:gym&&dow===0?ri(6,8):ri(3,5)}}
       if(i>0&&(extras.length||L[k])&&!skip&&R()<.75){let f=cl(Math.round(2.3+(d.energy||3)*.45+rnd(-.8,.8)),1,5);if(ix===12&&i<=6)f=ri(1,2);d.sfb={feel:f,energy:f>=4?'full':f<=2?'low':'steady',effort:f<=2?'harder':'right',trend:'unsure'}}
@@ -233,20 +236,20 @@ function buildDemo(){
 async function loadTeams(){const {data,error}=await sb.rpc('keel_my_teams');if(error){ERR=/keel_my_teams|function|schema/i.test(error.message||'')?'setup':error.message;return []}
   ERR='';const all=data||[];if(all.length&&!('staff' in all[0]))ERR='upgrade';return all.filter(t=>t.role==='coach')}
 async function loadSquad(t){
-  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();await loadSC(t);await loadNut(t);return}
+  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();await loadSC(t);await loadNut(t);await loadRehab(t);SQUAD.forEach(p=>p._di={});return}
   const from=addK(todayK(),-80),to=todayK();
   const {data:sq,error:e1}=await sb.rpc('keel_team_squad',{t:t.team_id});if(e1)throw e1;
   const rows=[];for(let off=0;off<50000;off+=1000){const {data,error}=await sb.rpc('keel_team_data',{t:t.team_id,from_day:from,to_day:to}).range(off,off+999);if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break}
   const by={};(sq||[]).forEach(m=>{by[m.user_id]=mkPlayer({id:m.user_id,name:m.display_name||(m.about&&m.about.name)||'Player',pos:m.pos||'',role:m.role,staff:m.staff,share:m.share,food:!!m.share_food,joined:m.joined_at,about:m.about||{}})});
   rows.forEach(r=>{const p=by[r.user_id];if(!p)return;(r.kind==='day'?p.D:p.L)[r.key]=Object.assign({date:r.key},r.data)});
   SQUAD=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name));
-  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes();await loadSC(t);await loadNut(t)}
+  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes();await loadSC(t);await loadNut(t);await loadRehab(t);SQUAD.forEach(p=>p._di={})}
 function attachNotes(){SQUAD.forEach(p=>{p.notes=NOTES.filter(n=>n.player_id===p.id);p._di={}})}
 async function selectTeam(id){TEAM=TEAMS.find(t=>t.team_id===id)||TEAMS[0];try{localStorage.setItem('keelCoachTeam',TEAM.team_id)}catch(e){}LOADING=true;render();
   try{await loadSquad(TEAM)}catch(e){toast('Could not load the squad: '+(e.message||e),5000);SQUAD=[];NOTES=[]}LOADING=false;render()}
 
 // ================= views =================
-const VIEWS=[['today','Overview','today','Squad'],['sc','S&C','load','Backroom'],['physio','Physio','avail','Backroom'],['nutrition','Nutrition','food','Backroom'],['mindset','Mindset','mind','Backroom'],['trends','Squad trends','trends','Tools'],['setup','Team','setup','Tools']];
+const VIEWS=[['today','Overview','today','Squad'],['sc','S&C','load','Backroom'],['physio','Physio','avail','Backroom'],['nutrition','Nutrition','food','Backroom'],['mindset','Mindset','mind','Backroom'],['recovery','Recovery','moon','Backroom'],['trends','Squad trends','trends','Tools'],['setup','Team','setup','Tools']];
 function route(){const h=location.hash.slice(1).split('/');const v=h[0];return {v:VIEWS.some(x=>x[0]===v)||v==='player'?v:(v?'today':homeView()),id:decodeURIComponent(h[1]||'')}}
 const isDemo=()=>TEAM&&TEAM.team_id===DEMO_ID;
 function shell(body,title){const rt=route();const cur=rt.v==='player'?'':rt.v;const mine=homeView();
@@ -361,7 +364,7 @@ function viewWellness(){const ps=sharing();if(!ps.length)return needTeam();const
    <section class="card"><header><div><h2>Check-ins each day</h2><p>How many players filled in the morning check-in. The dashboard is only as good as this number.</p></div></header>${barChart(keys.map(kk=>({k:kk,y:ps.filter(p=>checkedIn(p.D[kk])).length})),{max:ps.length,w:1100,h:190,ref:ps.length,refLabel:`Squad of ${ps.length}`,tip:p=>`${p.y} of ${ps.length} checked in`,label:'Check-ins'})}</section>`}
 
 function viewAvail(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;const inf=ps.map(p=>({p,i:dayInfo(p,k)}));
-  const why=i=>i.rs&&i.rs.length&&i.av!=='out'?'Restriction: '+i.rs[0].body:i.sick?`Unwell${i.sick.sev?' · '+i.sick.sev:''}`:i.pain>=3?`${i.nig.d.niggles[0].area} ${i.pain}/10`:i.s!=null&&i.s<55?`Balance ${i.s}`:i.ci?`Balance ${i.s??'–'}`:'No check-in';
+  const why=i=>i.rh?`Rehab: ${i.rh.area}, stage ${i.rh.stage+1} of ${i.rh.stages.length}`:i.rs&&i.rs.length&&i.av!=='out'?'Restriction: '+i.rs[0].body:i.sick?`Unwell${i.sick.sev?' · '+i.sick.sev:''}`:i.pain>=3?`${i.nig.d.niggles[0].area} ${i.pain}/10`:i.s!=null&&i.s<55?`Balance ${i.s}`:i.ci?`Balance ${i.s??'–'}`:'No check-in';
   const col=key=>{const [c,l,ic]=AV[key];const xs=inf.filter(x=>x.i.av===key).sort((a,b)=>a.p.name.localeCompare(b.p.name));
     return `<div class="avcol" style="border-top:3px solid ${c}"><h3><span style="color:${c};display:flex">${ico(ic,'width:17px;height:17px')}</span>${l}<span class="num">${xs.length}</span></h3>${xs.length?xs.map(({p,i})=>`<button class="avp" data-player="${esc(p.id)}"><b>${esc(p.name)}</b><small>${esc(why(i))}</small></button>`).join(''):'<div class="small muted">Nobody</div>'}</div>`};
   const areas={};ps.forEach(p=>{for(let i=0;i<28;i++){const kk=addK(k,-i),d=p.D[kk];(d&&d.niggles||[]).forEach(n=>{if(!n.area)return;const a=areas[n.area]||(areas[n.area]={who:{},days:0,max:0});a.days++;a.max=Math.max(a.max,+n.pain||0);const w=a.who[p.id]||(a.who[p.id]={p,max:0,last:kk});w.max=Math.max(w.max,+n.pain||0)})}});
@@ -392,6 +395,7 @@ const trendArrow=(now,before,goodUp)=>{if(now==null||before==null)return '<span 
 
 // ---------- S&C ----------
 function sessionCall(p,k){const i=dayInfo(p,k),a=p.E.acwr(k),rs=activeRestr(p,k);
+  if(i.rh)return ['hold',`Rehab: stage ${i.rh.stage+1} of ${i.rh.stages.length}`];
   if(i.av==='out')return ['hold','Unavailable'];
   if(rs.length)return ['hold','Restriction: '+rs[0].body];
   if(i.pain>=3)return ['hold',`${i.nig.d.niggles[0].area} ${i.pain}/10`];
@@ -528,7 +532,7 @@ function viewPlayer(id){const p=SQUAD.find(x=>x.id===id);if(!p)return `<div clas
       <section class="card"><header><div><h2>Protein</h2><p>Grams a day</p></div></header>${barChart(fk.map(x=>({k:x.k,y:x.f?x.f.protein:0})),{tip:q=>q.y?`${Math.round(q.y)} g`:'Not logged',label:'Protein'})}</section></div>`}
   const body={overview:(fl.length?`<section class="card"><header><div><h2>Worth knowing</h2></div></header><div class="flags">${fl.map(f=>`<div class="flag"><span class="ic" style="background:color-mix(in srgb,${f.col} 15%,transparent);color:${f.col}">${ico(f.ic)}</span><span class="who"><b>${esc(f.t)}</b><span>${esc(f.s)}</span></span></div>`).join('')}</div></section>`:'')+`<div class="grid g2">${bal}${sleep}${load}${line('energy','How they feel','Energy, 1 to 5')}</div>`,
     sc:playerSC(p)+`<div class="grid g2">${load}${bal}</div>${sessT}`,
-    physio:`<div class="grid g2">${pain||nigT}${line('sore','Body soreness','1 fresh to 5 very sore','var(--caution)')}</div>${pain?nigT:''}`,
+    physio:rehabWorkspace(p)+`<div class="grid g2">${pain||nigT}${line('sore','Body soreness','1 fresh to 5 very sore','var(--caution)')}</div>${pain?nigT:''}`,
     nutrition:foodBody+nutWorkspace(p),
     mindset:`<div class="grid g2">${line('mood','Mood','1 low to 5 great')}${line('stress','Stress','1 calm to 5 very stressed','var(--caution)')}${line('energy','Energy','1 drained to 5 full of it')}${sleep}</div>`}[tab];
   return head+body+notesCard(p)+`<p class="tiny muted">${p.food?'Food is shared as daily totals only. ':''}Notes, cycle tracking and${p.food?'':' food,'} drinks with alcohol stay private to ${esc(first(p.name))}.</p>`}
@@ -574,7 +578,7 @@ function render(){if(render._busy){setTimeout(render,0);return}render._busy=true
 function render2(){TIPS={};tipN=0;const rt=route();const root=$('#root');
   if(!SESSION){root.innerHTML=gateHTML();return}
   const title=rt.v==='player'?'Player':(VIEWS.find(v=>v[0]===rt.v)||VIEWS[0])[1];
-  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,sc:viewSCHub,physio:viewPhysio,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
+  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,sc:viewSCHub,physio:viewPhysioHub,recovery:viewRecovery,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
   const sy=scrollY;root.innerHTML=shell(body,title);if(render._v===location.hash)scrollTo(0,sy);else scrollTo(0,0);render._v=location.hash}
 let GATE={mode:'in',msg:''};
 function gateHTML(){if(GATE.mode==='up')return `<div class="gate"><form class="gcard" id="signup"><img src="/keel-wordmark.svg" alt="keel"><div><h1>Join the backroom team</h1><p class="muted small" style="margin-top:4px">For coaches, S&amp;C, physios, nutritionists and mindset coaches. You need the staff code from your team's manager.</p></div>
@@ -594,7 +598,7 @@ async function joinPending(){let pj=null;try{pj=JSON.parse(localStorage.getItem(
   toast(error?error.message:'You\'ve joined the team',4000)}
 
 // ================= events =================
-window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#player'))S.ptab=null;if(!location.hash.startsWith('#sc')){S.progEdit=null;S.draft=null;S.exEdit=null}S.nutT=null;S.nutP=null;render()});
+window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#player'))S.ptab=null;if(!location.hash.startsWith('#sc')){S.progEdit=null;S.draft=null;S.exEdit=null}S.nutT=null;S.nutP=null;S.rh=null;render()});
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(x=c('[data-gate]')){GATE={mode:x.dataset.gate,msg:''};render();return}
   if(x=c('[data-player]')){location.hash='player/'+encodeURIComponent(x.dataset.player);return}
@@ -665,6 +669,7 @@ function adherence(a,k){const pos=progPos(a,k);if(!pos||!pos.started)return {due
 // Koach: suggested load % for each player on a programme, from readiness, load and injuries
 function koachLoad(p,k){const i=dayInfo(p,k),a=p.E.acwr(k),rs=activeRestr(p,k);const b=lastN(k,7).map(kk=>dayInfo(p,kk).s).filter(v=>v!=null);const b7=b.length?avg(b):null;const debt=p.E.debt(k);
   if(i.sick&&i.sick.sev==='bad')return [40,'Unwell. Pause the gym until 24 hours clear'];
+  const rh=rehabOf(p.id);if(rh){const st=rh.stages[rh.stage]||{};const pct=[50,60,70,85,95][Math.min(4,Math.round(rh.stage/Math.max(1,rh.stages.length-1)*4))];return [pct,`In rehab (${rh.area.toLowerCase()}), stage ${rh.stage+1} of ${rh.stages.length}: ${st.name||''}. Follow the physio's plan for that area`]}
   if(i.pain>=5)return [60,`${i.nig.d.niggles[0].area} ${i.pain}/10. Upper body and rehab only, follow the physio`];
   if(i.sick)return [70,'Unwell. Light work only'];
   if(i.pain>=3||rs.length)return [80,`${rs.length?'Restriction: '+rs[0].body.replace(/\.\s*$/,''):i.nig.d.niggles[0].area+' '+i.pain+'/10'}. Swap out anything that aggravates it`];
@@ -1007,10 +1012,136 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
     if(!isDemo()){const {error}=await sb.from('nut_plans').delete().eq('id',x.dataset.npdel);if(error){toast(error.message);return}}NUT.plans=NUT.plans.filter(y=>y.id!==x.dataset.npdel);toast('Withdrawn');render();return}
 });
 
+// ================= Physio: staged rehab plans sent to the player's app =================
+const RH={plans:[],logs:[],missing:false};
+const RH_AREAS=['Hamstring','Calf / Achilles','Ankle','Groin / adductor','Knee','Quad','Lower back','Shoulder','Other'];
+const RH_STAGES=[['Protect and settle','Calm it down and keep moving without pain.','Walking and daily life pain-free; pain 2/10 or less at rest.'],
+  ['Rebuild strength','Load the area progressively.','Full range of movement; strength close to the other side.'],
+  ['Running','Back on the grass with straight-line running.','Jogging and strides pain-free, building to about 85% speed.'],
+  ['Football-specific','Speed, change of direction, kicking and contact drills.','Full speed and full drills with no reaction the next day.'],
+  ['Full training to match ready','Back in full training.','Two full sessions with no reaction and the physio signs off.']];
+const RH_ITEMS={Hamstring:[[['Isometric bridge hold','4','30 s','Daily'],['Easy spin bike','1','15 min','Daily']],[['Nordic hamstring curl','3','4','3 times a week'],['Single-leg Romanian deadlift','3','8 each side','3 times a week'],['Bridge walkouts','3','6','3 times a week']],[['A-skips','3','20 m','Every second day'],['Run progression','1','6 × 60 m at 60–80%','Every second day']],[['Accelerations','6','20 m','3 times a week'],['Kicking progression','1','15 min','3 times a week']],[['Full training','1','Session','As planned']]],
+  'Calf / Achilles':[[['Isometric calf raise hold','5','45 s','Daily'],['Easy spin bike','1','15 min','Daily']],[['Seated calf raise','3','12','Daily'],['Single-leg calf raise','3','10 each side','Every second day']],[['Pogo hops','3','20','Every second day'],['Run progression','1','6 × 60 m at 60–80%','Every second day']],[['Accelerations','6','20 m','3 times a week'],['Hopping and bounding','3','10','3 times a week']],[['Full training','1','Session','As planned']]],
+  Ankle:[[['Ankle range of movement','2','1 min each way','Daily'],['Single-leg balance','3','30 s','Daily']],[['Band eversion','3','15','Daily'],['Single-leg calf raise','3','10 each side','Every second day']],[['Hopping in place','3','20','Every second day'],['Run progression','1','6 × 60 m at 60–80%','Every second day']],[['Cutting drills','4','5 each side','3 times a week'],['Lateral bounds','3','8 each side','3 times a week']],[['Full training','1','Session','As planned']]],
+  'Groin / adductor':[[['Adductor squeeze hold','5','30 s','Daily'],['Easy spin bike','1','15 min','Daily']],[['Copenhagen plank','3','20 s each side','3 times a week'],['Lateral lunge','3','8 each side','3 times a week']],[['Run progression','1','6 × 60 m at 60–80%','Every second day'],['Side shuffles','3','20 m','Every second day']],[['Kicking progression','1','15 min','3 times a week'],['Cutting drills','4','5 each side','3 times a week']],[['Full training','1','Session','As planned']]],
+  Knee:[[['Wall sit hold','5','30 s','Daily'],['Easy spin bike','1','15 min','Daily']],[['Step-up','3','10 each side','3 times a week'],['Split squat','3','8 each side','3 times a week']],[['Run progression','1','6 × 60 m at 60–80%','Every second day'],['Landing drills','3','6','Every second day']],[['Cutting drills','4','5 each side','3 times a week'],['Hopping and bounding','3','10','3 times a week']],[['Full training','1','Session','As planned']]],
+  'Lower back':[[['Dead bug','3','8 each side','Daily'],['Bird dog','3','8 each side','Daily']],[['Hip hinge drill','3','10','3 times a week'],['Pallof press','3','10 each side','3 times a week']],[['Run progression','1','6 × 60 m at 60–80%','Every second day']],[['Med ball rotational throw','3','6 each side','3 times a week']],[['Full training','1','Session','As planned']]]};
+RH_ITEMS.Quad=RH_ITEMS.Knee;RH_ITEMS.Shoulder=[[['Band external rotation','3','15','Daily'],['Scapular push-up','3','12','Daily']],[['Landmine press','3','10','3 times a week'],['Single-arm dumbbell row','3','10 each side','3 times a week']],[['Tackle bag progression','1','10 min','3 times a week']],[['Contact drills','1','15 min','3 times a week']],[['Full training','1','Session','As planned']]];RH_ITEMS.Other=RH_ITEMS.Knee;
+function rhTemplate(area){const it=RH_ITEMS[area]||RH_ITEMS.Other;return RH_STAGES.map(([name,goal,criteria],i)=>({name,goal,criteria,items:(it[i]||[]).map(([n,sets,reps,freq])=>{const ex=SC.ex.find(e=>e.name.toLowerCase()===n.toLowerCase());return {ex:ex?ex.id:null,name:n,sets,reps,freq,note:''}})}))}
+async function loadRehab(t){RH.missing=false;if(t.team_id===DEMO_ID){Object.assign(RH,buildDemoRehab());return}
+  const a=await sb.from('rehab_plans').select('*').eq('team_id',t.team_id).order('updated_at',{ascending:false});if(a.error){if(/relation|does not exist|schema cache/i.test(a.error.message))RH.missing=true;RH.plans=RH.logs=[];return}
+  RH.plans=a.data||[];const b=await sb.from('rehab_logs').select('*').eq('team_id',t.team_id).gte('day',addK(todayK(),-90)).order('day',{ascending:false});RH.logs=b.data||[]}
+const rehabOf=pid=>RH.plans.find(r=>r.player_id===pid&&r.status==='active');
+const rhLogs=id=>RH.logs.filter(l=>l.plan_id===id);
+function rhAdherence(r,k){const ls=rhLogs(r.id);let d=0;for(let i=0;i<7;i++){if(ls.some(l=>l.day===addK(k,-i)&&l.done))d++}return d}
+function rhStep(r){const n=(r.stages||[]).length;return `<div class="rhsteps">${(r.stages||[]).map((s,i)=>`<span class="rhstep ${i<r.stage?'done':i===r.stage?'now':''}" title="${esc(s.name)}"></span>`).join('')}</div><div class="tiny muted" style="margin-top:4px">Stage ${r.stage+1} of ${n}: ${esc((r.stages[r.stage]||{}).name||'')}</div>`}
+function viewPhysioHub(){const t=route().id||'squad';
+  const tabs=`<div class="toolbar"><div class="seg">${[['squad','Squad'],['rehab','Rehab plans']].map(([v,l])=>`<a href="#physio/${v}" aria-pressed="${t===v}" class="segl">${l}</a>`).join('')}</div></div>`;
+  if(t!=='rehab')return tabs+viewPhysio();
+  if(RH.missing)return tabs+`<section class="card"><header><div><h2>One more database step</h2><p>Rehab plans need their own tables.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/rehab.sql</b> and click Run, then confirm.</li><li>Refresh this page.</li></ol></section>`;
+  const act=RH.plans.filter(r=>r.status==='active');const k=todayK();const cands=sharing().filter(p=>!rehabOf(p.id)&&dayInfo(p,S.k).pain>=3);
+  return tabs+`<section class="card"><header><div><h2>Rehab plans</h2><p>Staged return to play. The player sees today's exercises and videos in Keel and logs pain each day; S&amp;C sees the stage in Koach's load suggestions.</p></div></header>
+   ${act.length?`<div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Injury</th><th>Progress</th><th>Pain (last log)</th><th>Done, last 7 days</th><th>Target return</th><th></th></tr>${act.map(r=>{const lg=rhLogs(r.id).find(l=>l.pain!=null);const ad=rhAdherence(r,k);
+     return `<tr><td><b style="color:var(--text)">${esc(playerName(r.player_id))}</b></td><td>${esc(r.area)}${r.side?' <span class="muted">('+esc(r.side.toLowerCase())+')</span>':''}<div class="tiny muted">${r.injured_on?'Since '+esc(fmtK(r.injured_on,{day:'numeric',month:'short'})):''}</div></td><td style="min-width:180px">${rhStep(r)}</td>
+     <td>${lg?painChip(lg.pain):'<span class="muted">–</span>'}</td><td>${sevChip(ad,5,3,ad+'/7')}</td><td class="small">${r.target_day?esc(fmtK(r.target_day,{weekday:'short',day:'numeric',month:'short'})):'–'}</td><td style="text-align:right"><button class="btn ghost sm" data-rhopen="${esc(r.player_id)}">Open</button></td></tr>`}).join('')}</table></div>`:'<div class="small muted">Nobody in rehab.</div>'}</section>
+   ${cands.length?`<section class="card"><header><div><h2>Might need one</h2><p>Niggles of 3/10 or more without a rehab plan</p></div></header><div style="display:flex;gap:8px;flex-wrap:wrap">${cands.map(p=>{const i=dayInfo(p,S.k);return `<button class="chip ${i.pain>=5?'alert':'caution'}" data-rhopen="${esc(p.id)}">${esc(p.name)} · ${esc(i.nig.d.niggles[0].area)} ${i.pain}/10</button>`}).join('')}</div></section>`:''}`}
+// player page physio tab: the rehab workspace
+function rehabWorkspace(p){if(RH.missing)return `<section class="card"><div class="empty">Run <b>supabase/rehab.sql</b> in Supabase to build rehab plans.</div></section>`;
+  const r=rehabOf(p.id);const ed=S.rh&&S.rh.pid===p.id?S.rh:null;
+  if(ed)return rehabEditor(p,ed);
+  if(!r){const i=dayInfo(p,S.k);const area=i.nig?i.nig.d.niggles[0].area:'';const guess=RH_AREAS.find(a=>area&&a.toLowerCase().startsWith(area.toLowerCase().split(/[ /]/)[0]))||'';
+    return `<section class="card"><header><div><h2>Rehab plan</h2><p>Not in rehab.${area?` Logged niggle: ${esc(area)} ${i.pain}/10.`:''}</p></div><button class="btn sm" data-rhnew="${esc(p.id)}" data-area="${esc(guess)}" data-side="${esc(i.nig?i.nig.d.niggles[0].side||'':'')}">Start a rehab plan</button></header></section>`}
+  const ls=rhLogs(r.id);const keys=lastN(S.k,21);const cur=r.stages[r.stage]||{};
+  const exName=it=>{const e=it.ex&&exById(it.ex);return e?e.name:it.name};
+  return `<section class="card"><header><div><h2>Rehab: ${esc(r.area)}${r.side?' ('+esc(r.side.toLowerCase())+')':''}</h2><p>${r.injured_on?'Injured '+esc(fmtK(r.injured_on))+' · ':''}${r.target_day?'target return '+esc(fmtK(r.target_day)):'no target date'}${r.created_by_name?' · '+esc(r.created_by_name):''}</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-rhedit="${esc(r.id)}">Edit plan</button>${r.stage<r.stages.length-1?`<button class="btn sm" data-rhstage="${esc(r.id)}" data-to="${r.stage+1}">Move to stage ${r.stage+2}</button>`:`<button class="btn sm" data-rhclear="${esc(r.id)}">Clear to play</button>`}</div></header>
+    ${rhStep(r)}
+    <div class="grid g2" style="margin-top:14px;gap:14px"><div><h3 style="margin-bottom:6px">${esc(cur.name||'')}</h3><p class="small">${esc(cur.goal||'')}</p><p class="small muted" style="margin-top:6px"><b>To move on:</b> ${esc(cur.criteria||'')}</p>${r.pain_rule?`<p class="small" style="margin-top:6px;color:var(--caution)">${esc(r.pain_rule)}</p>`:''}</div>
+     <div>${(cur.items||[]).map(it=>`<div class="flag" style="padding:7px 4px"><span class="who"><b style="font-weight:500">${esc(exName(it))}</b><span>${esc([it.sets&&it.reps?it.sets+' × '+it.reps:it.reps,it.freq].filter(Boolean).join(' · '))}${it.ex&&exById(it.ex)&&exById(it.ex).video_path?' · ▶ video':''}</span></span></div>`).join('')||'<div class="small muted">No exercises in this stage.</div>'}</div></div></section>
+   <div class="grid g2"><section class="card"><header><div><h2>Pain during rehab</h2><p>What they logged each day, out of 10</p></div></header>${lineChart(keys.map(kk=>{const l=ls.find(x=>x.day===kk);return {k:kk,y:l&&l.pain!=null?l.pain:null}}),{min:0,max:10,ticks:[0,3,5,10],color:'var(--caution)',label:'Rehab pain',tip:q=>`Pain ${q.y}/10`})}</section>
+    <section class="card"><header><div><h2>Done</h2><p>Last 3 weeks</p></div></header><div class="rhcal">${keys.map(kk=>{const l=ls.find(x=>x.day===kk);return `<span class="${l?(l.done?'d':'m'):''}" ${tipAttr(`<b>${esc(fmtK(kk))}</b>${l?(l.done?'Done':'Missed')+(l.pain!=null?' · pain '+l.pain+'/10':''):'Nothing logged'}`)}>${parse(kk).getDate()}</span>`}).join('')}</div>
+     <div class="legend" style="margin-top:10px"><span><i style="background:var(--good)"></i>Done</span><span><i style="background:var(--alert)"></i>Missed</span><span><i style="background:var(--none)"></i>Not logged</span></div></section></div>`}
+function rehabEditor(p,ed){const d=ed.d;const exOpts=sel=>`<option value="">Not in library (text only)</option>${SC.ex.map(e=>`<option value="${esc(e.id)}" ${sel===e.id?'selected':''}>${esc(e.name)}${e.video_path?' ▶':''}</option>`).join('')}`;
+  return `<section class="card"><header><div><h2>${d.id?'Edit rehab plan':'New rehab plan'}</h2><p>Stages and exercises are filled in from a template for the injury. Change anything before sending.</p></div></header>
+   <div class="grid g3" style="gap:12px"><div class="field"><label>Injury</label><select class="in" id="rhArea">${RH_AREAS.map(a=>`<option ${d.area===a?'selected':''}>${a}</option>`).join('')}</select></div>
+    <div class="field"><label>Side</label><select class="in" id="rhSide">${['','Left','Right','Both'].map(s=>`<option value="${s}" ${d.side===s?'selected':''}>${s||'–'}</option>`).join('')}</select></div>
+    <div class="field"><label>Injured on</label><input class="in" type="date" id="rhOn" value="${esc(d.injured_on||'')}"></div>
+    <div class="field"><label>Target return</label><input class="in" type="date" id="rhTarget" value="${esc(d.target_day||'')}"></div>
+    <div class="field" style="grid-column:span 2"><label>Pain rule the player sees</label><input class="in" id="rhRule" value="${esc(d.pain_rule||'')}"></div></div>
+   ${d.id?'':`<button class="btn ghost sm" data-rhtpl="1" style="margin-top:12px">Refill stages for this injury</button>`}</section>
+   ${d.stages.map((s,si)=>`<section class="card rhs" data-si="${si}"><header style="flex-wrap:wrap;align-items:center"><span class="chip">Stage ${si+1}</span><input class="in" data-rs="name" value="${esc(s.name)}" style="flex:1;min-width:180px;font-weight:600"><button class="btn ghost sm" data-rsdel="${si}">Remove stage</button></header>
+     <div class="grid g2" style="gap:10px"><div class="field"><label>Goal</label><input class="in" data-rs="goal" value="${esc(s.goal||'')}"></div><div class="field"><label>To move on</label><input class="in" data-rs="criteria" value="${esc(s.criteria||'')}"></div></div>
+     <div class="pitems" style="margin-top:10px">${(s.items||[]).map((it,ii)=>`<div class="rhitem" data-ii="${ii}"><select class="in" data-ri="ex">${exOpts(it.ex)}</select><input class="in" data-ri="name" value="${esc(it.name||'')}" placeholder="Exercise"><input class="in" data-ri="sets" value="${esc(it.sets||'')}" placeholder="Sets"><input class="in" data-ri="reps" value="${esc(it.reps||'')}" placeholder="Reps / time"><input class="in" data-ri="freq" value="${esc(it.freq||'')}" placeholder="How often"><input class="in" data-ri="note" value="${esc(it.note||'')}" placeholder="Note"><button type="button" class="btn ghost sm" data-ridel="${ii}" aria-label="Remove">✕</button></div>`).join('')}</div>
+     <button type="button" class="btn ghost sm" data-riadd="${si}" style="margin-top:8px">+ Add exercise</button></section>`).join('')}
+   <section class="card"><div class="field"><label>Note for the player (optional)</label><input class="in" id="rhNote" value="${esc(d.note||'')}" placeholder="e.g. Ice after sessions for the first week; text me if it flares up"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" data-rhsave="${esc(p.id)}">${d.id?'Save and update their app':'Send to '+esc(first(p.name))}</button><button class="btn ghost" data-rhcancel="1">Cancel</button>
+     ${d.id?'':`<label class="small" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="rhRestrict" checked> Also add a restriction for the staff until the target date</label>`}</div></section>`}
+function syncRh(){const d=S.rh&&S.rh.d;if(!d)return;const v=id=>($(id)||{}).value;if($('#rhArea'))d.area=v('#rhArea');if($('#rhSide'))d.side=v('#rhSide');if($('#rhOn'))d.injured_on=v('#rhOn')||null;if($('#rhTarget'))d.target_day=v('#rhTarget')||null;if($('#rhRule'))d.pain_rule=v('#rhRule');if($('#rhNote'))d.note=v('#rhNote')}
+document.addEventListener('input',e=>{const t=e.target;if(!S.rh)return;const d=S.rh.d;
+  if(t.dataset.rs){d.stages[+t.closest('.rhs').dataset.si][t.dataset.rs]=t.value}
+  else if(t.dataset.ri&&t.dataset.ri!=='ex'){d.stages[+t.closest('.rhs').dataset.si].items[+t.closest('.rhitem').dataset.ii][t.dataset.ri]=t.value}
+  else syncRh()});
+document.addEventListener('change',e=>{const t=e.target;if(!S.rh)return;if(t.dataset.ri==='ex'){const it=S.rh.d.stages[+t.closest('.rhs').dataset.si].items[+t.closest('.rhitem').dataset.ii];it.ex=t.value||null;const ex=exById(t.value);if(ex)it.name=ex.name;setTimeout(render,0)}else if(t.id){syncRh()}});
+async function rhUpdate(id,patch){const r=RH.plans.find(x=>x.id===id);patch.updated_at=new Date().toISOString();if(!isDemo()){const {error}=await sb.from('rehab_plans').update(patch).eq('id',id);if(error){toast(error.message,4000);return false}}Object.assign(r,patch);SQUAD.forEach(p=>p._di={});return true}
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-rhopen]')){S.ptab='physio';location.hash='player/'+encodeURIComponent(x.dataset.rhopen);return}
+  if(x=c('[data-rhnew]')){const area=x.dataset.area||'Hamstring';const i=dayInfo(SQUAD.find(p=>p.id===x.dataset.rhnew),S.k);
+    S.rh={pid:x.dataset.rhnew,d:{id:null,area,side:x.dataset.side||'',injured_on:i.nig?i.nig.k:todayK(),target_day:addK(todayK(),21),pain_rule:'Some discomfort is fine. Stop and tell the physio if pain goes above 3/10 or is worse the next morning.',note:'',stage:0,stages:rhTemplate(area)}};render();return}
+  if(x=c('[data-rhedit]')){const r=RH.plans.find(y=>y.id===x.dataset.rhedit);S.rh={pid:r.player_id,d:JSON.parse(JSON.stringify(r))};render();return}
+  if(c('[data-rhtpl]')){syncRh();S.rh.d.stages=rhTemplate(S.rh.d.area);render();return}
+  if(c('[data-rhcancel]')){S.rh=null;render();return}
+  if(x=c('[data-rsdel]')){S.rh.d.stages.splice(+x.dataset.rsdel,1);render();return}
+  if(x=c('[data-riadd]')){S.rh.d.stages[+x.dataset.riadd].items.push({ex:null,name:'',sets:'',reps:'',freq:'Daily',note:''});render();return}
+  if(x=c('[data-ridel]')){S.rh.d.stages[+x.closest('.rhs').dataset.si].items.splice(+x.dataset.ridel,1);render();return}
+  if(x=c('[data-rhsave]')){syncRh();const d=S.rh.d;const pid=x.dataset.rhsave;d.stages=d.stages.filter(s=>s.name).map(s=>Object.assign(s,{items:(s.items||[]).filter(i=>i.ex||i.name)}));if(!d.stages.length){toast('Add at least one stage');return}
+    d.stage=Math.min(d.stage||0,d.stages.length-1);const row={area:d.area,side:d.side||null,injured_on:d.injured_on||null,target_day:d.target_day||null,stages:d.stages,stage:d.stage,pain_rule:d.pain_rule||null,note:d.note||null,updated_at:new Date().toISOString()};
+    const restrict=!d.id&&$('#rhRestrict')&&$('#rhRestrict').checked;
+    if(d.id){if(!(await rhUpdate(d.id,row)))return}
+    else{Object.assign(row,{team_id:TEAM.team_id,player_id:pid,status:'active',created_by_name:myName()});
+      if(isDemo())RH.plans.unshift(Object.assign({id:uid(),created_at:row.updated_at},row));else{const {data,error}=await sb.from('rehab_plans').insert(row).select().single();if(error){toast(error.message,4000);return}RH.plans.unshift(data)}
+      if(restrict){const n={team_id:TEAM.team_id,player_id:pid,author_name:myName(),author_staff:myStaff()||'physio',kind:'restriction',body:`In rehab (${d.area.toLowerCase()}): follow the rehab plan, no full training until the physio clears it.`,until_day:d.target_day||null};
+        if(isDemo())NOTES.unshift(Object.assign({id:uid(),author_id:SESSION.user.id,created_at:new Date().toISOString()},n));else{const {data}=await sb.from('team_notes').insert(n).select().single();if(data)NOTES.unshift(data)}attachNotes()}}
+    SQUAD.forEach(p=>p._di={});S.rh=null;toast(`Sent. ${first(playerName(pid))} will see it in Keel.`,4000);render();return}
+  if(x=c('[data-rhstage]')){const r=RH.plans.find(y=>y.id===x.dataset.rhstage);if(await rhUpdate(r.id,{stage:+x.dataset.to})){toast(`Moved to stage ${+x.dataset.to+1}: ${r.stages[+x.dataset.to].name}`);render()}return}
+  if(x=c('[data-rhclear]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Clear them to play?';return}const r=RH.plans.find(y=>y.id===x.dataset.rhclear);
+    if(await rhUpdate(r.id,{status:'cleared'})){toast(`${first(playerName(r.player_id))} is cleared. Remember to end any restriction in Staff notes.`,4500);render()}return}
+});
+function buildDemoRehab(){const now=new Date().toISOString();const plans=[],logs=[];const T=todayK();const R=rng(91);
+  const mk=(ix,area,side,since,stage,target)=>{const p=players()[ix];if(!p)return;const r={id:'rh'+ix,team_id:DEMO_ID,player_id:p.id,area,side,injured_on:addK(T,-since),target_day:addK(T,target),stages:rhTemplate(area),stage,pain_rule:'Some discomfort is fine. Stop and tell the physio if pain goes above 3/10 or is worse the next morning.',note:null,status:'active',created_by_name:'Aoife (physio)',created_at:now,updated_at:now};plans.push(r);
+    for(let i=since-1;i>=1;i--){if(R()<.15)continue;const k=addK(T,-i);logs.push({id:'rl'+ix+i,plan_id:r.id,team_id:DEMO_ID,player_id:p.id,day:k,stage:Math.min(stage,Math.floor((since-i)/Math.max(1,since/(stage+1)))),done:R()>.1,pain:Math.max(0,Math.round(4-(since-i)*(4/since)+R()*1.5))})}};
+  mk(2,'Hamstring','Left',4,0,18);mk(16,'Ankle','Left',25,3,4);mk(8,'Calf / Achilles','Right',2,0,10);
+  return {plans,logs:logs.sort((a,b)=>b.day.localeCompare(a.day)),missing:false}}
+
+// ================= Recovery: is the squad recovering as hard as it trains? =================
+function recOn(p,k){const d=p.D[k];if(!d)return [];const out=[];(d.recovery||[]).forEach(x=>out.push({what:x.kind||'Recovery',min:+x.min||0}));(d.mobility||[]).forEach(x=>out.push({what:'Mobility'+(x.name?': '+x.name:''),min:+x.min||0}));
+  (d.hc||[]).forEach(x=>out.push({what:x.type||'Heat or cold',min:+x.min||0}));
+  SC.logs.filter(l=>l.player_id===p.id&&l.day===k&&l.done).forEach(l=>{const a=SC.assigns.find(y=>y.id===l.assignment_id);const pp=a&&progPos(a,k);const day=pp&&pp.week&&pp.week.days.find(x=>x.dow===l.dow);if(day&&(day.kind==='recovery'||day.kind==='mobility'))out.push({what:day.title||'Recovery session',min:+l.dur||0})});return out}
+const recMin=(p,k)=>recOn(p,k).reduce((a,x)=>a+x.min,0);
+function lastMatch(k){for(let i=0;i<14;i++){const kk=addK(k,-i);if(sharing().some(p=>sessionsOn(p,kk).some(s=>/match/i.test(s.what))))return kk}return null}
+function viewRecovery(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;const wk=lastN(k,7);
+  const rows=ps.map(p=>{const items=wk.flatMap(kk=>recOn(p,kk));const sl=avgOf(wk.map(kk=>sleepHours(p.D[kk])));const so=avgOf(wk.map(kk=>p.D[kk]&&isNum(p.D[kk].sore)?+p.D[kk].sore:null));
+    const types=[...new Set(items.map(x=>x.what.split(':')[0]))];return {p,n:items.length,min:items.reduce((a,x)=>a+x.min,0),sl,debt:p.E.debt(k),so,types,load:p.E.load7(k)}}).sort((a,b)=>a.p.name.localeCompare(b.p.name));
+  const any=rows.filter(r=>r.n>0).length;const lm=lastMatch(k);
+  const after=lm&&lm<k?ps.map(p=>{const k1=addK(lm,1),k2=addK(lm,2);const did=[...recOn(p,lm),...recOn(p,k1),...recOn(p,k2)];const so=p.D[k1]&&isNum(p.D[k1].sore)?+p.D[k1].sore:null;const sl=sleepHours(p.D[k1]);
+    return {p,did,so,sl,played:sessionsOn(p,lm).some(s=>/match/i.test(s.what))}}).filter(x=>x.played):[];
+  const champs=rows.filter(r=>r.n>=2).sort((a,b)=>(b.min+(b.sl||0)*10)-(a.min+(a.sl||0)*10)).slice(0,3);
+  const days=lastN(k,28).map(kk=>({k:kk,y:avg(ps.map(p=>recMin(p,kk)))}));
+  return kpiRow([kpiTile(`${any}<small>/ ${ps.length}</small>`,'Did some recovery this week',{ic:'check',col:'var(--good)'}),kpiTile(fx(avgOf(rows.map(r=>r.min))),'Recovery minutes each, this week',{ic:'wellness'}),
+     kpiTile(fx(avgOf(rows.map(r=>r.sl)),1)+'<small>h</small>','Sleep, 7-day average',{ic:'moon'}),kpiTile(fx(avgOf(rows.map(r=>r.debt)),1)+'<small>h</small>','Average sleep debt this week',{ic:'clock',col:'var(--caution)'})])
+   +`<div class="grid g-today"><section class="card"><header><div><h2>After the last match</h2><p>${lm?esc(fmtK(lm,{weekday:'long',day:'numeric',month:'short'}))+'. Recovery logged that day or the next two, soreness and sleep the night after.':'No match in the last 2 weeks.'}</p></div></header>
+     ${after.length?`<div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Recovery done</th><th>Sore next day</th><th>Sleep that night</th></tr>${after.sort((a,b)=>a.did.length-b.did.length).map(a=>`<tr><td><button data-player="${esc(a.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(a.p.name)}</b></button></td>
+       <td>${a.did.length?`<span class="chip good">${esc([...new Set(a.did.map(x=>x.what.split(':')[0]))].join(', '))}</span>`:'<span class="chip caution">None logged</span>'}</td><td class="num">${a.so!=null?a.so+'/5':'–'}</td><td class="num">${a.sl!=null?a.sl+' h':'–'}</td></tr>`).join('')}</table></div>`:'<div class="small muted">Nothing to show yet.</div>'}</section>
+    <section class="card"><header><div><h2>Doing it well</h2><p>Most recovery and best sleep this week. Worth a shout-out at training.</p></div></header><div class="flags">${champs.length?champs.map((r,i)=>`<button class="flag" data-player="${esc(r.p.id)}"><span class="ic" style="background:color-mix(in srgb,var(--good) 15%,transparent);color:var(--good);font:600 15px var(--f-display)">${i+1}</span><span class="who"><b>${esc(r.p.name)}</b><span>${r.n} recovery session${r.n>1?'s':''}, ${r.min} min · sleeping ${fx(r.sl,1)} h</span></span></button>`).join(''):'<div class="small muted">Nobody has logged recovery twice this week yet.</div>'}</div>
+     <p class="tiny muted" style="margin-top:12px">Recovery counts sessions from the Recover tab, mobility follow-alongs, sauna, hot tub and cold water, and recovery sessions in an S&amp;C programme.</p></section></div>
+   <section class="card"><header><div><h2>Recovery minutes each day</h2><p>Squad average per player, last 4 weeks</p></div></header>${barChart(days,{w:1100,h:180,color:'var(--good)',tip:q=>`${Math.round(q.y)} min average`,label:'Recovery minutes'})}</section>
+   <section class="card"><header><div><h2>Each player, this week</h2><p>Training load against recovery and sleep</p></div></header><div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Load</th><th>Recovery</th><th>What</th><th>Sleep</th><th>Sleep debt</th><th>Soreness</th></tr>
+    ${rows.map(r=>`<tr><td><button data-player="${esc(r.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(r.p.name)}</b></button></td><td class="num">${Math.round(r.load)}</td><td>${r.n?`<span class="chip ${r.n>=2?'good':''}">${r.n} · ${r.min} min</span>`:`<span class="chip ${r.load>1800?'caution':''}">None</span>`}</td><td class="small">${esc(r.types.join(', ')||'–')}</td>
+      <td class="num">${r.sl!=null?r1(r.sl)+' h':'–'}</td><td>${r.debt!=null?sevChip(-r.debt,-2,-5,r.debt+' h'):'–'}</td><td class="num">${fx(r.so,1)}</td></tr>`).join('')}</table></div></section>`}
+
 // ================= start =================
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
-  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());render();return}
+  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());Object.assign(RH,buildDemoRehab());SQUAD.forEach(p=>p._di={});render();return}
     $('#root').innerHTML='<div class="gate"><div class="gcard"><h1>Not set up yet</h1><p class="muted">The dashboard can\'t reach the database settings.</p></div></div>';return}
   const {data:{session}}=await sb.auth.getSession();SESSION=session;if(!session){render();return}
   await joinPending();
