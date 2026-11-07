@@ -1927,6 +1927,13 @@ function kHideIrrelevant(){if(KTRAINS())return;const app=document.getElementById
   app.querySelectorAll('.panel').forEach(p=>{const h=p.querySelector('h3');if(!h)return;const t=h.textContent;
     if(/^(Activity through the weeks|Hyrox classes|5 km tests|Threshold pace|Strength|Plan completion)$/.test(t)&&!(t==='Activity through the weeks'&&KMANUAL()))p.remove()})}
 
+// ================= data safety: merge with the server copy when saving a day =================
+async function persistDay(k,fields){const cur=days[k]||{date:k};let base=cur;
+  if(daysCol&&sb&&UID){try{const {data,error}=await sb.from('entries').select('data').match({user_id:UID,kind:'day',key:k}).maybeSingle();if(!error&&data&&data.data)base={...cur,...data.data}}catch(e){}}
+  const doc={...base,...fields,date:k,savedAt:new Date().toISOString()};days[k]=doc;
+  if(daysCol){try{await daysCol.doc(k).set(doc)}catch(e){toast('Could not save. Try again.');return false}}
+  return true}
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}

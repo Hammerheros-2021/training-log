@@ -3229,7 +3229,7 @@ function p1MealHTML(m,its){const mt={};['kcal','protein','carbs','fat'].forEach(
 let p2FtS=null;
 function p2FoodSave(k,food){days[k]={...(days[k]||{date:k}),food};render();clearTimeout(p2FtS);p2FtS=setTimeout(()=>persistDay(k,{food:days[k].food}),600)}
 const p2Shift=(t,d)=>{const m=p1Min(t);return m==null?t:hm(m+d)};
-window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+window.addEventListener('click',e=>{return;const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(x=c('[data-p2fmt]')){e.preventDefault();e.stopPropagation();const det=x.closest('details');if(det)det.open=true;P2FT=P2FT&&P2FT.meal===x.dataset.p2fmt?null:{meal:x.dataset.p2fmt};render();return}
   if(x=c('[data-p2ft]')){e.preventDefault();e.stopPropagation();const ix=+x.dataset.p2ft;P2FT=P2FT&&P2FT.ix===ix?null:{ix};render();return}
   if(c('[data-p2ftx]')){e.preventDefault();e.stopPropagation();P2FT=null;render();return}
@@ -3240,6 +3240,43 @@ document.addEventListener('change',e=>{const t=e.target;if(!t||!t.dataset||!t.va
   if(t.dataset.p2fti!=null){const food=clone((days[k]||{}).food||[]);const it=food[+t.dataset.p2fti];if(!it)return;it.at=t.value;const nm=p1MealFor(t.value);const moved=nm!==it.meal;it.meal=nm;if(moved)P2FT=null;p2FoodSave(k,food);if(moved){setTimeout(()=>{const d=document.querySelector(`details[data-ms="meal${nm}"]`);if(d)d.open=true},0);toast(`Moved to ${nm.toLowerCase()} at ${t.value}`)}return}
   if(t.dataset.p2fmi!=null){const m=t.dataset.p2fmi;const food=clone((days[k]||{}).food||[]);const its=food.filter(i=>i.meal===m);const first=its.map(i=>i.at).filter(Boolean).sort()[0];const d=first?p1Min(t.value)-p1Min(first):0;const nm=p1MealFor(t.value);
     its.forEach(i=>{i.at=i.at?p2Shift(i.at,d):t.value;i.meal=nm});P2FT=null;p2FoodSave(k,food);setTimeout(()=>{const dd=document.querySelector(`details[data-ms="meal${nm}"]`);if(dd)dd.open=true},0);toast(`${m} moved to ${t.value}${nm!==m?` (now ${nm.toLowerCase()})`:''}`)}});
+
+// ================= P2: safer saving, and moving a whole meal only =================
+// Saving a day now merges with what's on the server, so an older copy of the app (another tab, the home-screen app, another device) can't wipe changes made elsewhere.
+async function persistDay(k,fields){const cur=days[k]||{date:k};let base=cur;
+  if(daysCol&&sb&&UID){try{const {data,error}=await sb.from('entries').select('data').match({user_id:UID,kind:'day',key:k}).maybeSingle();if(!error&&data&&data.data)base={...cur,...data.data}}catch(e){}}
+  const doc={...base,...fields,date:k,savedAt:new Date().toISOString()};days[k]=doc;
+  if(daysCol){try{await daysCol.doc(k).set(doc)}catch(e){toast('Could not save. Try again.');return false}}
+  return true}
+// coming back to the app after a while: fetch today and yesterday fresh before you change anything
+let p2Hid=0;
+document.addEventListener('visibilitychange',async()=>{if(document.hidden){p2Hid=Date.now();return}if(!p2Hid||Date.now()-p2Hid<60000||!sb||!UID)return;p2Hid=0;
+  try{const ks=[iso(todayDate()),iso(addD(todayDate(),-1)),iso(sel)];const {data}=await sb.from('entries').select('key,data').eq('user_id',UID).eq('kind','day').in('key',[...new Set(ks)]);(data||[]).forEach(r=>{if(r&&r.data)days[r.key]=r.data});if(!document.querySelector('#p1Host .kshead'))render()}catch(e){}});
+// times: understand "9", "9am", "9:30 pm", "21.15"; never write a broken time
+function p2T(t){if(t==null)return null;const s=String(t).trim().toLowerCase();if(/nan/.test(s))return null;const m=/^(\d{1,2})(?:[:.](\d{2}))?(?::\d{2})?\s*(am|pm)?$/.exec(s);if(!m)return null;let h=+m[1],mi=+(m[2]||0);if(m[3]==='pm'&&h<12)h+=12;if(m[3]==='am'&&h===12)h=0;if(h>23||mi>59)return null;return String(h).padStart(2,'0')+':'+String(mi).padStart(2,'0')}
+// one clock, on the meal: pick a time, tap Move. Undo if it's wrong.
+function p1FoodRow(i){const pc=i.pct||100;const tag=i.src==='plan'?' <span class="est">plan</span>':i.src==='alcohol'?' <span class="est">drink</span>':i.est?' <span class="est">est.</span>':'';const at=p2T(i.at);
+  return `<div class="p1fi"><div class="p1fit"><div class="fn">${esc(i.name)}${tag}</div><b class="num">${kcalOf(i)} kcal</b>${sampleMode?'':`<button type="button" class="x" data-del-food="${i.ix}" aria-label="Remove ${esc(i.name)}">${ico('x')}</button>`}</div>
+    <div class="p1fib"><span class="fq num">${at?esc(at)+' · ':''}${esc(i.qty||'')}<br>${Math.round(+i.protein||0)}p · ${Math.round(+i.carbs||0)}c · ${Math.round(+i.fat||0)}f</span>${sampleMode?'':`<div class="p1por" role="group" aria-label="Portion"><button type="button" data-fpct="${i.ix}:-25" aria-label="Less">${ico('minus')}</button><span class="num">${pc}%</span><button type="button" data-fpct="${i.ix}:25" aria-label="More">${ico('plus')}</button></div>`}</div></div>`}
+function p1MealHTML(m,its){const mt={};['kcal','protein','carbs','fat'].forEach(k=>mt[k]=its.reduce((a,i)=>a+(k==='kcal'?kcalOf(i):(+i[k]||0)),0));const e=(mt.protein*4+mt.carbs*4+mt.fat*9)||1;
+  const ats=its.map(i=>p2T(i.at)).filter(Boolean).sort();const first=ats[0]||null;const ed=P2FT&&P2FT.meal===m;const keep=ed||P2OPEN.has(m);
+  return `<details class="p1meal" data-ms="meal${m}" ${keep?'open':''}><summary><div class="p1mh"><span class="mico" aria-hidden="true">${MICO[m]}</span><b>${m}</b>${sampleMode?`<small>${its.length} item${its.length>1?'s':''}</small>`:`<button type="button" class="p2tc p2tcm" data-p2fmt="${m}" aria-label="Change the time of ${m}">${ico('clock')}<span>${first||'Set time'}</span></button>`}<span class="num">${Math.round(mt.kcal)} kcal</span><i aria-hidden="true">▾</i></div>
+    <div class="p1split" aria-hidden="true"><i style="width:${mt.protein*400/e}%;background:var(--s)"></i><i style="width:${mt.carbs*400/e}%;background:var(--e)"></i><i style="width:${mt.fat*900/e}%;background:var(--x)"></i></div>
+    <div class="p1mm num"><span style="--c:var(--s)">${Math.round(mt.protein)} g protein</span><span style="--c:var(--e)">${Math.round(mt.carbs)} g carbs</span><span style="--c:var(--x)">${Math.round(mt.fat)} g fat</span></div></summary>
+    ${ed?`<div class="p2ftm"><div class="p2fte"><label class="p2ftt">${ico('clock')}<span>When did you have ${m.toLowerCase()}?</span></label><input type="time" id="p2mt" value="${esc(P2FT.t||first||p1Now())}">
+      <div class="p2fta"><button type="button" class="ghost" data-p2ftx>Cancel</button><button type="button" class="primary" data-p2mmove="${m}">Move ${its.length} item${its.length>1?'s':''}</button></div></div></div>`:''}${its.map(p1FoodRow).join('')}</details>`}
+let p2Undo=null;
+window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p2fmt]')){e.preventDefault();e.stopImmediatePropagation();const det=x.closest('details');if(det){det.open=true;P2OPEN.add(x.dataset.p2fmt)}P2FT=P2FT&&P2FT.meal===x.dataset.p2fmt?null:{meal:x.dataset.p2fmt};render();return}
+  if(c('[data-p2ftx]')){e.preventDefault();e.stopImmediatePropagation();P2FT=null;render();return}
+  if(x=c('[data-p2mmove]')){e.preventDefault();e.stopImmediatePropagation();const m=x.dataset.p2mmove;const t=p2T(($('#p2mt')||{}).value);if(!t){toast('Pick a time first');return}
+    const k=iso(sel);const before=clone((days[k]||{}).food||[]);const food=clone(before);const its=food.filter(i=>i.meal===m);if(!its.length){P2FT=null;render();return}
+    const first=its.map(i=>p2T(i.at)).filter(Boolean).sort()[0];const d=first?p1Min(t)-p1Min(first):0;const nm=p1MealFor(t);
+    its.forEach(i=>{const a=p2T(i.at);i.at=a?hm(p1Min(a)+d):t;i.meal=nm});P2FT=null;P2OPEN.add(nm);p2Undo={k,food:before};
+    days[k]={...(days[k]||{date:k}),food};render();await persistDay(k,{food});
+    p2UndoBar(`${m} moved to ${t}${nm!==m?`, now under ${nm.toLowerCase()}`:''}.`);return}
+  if(c('[data-p2undo]')){e.preventDefault();e.stopImmediatePropagation();if(!p2Undo)return;const u=p2Undo;p2Undo=null;days[u.k]={...(days[u.k]||{date:u.k}),food:u.food};render();await persistDay(u.k,{food:u.food});const ub=document.getElementById('p2undo');if(ub)ub.remove();toast('Put back');return}},true);
+function p2UndoBar(msg){let el=document.getElementById('p2undo');if(el)el.remove();el=document.createElement('div');el.id='p2undo';el.className='p2undo';el.innerHTML=`<span>${esc(msg)}</span><button type="button" data-p2undo>Undo</button>`;document.body.appendChild(el);clearTimeout(p2UndoBar.t);p2UndoBar.t=setTimeout(()=>{el.remove()},8000)}
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}

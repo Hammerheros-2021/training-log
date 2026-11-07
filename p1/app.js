@@ -2971,6 +2971,13 @@ window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closes
   if(c('#fSay')||c('#fType')){vForce='food';P1F.open=false;p1Sheet(null)}},true);
 window.addEventListener('change',e=>{const t=e.target;if(t&&(t.id==='mealFile'||t.id==='mealFile2')&&t.closest&&t.closest('#p1Host')){P1F.open=false;setTimeout(()=>p1Sheet(null),0)}},true);
 
+// ================= data safety: merge with the server copy when saving a day =================
+async function persistDay(k,fields){const cur=days[k]||{date:k};let base=cur;
+  if(daysCol&&sb&&UID){try{const {data,error}=await sb.from('entries').select('data').match({user_id:UID,kind:'day',key:k}).maybeSingle();if(!error&&data&&data.data)base={...cur,...data.data}}catch(e){}}
+  const doc={...base,...fields,date:k,savedAt:new Date().toISOString()};days[k]=doc;
+  if(daysCol){try{await daysCol.doc(k).set(doc)}catch(e){toast('Could not save. Try again.');return false}}
+  return true}
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
