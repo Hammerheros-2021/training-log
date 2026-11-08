@@ -197,7 +197,7 @@ function checkinSummary(saved){
   if(isNum(y.steps))dd.push(`Steps <b>${(+y.steps).toLocaleString('en-IE')}</b>`);
   (y.habits||[]).forEach(h=>dd.push(esc(h)));
   (y.extras||[]).forEach(x=>dd.push(`${esc(x.kind)} <b>${x.dur||'?'}'</b>`));
-  const hid=p2Hidden(saved.date);return `<article class="card"><div class="chead">${hid?'':gauge(s)}<div style="flex:1;min-width:0"><h2>Check-in done</h2><div class="sub">${hid?'Your balance shows after your session':`Balance ${s??'-'} / 100`}</div></div><button type="button" class="editbtn" id="dEditBtn">✎ Edit</button></div>
+  return `<article class="card"><div class="chead">${gauge(s)}<div style="flex:1;min-width:0"><h2>Check-in done</h2><div class="sub">Balance ${s??'-'} / 100</div></div><button type="button" class="editbtn" id="dEditBtn">✎ Edit</button></div>
     <div class="verdict" style="--vc:${vc};margin-top:12px"><b>${vh}</b> ${vt}</div>
     <div class="label" style="padding:0 16px">Last night &amp; this morning</div><div class="chips">${m.map(c=>`<span>${c}</span>`).join('')||'<span>Not filled in</span>'}</div>
     <div class="label" style="padding:0 16px">Yesterday, ${fmtD(parse(prevKey(saved.date)),{weekday:'long'})}</div><div class="chips">${dd.map(c=>`<span>${c}</span>`).join('')||'<span>Not filled in</span>'}</div>
@@ -676,7 +676,7 @@ function ensureDrafts(){const key=iso(sel);
 function viewTraining(){
   ensureDrafts();const pl=planFor(sel),key=iso(sel);const dd=D()[key];const s=readiness(dd);
   let pill;
-  if(dd&&s!=null){const [vc,vh]=rVerdict(s,dd);pill=`<a class="rpill" href="#checkin" style="--vc:${vc}"><b class="num">${p2Hidden(key)?P2WORD(s):s}</b><span><b>${vh}</b><br><small>Balance from today's check-in</small></span><span aria-hidden="true">›</span></a>`}
+  if(dd&&s!=null){const [vc,vh]=rVerdict(s,dd);pill=`<a class="rpill" href="#checkin" style="--vc:${vc}"><b class="num">${s}</b><span><b>${vh}</b><br><small>Balance from today's check-in</small></span><span aria-hidden="true">›</span></a>`}
   else pill=`<a class="rpill" href="#checkin" style="--vc:var(--muted)"><b>–</b><span><b>Do your morning check-in</b><br><small>Sleep, how you feel, niggles. 30 seconds.</small></span><span aria-hidden="true">›</span></a>`;
   let pre='';
   if(todayDate()<FIRST&&key===iso(FIRST))pre=`<div class="banner"><b style="color:var(--fg)">Day one is ${fmtD(FIRST,{weekday:'long',day:'numeric',month:'long'})}.</b></div>`;
@@ -719,7 +719,14 @@ function viewDashboard(){
   const toggle=`<div class="dtop"><div class="kgreet"><h1>${greet()}</h1><small>${fmtD(now,{weekday:'short',day:'numeric',month:'short'})} · ${sampleMode?'Example data, not yours':now<FIRST?`Plan starts in ${Math.round((FIRST-now)/DAY)} days`:pl?`Week ${pl.wk} of 16 · ${PHN[pl.p]}`:'Plan complete'}</small></div><div style="display:flex;gap:8px;align-items:center"><button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'My data':'Example'}</button></div></div>
     <div class="prog" aria-hidden="true"><i style="width:${Math.max(0,Math.min(100,(now-FIRST)/(END-FIRST)*100))}%"></i>${[1,2,3].map(i=>`<span style="left:${i*25}%"></span>`).join('')}</div>`;
   // hero
-  const s=readiness(d);const hero=p2HeroHTML(k,d,s);
+  const s=readiness(d);let hero;
+  if(d&&s!=null){const [vc,vh,vt]=rVerdict(s,d);const sh=sleepHours(d),need=sleepNeed(k);
+    const feel=avg([d.energy!=null?(d.energy-1)/4:null,d.mood!=null?(d.mood-1)/4:null,d.stress!=null?(5-d.stress)/4:null].filter(x=>x!=null));
+    const body=avg([d.sore!=null?(5-d.sore)/4:null,1-maxPain(d)/10].filter(x=>x!=null));
+    const sl=sh!=null?Math.min(1,sh/need):null;const pc=v=>v==null?'-':Math.round(v*100)+'%';const cl=v=>v==null?'var(--muted)':v>=.75?'var(--ok)':v>=.55?'var(--warn)':'var(--bad)';
+    hero=`<section class="hero" style="--vc:${vc}">${ring(s,100,112,11,'fade',s,'Balance')}<div class="hv"><h2>${p1Trend(k)}</h2>
+      ${miniBar('Sleep',sl??0,1,cl(sl),pc(sl))}${miniBar('Feel',feel??0,1,cl(feel),pc(feel))}${miniBar('Body',body??0,1,cl(body),pc(body))}</div></section>`}
+  else hero=`<a class="hero empty" href="#checkin">${ring(null,100,112,11,'fade','–','Balance')}<div class="hv"><h2>Check in to see your balance</h2><p>Last night's sleep, how you feel and any niggles. Or tap Dictate and just say it.</p><span class="go">Open check-in ›</span></div></a>`;
   // tiles
   const sh=sleepHours(d),need=sleepNeed(k),debt=sleepDebt(k);
   const tSleep=`<a class="dt" href="#checkin" data-dtab><span class="dl">Sleep</span>${sh!=null?`<b class="big num">${sh}<small>h</small></b><span class="ds">${esc(d.bed||'')}${d.wake?`–${esc(d.wake)}`:''}</span><span class="dots">${[1,2,3,4,5].map(i=>`<i class="${d.sleepQ>=i?'on':''}"></i>`).join('')}</span><span class="ds">Need ${need} h${debt>0.2?` · <b style="color:${debt>=3?'var(--bad)':'var(--warn)'}">${debt} h debt</b>`:''}</span>`:'<b class="big">–</b><span class="ds">Not logged</span>'}</a>`;
@@ -1297,7 +1304,7 @@ function signChip(k){if(sampleMode||k>iso(todayDate()))return '';const d=D()[k]|
   const late=tday&&new Date().getHours()>=19;
   return statusRow(late?'todo late':'todo','Not signed off yet',late?'Finished eating? Check over the day and sign off':'Sign off when you\'ve finished eating','<button type="button" class="stbtn" id="signOpen">Sign off</button>')}
 function ciChip(k){if(sampleMode)return '';const d=D()[k]||{};if(k>iso(todayDate()))return '';
-  if(ciDone(d)){const s=readiness(d);return statusRow('done','Checked in',s!=null?(p2Hidden(k)?'Balance shows after your session':`Balance ${s} / 100`):'Saved','')}
+  if(ciDone(d)){const s=readiness(d);return statusRow('done','Checked in',s!=null?`Balance ${s} / 100`:'Saved','')}
   return statusRow('todo','Not checked in yet',k===iso(todayDate())?'Takes 30 seconds: say it or tap below':'','')}
 function sessChip(k){if(sampleMode||tView!=='today')return '';const p=planFor(parse(k)),l=L()[k],d=D()[k]||{};
   if((!p||p.type==='R'||p.pre)&&d.trainIntent==='extra'&&!(d.extras||[]).length)return statusRow('todo','Training planned, not logged yet',k>iso(todayDate())?'Coming up':'Log it below once it\'s done','<button type="button" class="stbtn kghost" data-intentclear>It didn\'t happen</button>');
@@ -3101,7 +3108,8 @@ window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closes
   if(c('#fSay')||c('#fType')){vForce='food';P1F.open=false;p1Sheet(null)}},true);
 window.addEventListener('change',e=>{const t=e.target;if(t&&(t.id==='mealFile'||t.id==='mealFile2')&&t.closest&&t.closest('#p1Host')){P1F.open=false;setTimeout(()=>p1Sheet(null),0)}},true);
 
-// ================= P2: heart rate pop-up, and editing any day's check-in ==========Object.assign(ICO,{heart:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>'});
+// ================= P2: heart rate pop-up, and editing any day's check-in =================
+Object.assign(ICO,{heart:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>'});
 const HRT=[['wake','Just woke, still in bed','The best one: before you get up or check your phone.'],['lie','Lying down for 5 minutes','Good at bedtime, or any quiet lie-down.'],['sit','Sitting quietly for 5 minutes','The afternoon one: sit, no phone, then count.']];
 const HROFF={wake:0,lie:3,sit:8};
 // each kind of reading has its own normal; readings are also turned into a morning-equivalent so the balance score can use them
@@ -3269,169 +3277,27 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
     p2UndoBar(`${m} moved to ${t}${nm!==m?`, now under ${nm.toLowerCase()}`:''}.`);return}
   if(c('[data-p2undo]')){e.preventDefault();e.stopImmediatePropagation();if(!p2Undo)return;const u=p2Undo;p2Undo=null;days[u.k]={...(days[u.k]||{date:u.k}),food:u.food};render();await persistDay(u.k,{food:u.food});const ub=document.getElementById('p2undo');if(ub)ub.remove();toast('Put back');return}},true);
 function p2UndoBar(msg){let el=document.getElementById('p2undo');if(el)el.remove();el=document.createElement('div');el.id='p2undo';el.className='p2undo';el.innerHTML=`<span>${esc(msg)}</span><button type="button" data-p2undo>Undo</button>`;document.body.appendChild(el);clearTimeout(p2UndoBar.t);p2UndoBar.t=setTimeout(()=>{el.remove()},8000)}
-// ================= P2 v2: personal balance that learns from how sessions feel =================
-// Balance compares you with your own usual, counts recent load and sleep debt, caps when you're unwell,
-// and learns from session feedback which of your inputs best predict how training actually goes.
-// The number stays hidden on training days until after the session, so nobody trains to it.
-const P2W={sleep:18,sleepQ:13,energy:13,mood:9,stress:9,sore:9,pain:10,load:7,debt:5,rhr:5,hrv:10};
-const P2WL={sleep:'Sleep',sleepQ:'Sleep quality',energy:'Energy',mood:'Mood',stress:'Stress',sore:'Body',pain:'Niggles',load:'Recent training and work',debt:'Sleep debt',rhr:'Morning pulse',hrv:'HRV'};
-const clamp01=x=>Math.max(0,Math.min(1,x));
-let P2V=0;const P2M={sig:'',c:{}};
-function p2Sig(){return (sampleMode?'s':'u')+Object.keys(D()).length+'.'+Object.keys(L()).length+'.'+P2V}
-function p2Memo(n,k,fn){const s=p2Sig();if(P2M.sig!==s){P2M.sig=s;P2M.c={}}const key=n+'|'+k;if(key in P2M.c)return P2M.c[key];const v=fn();P2M.c[key]=v;return v}
-const _p2pd=persistDay;persistDay=async function(k,f){P2V++;const r=await _p2pd(k,f);P2V++;return r};
 
-// your usual for a 1-5 slider over the last 2 weeks (needs a week of check-ins)
-function p2Usual(map,k,field){const v=[];for(let i=1;i<=14;i++){const x=map[iso(addD(parse(k),-i))];if(x&&isNum(x[field]))v.push(+x[field])}return v.length>=7?avg(v):null}
-// your own sleep need: the typical sleep before mornings you woke with good energy (8 h until there's enough to go on)
-function p2NeedBase(k){return p2Memo('need',k,()=>{const DD=D();const good=[];for(let i=1;i<=42;i++){const d=DD[iso(addD(parse(k),-i))];if(d&&isNum(d.energy)&&+d.energy>=4){const sh=sleepHours(d);if(sh!=null)good.push(sh)}}
-  if(good.length<8)return 8;good.sort((a,b)=>a-b);return Math.round(Math.max(6.5,Math.min(9,good[Math.floor(good.length/2)]))*4)/4})}
-const _p2sn=sleepNeed;sleepNeed=function(k){return Math.round((_p2sn(k)-8+p2NeedBase(k))*10)/10};
+// ================= note which version someone opens (for the owner's testers list) =================
+(function(){const VER=/\/p2\//.test(location.pathname)?'p2':/\/p1\//.test(location.pathname)?'p1':'main';let done=false;
+  const t=setInterval(async()=>{if(done)return;try{if(!(typeof sb!=='undefined'&&sb&&UID&&PROFILE))return;done=true;clearInterval(t);const today=new Date().toISOString().slice(0,10);
+    const {data}=await sb.from('entries').select('data').match({user_id:UID,kind:'meta',key:'seen'}).maybeSingle();const cur=(data&&data.data)||{};if(cur[VER]===today)return;
+    await sb.from('entries').upsert({user_id:UID,kind:'meta',key:'seen',data:{...cur,[VER]:today,last:VER,at:new Date().toISOString()},updated_at:new Date().toISOString()})}catch(e){}},3000);setTimeout(()=>clearInterval(t),120000)})();
 
-// marks from 0 to 1 for each input, before weighting
-function p2Parts(d,map){
-  if(!d||!d.date)return null;map=map||D();const k=d.date;const P={};
-  const sh=sleepHours(d);if(sh!=null){const need=sleepNeed(k);P.sleep=clamp01((sh-(need-3))/3)}
-  const sl=(f,rev)=>{if(!isNum(d[f]))return;const v=+d[f];const ab=rev?(5-v)/4:(v-1)/4;const u=p2Usual(map,k,f);if(u==null){P[f]=ab;return}
-    const rel=clamp01(.75+(rev?(u-v):(v-u))*.25);P[f]=.5*ab+.5*rel};
-  sl('sleepQ');sl('energy');sl('mood');sl('stress',1);sl('sore',1);
-  if(Object.keys(P).length<3)return null;
-  P.pain=1-maxPain(d)/10;
-  // the last two days of training and work against your usual over four weeks (20% over usual is fine)
-  const ac=.65*dayLoadAll(iso(addD(parse(k),-1)))+.35*dayLoadAll(iso(addD(parse(k),-2)));let ch=0,cn=0;
-  for(let i=1;i<=28;i++){const kk=iso(addD(parse(k),-i));if(map[kk]||L()[kk]){ch+=dayLoadAll(kk);cn++}}
-  if(cn>=10&&ch>0)P.load=clamp01(1-(ac/(ch/cn)-1.2)*.5);
-  // sleep debt over the six nights before last night
-  let debt=0,dn=0;for(let i=1;i<=6;i++){const kk=iso(addD(parse(k),-i)),s2=sleepHours(map[kk]);if(s2!=null){debt+=Math.max(0,sleepNeed(kk)-s2);dn++}}
-  if(dn>=3)P.debt=clamp01(1-debt/5);
-  // pulse and HRV: at your usual or better is full marks, so a normal reading never pulls you down
-  const br=isNum(d.rhr)?baseline(map,k,'rhr'):null;if(br)P.rhr=clamp01(1-(d.rhr-br)/5);
-  const bh=isNum(d.hrv)?baseline(map,k,'hrv'):null;if(bh)P.hrv=clamp01(1+(d.hrv/bh-1)*5);
-  return P}
-function p2Cap(d){let c=100;const mp=maxPain(d);if(mp>=5)c=40;else if(mp>=3)c=60;if(has(d,'Sick / run down'))c=Math.min(c,50);
-  const sk=d.sick;if(sk&&sk.types&&sk.types.length)c=Math.min(c,sk.sev==='bad'?25:sk.sev==='moderate'?40:50);return c}
-function p2Score(d,map,raw){const P=p2Parts(d,map);if(!P)return {s:null};const Ln=raw?null:p2Learn();const W={};let tw=0,tv=0;
-  Object.keys(P).forEach(f=>{W[f]=P2W[f]*((Ln&&Ln.m[f])||1);tw+=W[f];tv+=W[f]*P[f]});
-  let s=100*tv/tw;if(Ln&&Ln.off)s+=Ln.off;s=Math.round(Math.max(0,Math.min(100,s)));const cap=p2Cap(d);
-  return {s:Math.min(s,cap),P,W,tw,capped:s>cap?cap:null}}
-readiness=function(d,map){if(!d)return null;const DD=D();map=map||DD;if(map===DD&&d.date&&DD[d.date]===d)return p2Memo('r',d.date,()=>p2Score(d,map).s);return p2Score(d,map).s};
-
-// ---------- learning from how sessions feel ----------
-const FB_FEEL=[[1,'Awful'],[2,'Tough'],[3,'OK'],[4,'Good'],[5,'Brilliant']];
-const FB_TARGET=[null,25,45,62,80,92];// the balance that would have matched how it felt
-const FB_Q=[['start','How did it start?',[['slow','Slow and groggy'],['normal','Normal'],['sharp','Sharp from the off']]],
-  ['flow','Once you got going',[['better','Got better'],['same','Stayed the same'],['faded','Faded']]],
-  ['energy','Energy',[['low','Lacking'],['steady','Steady'],['full','Full of it']]],
-  ['effort','Compared with what was planned',[['easier','Easier than expected'],['right','About right'],['harder','Harder than expected']]],
-  ['trend','Lately you feel',[['fitter','Getting fitter'],['plateau','Plateaued'],['back','Going backwards'],['unsure','Not sure']]]];
-function p2Target(d){const f=d&&d.sfb;if(!f||!isNum(f.feel))return null;let t=FB_TARGET[Math.max(1,Math.min(5,Math.round(+f.feel)))];if(f.energy==='low')t-=6;else if(f.energy==='full')t+=6;return Math.max(0,Math.min(100,t))}
-const p2Band=s=>s==null?null:s>=75?2:s>=55?1:0;
-function p2Corr(a,b){const n=a.length;if(n<3)return null;const ma=avg(a),mb=avg(b);let sab=0,saa=0,sbb=0;for(let i=0;i<n;i++){sab+=(a[i]-ma)*(b[i]-mb);saa+=(a[i]-ma)**2;sbb+=(b[i]-mb)**2}return saa>1e-9&&sbb>1e-9?sab/Math.sqrt(saa*sbb):null}
-function p2Learn(){return p2Memo('learn','all',()=>{const DD=D();const rows=[];
-  Object.keys(DD).sort().forEach(k=>{const d=DD[k];const t=p2Target(d);if(t==null||p2Cap(d)<100)return;const r=p2Score(d,DD,true);if(r.s==null)return;rows.push({k,t,P:r.P,raw:r.s})});
-  const n=rows.length;const out={n,m:{},off:0,acc:null,better:0,worse:0,corr:{}};if(n<6)return out;
-  const trust=n/(n+12);// trust grows the more feedback there is
-  Object.keys(P2W).forEach(f=>{const pr=rows.filter(r=>r.P[f]!=null);if(pr.length<6)return;const c=p2Corr(pr.map(r=>r.P[f]),pr.map(r=>r.t));if(c!=null)out.corr[f]=c});
-  const cs=Object.values(out.corr);const cbar=cs.length?avg(cs):0;
-  Object.keys(out.corr).forEach(f=>{out.m[f]=Math.round(Math.max(f==='pain'?1:.5,Math.min(1.6,1+(out.corr[f]-cbar)*2*trust))*100)/100});
-  // re-score with the new weights, then nudge the whole scale towards how sessions actually felt
-  const sc=rows.map(r=>{let tw=0,tv=0;Object.keys(r.P).forEach(f=>{const w=P2W[f]*(out.m[f]||1);tw+=w;tv+=w*r.P[f]});return 100*tv/tw});
-  out.off=Math.round(Math.max(-12,Math.min(12,avg(rows.map((r,i)=>r.t-sc[i]))*trust)));
-  let agree=0;rows.forEach((r,i)=>{const s=sc[i]+out.off,bs=p2Band(s),bt=p2Band(r.t);if(bs===bt)agree++;else if(bt>bs)out.better++;else out.worse++});
-  out.acc=Math.round(agree/n*100);return out})}
-
-// ---------- hide the number until after the session ----------
-function p2Pending(k){const p=planFor(parse(k)),d=D()[k]||{},l=L()[k];const planned=!!(p&&p.type!=='R'&&!p.pre);
-  const done=!!(l&&l.status)||(d.extras||[]).length>0;return !done&&(planned||d.trainIntent==='extra')}
-function p2Hidden(k){if(sampleMode||!k||k!==iso(todayDate()))return false;const d=D()[k]||{};if(d.showBal||(meta.flags&&meta.flags.showBalAlways))return false;return p2Pending(k)}
-function p2NeedsFb(k){if(sampleMode)return false;const d=D()[k]||{},l=L()[k];return !d.sfb&&(!!(l&&(l.status==='done'||l.status==='partial'))||(d.extras||[]).length>0)}
-const P2WORD=s=>s>=75?'Go':s>=55?'Steady':'Easy';
-function p2HeroHTML(k,d,s){
-  if(!(d&&s!=null))return `<a class="hero empty" href="#checkin">${ring(null,100,112,11,'fade','–','Balance')}<div class="hv"><h2>Check in to see your balance</h2><p>Last night's sleep, how you feel and any niggles. Or tap Dictate and just say it.</p><span class="go">Open check-in ›</span></div></a>`;
-  const [vc]=rVerdict(s,d);
-  if(p2Hidden(k))return `<section class="hero p2hid" style="--vc:var(--line)">${ring(100,100,112,11,'fade',P2WORD(s),'Balance')}<div class="hv"><h2>Train by feel today</h2>
-    <p>Your number shows after your session, once you've said how it felt, so it doesn't set the tone before you start.</p>
-    <div class="p2hb"><button type="button" class="linkbtn" data-p2show="${k}">Show it now</button><button type="button" class="linkbtn" data-p2always>Always show my number</button></div></div></section>`;
-  const sh=sleepHours(d),need=sleepNeed(k);
-  const feel=avg([d.energy!=null?(d.energy-1)/4:null,d.mood!=null?(d.mood-1)/4:null,d.stress!=null?(5-d.stress)/4:null].filter(x=>x!=null));
-  const body=avg([d.sore!=null?(5-d.sore)/4:null,1-maxPain(d)/10].filter(x=>x!=null));
-  const sl=sh!=null?Math.min(1,sh/need):null;const pc=v=>v==null?'-':Math.round(v*100)+'%';const cl=v=>v==null?'var(--muted)':v>=.75?'var(--ok)':v>=.55?'var(--warn)':'var(--bad)';
-  const f=d.sfb;let fbl='';
-  if(f&&isNum(f.feel)){const t=p2Target(d);const gap=p2Band(t)-p2Band(s);const w=(FB_FEEL.find(x=>x[0]===+f.feel)||[0,''])[1].toLowerCase();
-    fbl=`<p class="p2fbl">You said it felt <b>${esc(w)}</b>. ${gap>0?'Better than your balance suggested. Keel learns from that.':gap<0?'Harder than your balance suggested. Keel learns from that.':'Your balance read it right.'} <button type="button" class="linkbtn" data-p2fb="${k}">Change</button></p>`}
-  else if(p2NeedsFb(k))fbl=`<button type="button" class="p2fbask" data-p2fb="${k}">${ico('sparkles')}<span><b>How did it go?</b><small>20 seconds. Helps Keel learn what your body's telling you.</small></span><span aria-hidden="true">›</span></button>`;
-  return `<section class="hero" style="--vc:${vc}">${ring(s,100,112,11,'fade',s,'Balance')}<div class="hv"><h2>${p1Trend(k)}</h2>
-    ${miniBar('Sleep',sl??0,1,cl(sl),pc(sl))}${miniBar('Feel',feel??0,1,cl(feel),pc(feel))}${miniBar('Body',body??0,1,cl(body),pc(body))}${(meta.flags&&meta.flags.showBalAlways&&!sampleMode)?`<button type="button" class="linkbtn p2hb1" data-p2hide>Hide my number until after training</button>`:''}</div></section>${fbl}`}
-
-// ---------- session feedback sheet ----------
-const P2FB={k:null,f:null};
-function p2FbOpen(k){const d=D()[k]||{};P2FB.k=k;P2FB.f=Object.assign({feel:null,start:null,flow:null,energy:null,effort:null,trend:null,note:''},clone(d.sfb||{}));p2FbDraw()}
-function p2FbDraw(){const f=P2FB.f;const b=(q,v,l)=>`<button type="button" data-p2fq="${q}" data-p2fv="${v}" aria-pressed="${String(f[q])===String(v)}">${esc(l)}</button>`;
-  p1Sheet(`<div class="kshead"><h2>How did it go?</h2><button type="button" class="x" id="p2FbX" aria-label="Close">${ico('x')}</button></div>
-  <p class="ds" style="margin:0 0 12px">Keel uses this to tune your plan, your recovery and how your balance is worked out for you.</p>
-  <div class="field"><span class="label">Overall</span><div class="p1cof p2fbr">${FB_FEEL.map(([v,l])=>b('feel',v,l)).join('')}</div></div>
-  ${FB_Q.map(([q,l,o])=>`<div class="field"><span class="label">${l}</span><div class="p1cof">${o.map(([v,t])=>b(q,v,t)).join('')}</div></div>`).join('')}
-  <div class="field"><label class="label" for="p2FbNote">Anything else? <small>optional</small></label><textarea id="p2FbNote" rows="2" maxlength="400" placeholder="e.g. legs heavy for the first 10 minutes, then flew">${esc(f.note||'')}</textarea></div>
-  <button type="button" class="primary" id="p2FbSave" style="width:100%">Save</button>`)}
-async function p2FbSave(){const f=P2FB.f,k=P2FB.k;const el=document.getElementById('p2FbNote');if(el)f.note=el.value.slice(0,400);if(!f.feel){toast('Pick how it felt overall');return}
-  const doc={...f,at:new Date().toISOString()};if(sampleMode){p1Sheet(null);return}
-  const ok=await persistDay(k,{sfb:doc,showBal:true});p1Sheet(null);if(ok){const s=readiness(D()[k]);toast(s!=null?`Saved. Your balance this morning was ${s}.`:'Saved. Thanks.',3500)}render()}
-document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
-  if(x=c('[data-p2fq]')){const el=document.getElementById('p2FbNote');if(el)P2FB.f.note=el.value;const q=x.dataset.p2fq,v=x.dataset.p2fv;P2FB.f[q]=q==='feel'?+v:(P2FB.f[q]===v?null:v);p2FbDraw();return}
-  if(c('#p2FbSave')){p2FbSave();return}
-  if(c('#p2FbX')){p1Sheet(null);return}
-  if(x=c('[data-p2fb]')){p2FbOpen(x.dataset.p2fb||iso(todayDate()));return}
-  if(x=c('[data-p2show]')){persistDay(x.dataset.p2show,{showBal:true}).then(()=>render());return}
-  if(c('[data-p2always]')){persistMeta('flags',Object.assign({},meta.flags||{},{showBalAlways:true})).then(()=>render());return}
-  if(c('[data-p2hide]')){persistMeta('flags',Object.assign({},meta.flags||{},{showBalAlways:false})).then(()=>render());return}
-  if(c('[data-p2adjust]')){p2AdjustWeek();return}},true);
-// ask straight after a session is logged
-const _p2saveLog=saveLog;saveLog=async function(pl){const k=(sDraft&&sDraft.date)||iso(sel);await _p2saveLog(pl);P2V++;const l=L()[k];
-  if(!sampleMode&&l&&(l.status==='done'||l.status==='partial')&&!(D()[k]||{}).sfb&&k>=iso(addD(todayDate(),-2)))setTimeout(()=>p2FbOpen(k),450)};
-const _p2addExtra=addExtra;addExtra=async function(){const k=iso(sel);const n0=((D()[k]||{}).extras||[]).length;await _p2addExtra();const n1=((D()[k]||{}).extras||[]).length;
-  if(!sampleMode&&n1>n0&&!(D()[k]||{}).sfb&&k>=iso(addD(todayDate(),-2)))setTimeout(()=>p2FbOpen(k),450)};
-
-// ---------- feedback into Koach's advice and the plan ----------
-function p2FbRecent(k,n){const out=[];for(let i=0;i<28&&out.length<n;i++){const kk=iso(addD(parse(k),-i)),d=D()[kk];if(d&&d.sfb&&isNum(d.sfb.feel))out.push({date:kk,...d.sfb})}return out}
-function p2FbPoints(k){const r=p2FbRecent(k,4);if(r.length<2)return [];const cnt=(q,v,m)=>r.slice(0,m||4).filter(x=>x[q]===v).length;const pts=[];
-  const adj=t=>` <button type="button" class="linkbtn" data-p2adjust>${t} ›</button>`;
-  if(cnt('trend','back')>=2)pts.push(['You feel you\'re going backwards.','That\'s usually tiredness, not lost fitness. An easier few days often brings it back.'+adj('Ask Koach to ease my week')]);
-  else if(cnt('effort','harder',3)>=2)pts.push(['Sessions are feeling harder than planned.','Hold the effort a notch lower and put sleep first this week.'+adj('Ask Koach to ease my week')]);
-  else if(cnt('trend','plateau')>=2)pts.push(['You feel you\'ve plateaued.','Change one thing for two weeks: a different interval set, an extra easy run or earlier nights.'+adj('Ask Koach to freshen up my week')]);
-  else if(cnt('trend','fitter')>=2)pts.push(['You feel yourself getting fitter.','Keep doing what you\'re doing. Steady sleep and good food lock it in.']);
-  if(cnt('start','slow')>=3)pts.push(['Your sessions keep starting slow.','Give the warm-up the full 15 minutes and build into it rather than starting at target effort.']);
-  if(cnt('flow','faded')>=2)pts.push(['You\'ve been fading in sessions.','Eat something 2-3 hours before, bring water, and check your food on training days.']);
-  if(cnt('energy','low')>=3)pts.push(['Energy has been low in training.','Look at sleep and food first. A gentle Recover session in place of one hard day can help.']);
-  return pts.slice(0,2)}
-const _p2Read2=p1ReadHTML;
-p1ReadHTML=function(k){let h=_p2Read2(k);if(!h||sampleMode||h.includes('p1readc'))return h;const pts=p2FbPoints(k);if(!pts.length)return h;
-  h=h.replace(/<li><span><b>Nothing stands out\.<\/b>[\s\S]*?<\/li>/,'');return h.replace('<ul>','<ul>'+pts.map(([a,b])=>`<li><span><b>${a}</b> ${b}</span></li>`).join(''))};
-async function p2AdjustWeek(){if(!sample||sampleMode){toast('This needs the AI coach');return}const d0=todayDate();const days7=[];
-  for(let i=0;i<7;i++){const dd=addD(d0,i),kk=iso(dd),p=planFor(dd);if(p&&!p.pre&&!L()[kk])days7.push({date:kk,weekday:fmtD(dd,{weekday:'long'}),code:p.type,session:sessionBrief(dd,p)})}
-  if(!days7.length){toast('Nothing left to change this week');return}toast('Koach is looking at your week…',5000);
-  try{const out=await sample.json(`${XABOUT()} tells us after each session how it felt. Use that to make small, sensible changes to the coming week.
-Session feedback, newest first (feel is 1-5): ${JSON.stringify(p2FbRecent(iso(d0),8))}
-Last 7 days: ${JSON.stringify(loadHistory(iso(addD(d0,-1))))}
-Coming days (you may change only these): ${JSON.stringify(days7)}
-Session codes: ${planCodes().map(c=>`${c} = ${TNAME[c]}`).join(', ')}.
-Rules: if sessions feel harder than planned, they feel they're going backwards, energy is low or they fade, ease the week: make one or two hard sessions (${HARDC.filter(c=>TNAME[c]).map(c=>TNAME[c]).join(', ')}) easier or swap one for an easy or rest day. If they feel they've plateaued but otherwise fine, freshen it: change what one session asks of them (a note with a different set or a swap), adding no more than about 10% work. If they feel fitter and sessions are about right, change nothing. Slow starts: a note on the next hard day about a longer warm-up. Keep at least one rest day in any 7. Fixed classes or club sessions stay put. Change at most 3 days.
-Reply with ONLY JSON: {"adjust":[{"date":"YYYY-MM-DD","type":"code","note":"one short practical line"}],"summary":"one short line"}`,{modelTier:'quick'});
-    const applied=await applyAdjust(out&&out.adjust,'feedback');toast(applied.length?`Week updated: ${String(out.summary||`${applied.length} day${applied.length>1?'s':''} changed`).slice(0,140)}`:String((out&&out.summary)||'Your week looks right as it is.').slice(0,140),6000);render()}
-  catch(e){toast(foodErr(e),4000)}}
-const _p2BS=buildSummary;buildSummary=function(now){let s=_p2BS(now);const fb=p2FbRecent(iso(now),12);
-  if(fb.length)s+='\nHow sessions felt, newest first: '+fb.map(f=>`${f.date}: ${f.feel}/5${f.start?`, start ${f.start}`:''}${f.flow?`, then ${f.flow}`:''}${f.energy?`, energy ${f.energy}`:''}${f.effort?`, vs plan ${f.effort}`:''}${f.trend?`, lately ${f.trend}`:''}${f.note?` "${String(f.note).slice(0,100)}"`:''}`).join('; ');
-  const Ln=p2Learn();if(Ln.n>=6)s+=`\nBalance checked against ${Ln.n} sessions: matched how they felt ${Ln.acc}% of the time (felt better than it said ${Ln.better} times, worse ${Ln.worse}).`;return s};
-
-// ---------- Patterns: how your balance is worked out ----------
-function p2BalCard(){const Ln=p2Learn();const k=iso(sampleMode?SAMPLE.now:todayDate());const need=p2NeedBase(k);
-    const fs=Object.keys(P2W).filter(f=>f!=='hrv'&&(f!=='rhr'||Object.values(D()).some(d=>isNum(d.rhr))));const tw0=fs.reduce((a,f)=>a+P2W[f],0),tw=fs.reduce((a,f)=>a+P2W[f]*(Ln.m[f]||1),0);
-  const rows=fs.map(f=>{const sh=P2W[f]*(Ln.m[f]||1)/tw,r=sh/(P2W[f]/tw0);
-    return `<li><span>${P2WL[f]}</span><span class="num"><b>${Math.round(sh*100)}%</b>${r>=1.15?' <small class="p2up">counts more for you</small>':r<=.85?' <small class="p2dn">counts less for you</small>':''}</span></li>`}).join('');
-  const head=Ln.n<6?`<p>After each session, say how it felt. Once there are 6, Keel starts checking which of your inputs best predict a good session and adjusts how much each one counts for you. <b>${Ln.n} so far.</b></p>`
-    :`<p>Checked against <b>${Ln.n} sessions</b>. Your balance matched how they felt <b>${Ln.acc}%</b> of the time. You felt better than it said ${Ln.better} time${Ln.better===1?'':'s'} and worse ${Ln.worse} time${Ln.worse===1?'':'s'}.${Ln.off?` Your scores are nudged ${Ln.off>0?'up':'down'} ${Math.abs(Ln.off)} point${Math.abs(Ln.off)===1?'':'s'} to match how your sessions actually go.`:''}</p>`;
-  return `<article class="card p2balc"><div class="chead"><div style="flex:1"><h2>How your balance is worked out</h2><div class="sub">Compared with your own usual, and learning from your sessions</div></div></div><div class="form">${head}
-    <ul class="p2wts">${rows}</ul><p class="ds">Your sleep need: <b>${need} h</b>${need===8?' (Keel works this out once it has a few weeks of check-ins)':', from the nights before mornings you felt good'}. Niggles, feeling unwell and the "Sick / run down" tag also put a ceiling on the score.</p></div></article>`}
-const _p2PV=p1PatternsView;p1PatternsView=function(){return _p2PV()+p2BalCard()};
+// ================= owner only: who's using Keel =================
+var P2TS={list:null,busy:false,err:''};
+async function p2LoadTesters(){P2TS.busy=true;P2TS.err='';render();try{const r=await fetch('/api/testers',{headers:{authorization:'Bearer '+SESSION.access_token}});const j=await r.json();if(!r.ok)P2TS.err=j.error||'Could not load';else P2TS.list=j.list}catch(e){P2TS.err='Could not load'}P2TS.busy=false;render()}
+function p2Ago(t){if(!t)return 'never';const d=(Date.now()-new Date(t))/864e5;return d<1/24?'just now':d<1?`${Math.round(d*24)} h ago`:d<2?'yesterday':d<30?`${Math.round(d)} days ago`:fmtD(new Date(t),{day:'numeric',month:'short'})}
+function p2TestersHTML(){if(!IS_OWNER)return '';const L=P2TS.list;const VN={main:'Original',p1:'Prototype 1',p2:'Prototype 2'};
+  const rows=L?L.map(x=>{const v=Object.keys(VN).filter(k=>x.versions&&x.versions[k]).sort((a,b)=>String(x.versions[b]).localeCompare(String(x.versions[a])));
+    const st=!x.confirmed?['var(--status-caution)','Hasn\'t confirmed email']:!x.setUp?['var(--status-caution)','Signed up, not set up']:x.lastActive&&(Date.now()-new Date(x.lastActive))<3*864e5?['var(--status-good)','Active']:['var(--text-muted)','Gone quiet'];
+    return `<div class="p2tr"><div class="p2trh"><b>${esc(x.name||x.email.split('@')[0])}${x.me?' (you)':''}</b><span class="p2ts" style="--c:${st[0]}">${st[1]}</span></div><small>${esc(x.email)}</small>
+      <div class="p2trg"><span>Joined <b>${p2Ago(x.joined)}</b></span><span>Last in <b>${p2Ago(x.lastSignIn)}</b></span><span>Last logged <b>${p2Ago(x.lastActive)}</b></span><span><b>${x.days}</b> days · <b>${x.logs}</b> sessions</span>${v.length?`<span>Uses <b>${v.map(k=>VN[k]).join(', ')}</b></span>`:''}</div></div>`}).join(''):'';
+  const n=L?L.length:0,act=L?L.filter(x=>x.lastActive&&(Date.now()-new Date(x.lastActive))<3*864e5).length:0;
+  return `<section class="panel p2testers"><h3>Testers <small class="ds">only you can see this</small></h3>
+    ${L?`<div class="ds" style="margin-bottom:8px">${n} account${n===1?'':'s'} · ${act} active in the last 3 days</div>${rows}`:P2TS.err?`<div class="ds">${esc(P2TS.err)}</div>`:''}
+    <button type="button" class="ghost" data-p2testers style="width:100%;margin-top:8px">${P2TS.busy?'Loading…':L?'Refresh':'Show who\'s using Keel'}</button></section>`}
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-p2testers]')&&!P2TS.busy)p2LoadTesters()});
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
@@ -3603,7 +3469,7 @@ async function runAI(){
 Each day's sleep fields describe the night before that date. Strain is 0-21 combining training and ${WORK.toLowerCase()}. No wearable; all values are self-logged. Readiness 0-100; scores out of 5; RPE out of 10.
 ${buildSummary(now)}
 
-Use the session feedback to judge whether the plan, the recovery and the balance score suit them, and say so if the score keeps disagreeing with how sessions feel. Never quote today's balance number. Write a short review in plain text, no headings, no bold. Use 6-10 bullet points. Each bullet is ONE line in this exact form: "- " then a short headline of 4-9 words, then " :: ", then 2-4 sentences of detail tied to the numbers and ending with one practical thing to do. Cover, where the data allows: training load and readiness trends; sleep timing and consistency, screens-off time, caffeine timing; how farm work, desk and car time relate to soreness, niggles and readiness; family time and mood; nutrition adherence, protein, vitamin and mineral gaps, fasting hours and how they relate to energy; niggle patterns and likely triggers; progress in strength, threshold pace and 5 km. Then one final line starting "Next week:" with the single most useful change. Under 220 words. No medical diagnoses; if pain is 5/10 or more, say to get it checked by a physio.`;
+Write a short review in plain text, no headings, no bold. Use 6-10 bullet points. Each bullet is ONE line in this exact form: "- " then a short headline of 4-9 words, then " :: ", then 2-4 sentences of detail tied to the numbers and ending with one practical thing to do. Cover, where the data allows: training load and readiness trends; sleep timing and consistency, screens-off time, caffeine timing; how farm work, desk and car time relate to soreness, niggles and readiness; family time and mood; nutrition adherence, protein, vitamin and mineral gaps, fasting hours and how they relate to energy; niggle patterns and likely triggers; progress in strength, threshold pace and 5 km. Then one final line starting "Next week:" with the single most useful change. Under 220 words. No medical diagnoses; if pain is 5/10 or more, say to get it checked by a physio.`;
   aiState={busy:true,text:'',err:''};render();
   try{const {text}=await sample(prompt,{onText:({text})=>{aiState.text=text;const el=$('#aiOut');if(el)el.textContent=text},cache:false});
     aiState={busy:false,text,err:''};
@@ -3672,7 +3538,7 @@ function viewReports(){
 let SAMPLE=null;
 function buildSample(){
   const LIB=DEF_LIB;
-  const now=addD(FIRST,63);const logs={},days={};let tb=80,ss=12,pace=290;let seed=11,fs=29;const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
+  const now=addD(FIRST,63);const logs={},days={};let tb=80,ss=12,pace=290;let seed=11;const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
   const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
   const classes=[
     {summary:'4 rounds for time',runM:4000,items:[['Run','1 km','Run',['Quads','Calves','Hamstrings']],['Wall balls','25','Wall balls',['Quads','Glutes','Shoulders']],['Sled push','2 × 25 m','Sled push',['Quads','Glutes','Calves']],['Burpee broad jumps','15','Burpee broad jumps',['Quads','Chest','Core']]]},
@@ -3726,11 +3592,7 @@ function buildSample(){
     if(typ==='S'&&status!=='missed'){l.tb=tb;l.ss=ss;if(!DELOAD[p.wk]&&status==='done'){tb+=5;ss+=1}}
     if(typ==='T'){if(p.wk===1)l.fivek='22:40';else if(rnd()<.2){l.type='H';l.hyrox=mkH(classes[Math.floor(rnd()*3)])}else if(status!=='missed'){l.pace=fromSec(pace);pace-=3}}
     if(typ==='H')l.hyrox=mkH(classes[Math.floor(rnd()*3)]);
-    logs[k]=l;
-    // how sessions felt, on its own random stream so the rest of the example data stays the same
-    if(status!=='missed'){fs=(fs*16807)%2147483647;const fr=(fs-1)/2147483646;fs=(fs*16807)%2147483647;const fr2=(fs-1)/2147483646;
-      const feel=cl(Math.round(1.6+(sh-6.5)*.75+(energy-3)*.45-(sore>=4?.5:0)+fr*1.4),1,5);
-      days[k].sfb={feel,start:fr2<.3?'slow':fr2>.8?'sharp':'normal',flow:feel>=4?'better':feel<=2?'faded':'same',energy:feel>=4?'full':feel<=2?'low':'steady',effort:feel<=2?'harder':feel>=5?'easier':'right',trend:p.wk>=6&&p.wk<=8?'plateau':p.wk>=10?'fitter':'unsure',note:''}}}
+    logs[k]=l;}
   return {now,logs,days};
 }
 // ================= render + events =================
@@ -4423,7 +4285,7 @@ function viewProfile(){
   <section class="panel"><h3>Send feedback</h3><div class="ds">What works, what's confusing, what's missing. It goes straight to whoever invited you.</div>
     <textarea id="fb-text" placeholder="e.g. Dictation is great but I'd like to log a match as well"></textarea>
     <button type="button" class="primary" id="fbSend" ${fbState.busy?'disabled':''} style="flex:none">${fbState.busy?'Sending…':'Send feedback'}</button></section>
-  ${IS_ADMIN?`<section class="panel"><h3>Feedback from testers</h3>${fbState.list?fbState.list.length?fbState.list.map(f=>`<div class="cmp"><span class="q">${esc(f.name||'Someone')} <span class="ds">· ${fmtD(new Date(f.created_at))} · ${esc(f.tab||'')}</span></span><span>${esc(f.text)}</span></div>`).join(''):'<div class="ds">No feedback yet.</div>':'<button type="button" class="ghost" id="fbLoad" style="color:var(--fg)">Show feedback</button>'}</section>`:''}
+  ${p2TestersHTML()}${IS_ADMIN?`<section class="panel"><h3>Feedback from testers</h3>${fbState.list?fbState.list.length?fbState.list.map(f=>`<div class="cmp"><span class="q">${esc(f.name||'Someone')} <span class="ds">· ${fmtD(new Date(f.created_at))} · ${esc(f.tab||'')}</span></span><span>${esc(f.text)}</span></div>`).join(''):'<div class="ds">No feedback yet.</div>':'<button type="button" class="ghost" id="fbLoad" style="color:var(--fg)">Show feedback</button>'}</section>`:''}
   <section class="panel"><h3>Account</h3><div class="ds">Your data is stored in this app's database and is only shown to you in the app. The person running the trial can see the database as its administrator.</div><button type="button" class="ghost danger" id="signOut">Sign out</button></section>`;
 }
 async function sendFeedback(){
@@ -4485,151 +4347,6 @@ document.addEventListener('click',async e=>{
   if(id==='rebuild'){ob={step:5,a:Object.assign({},PROFILE.answers||{})};obSave();obRender();return}
   if(id==='fbSend'){sendFeedback();return}
   if(id==='fbLoad'){loadFeedback();return}
-});
-// ================= P2: your team (share your Keel with a coach) =================
-// Joining uses the team's player code. Before anything is shared, the person sees exactly what the coach
-// will and won't see. Sharing can be paused or the team left at any time. See supabase/teams.sql.
-const TEAM={list:null,busy:false,err:'',ask:null,loading:false};
-const TEAM_SEES=['Your balance each day and how it is trending','Sleep times and sleep quality','The check-in sliders: energy, mood, stress and how your body feels','Niggles: where, which side and how sore (not your notes)','Sessions: type, minutes, effort, done or missed, and how they felt','That you\'re unwell and how badly (not what it is)','Morning pulse and HRV if you log them','Recovery: sessions, mobility, sauna and cold water (type and minutes)','Your name, age, sport and goal from sign-up'];
-const TEAM_NEVER=['Food, unless you turn on food sharing below (and then only daily totals)','Drinks with alcohol, notes and photos','Cycle tracking','Your weight, Koach\'s chats and overview'];
-async function teamLoad(){if(!sb||TEAM.loading)return;TEAM.loading=true;try{const {data,error}=await sb.rpc('keel_my_teams');if(error)throw error;TEAM.list=data||[];TEAM.err=''}catch(e){TEAM.list=[];TEAM.err=/keel_my_teams|function|schema/i.test(String(e&&e.message))?'Teams are not switched on for this app yet.':''}TEAM.loading=false;render()}
-function teamPanel(){
-  if(TEAM.list==null){setTimeout(teamLoad,0);return `<section class="panel" id="teamPanel"><h3>Your team</h3><div class="ds">Loading…</div></section>`}
-  const mine=TEAM.list.map(m=>`<div class="cmp"><span class="q">${esc(m.name||'Team')} <span class="ds">· ${m.role==='coach'?'Staff':m.share?'Sharing with the staff':'Sharing paused'}</span></span>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">${m.role==='coach'?`<a class="primary" href="/coach/" style="flex:none;text-decoration:none;padding:8px 16px;font-size:15px">Open the coach dashboard</a>`:`<button type="button" class="ghost" data-teamshare="${m.team_id}" data-on="${m.share?0:1}" style="color:var(--fg)">${m.share?'Pause sharing':'Share again'}</button>`}
-    <button type="button" class="ghost danger" data-teamleave="${m.team_id}">Leave</button></div>${m.role!=='coach'&&m.share?`<label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-top:4px"><input type="checkbox" data-teamfood="${m.team_id}" ${m.share_food?'checked':''} style="margin-top:3px"><span>Share food totals with the nutritionist and staff<br><span class="ds">Daily calories, protein, carbs, fat, fibre, plants, water and a few vitamins. Never meals, photos or drinks with alcohol.</span></span></label>`:''}</div>`).join('');
-  const ask=TEAM.ask?`<div class="cmp" style="gap:12px"><b>Before you join</b><div class="ds" style="font-size:13px">The team's staff (manager, coaches, S&amp;C, physio, nutritionist, mindset coach) will see:</div><ul style="margin:0 0 0 18px;font-size:14px;line-height:1.5">${TEAM_SEES.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
-    <div class="ds" style="font-size:13px">They will never see:</div><ul style="margin:0 0 0 18px;font-size:14px;line-height:1.5">${TEAM_NEVER.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
-    <div class="ds">This includes what you've already logged. You can pause sharing or leave the team here at any time.</div>
-    <div style="display:flex;gap:8px"><button type="button" class="ghost" id="teamBack" style="flex:1;color:var(--fg)">Not now</button><button type="button" class="primary" id="teamYes" ${TEAM.busy?'disabled':''}>${TEAM.busy?'Joining…':'Join and share'}</button></div></div>`
-   :`<div class="field"><label class="label" for="teamCode">Join a team</label><input id="teamCode" type="text" autocomplete="off" autocapitalize="characters" placeholder="Code from your coach, e.g. K7PQ2M" style="text-transform:uppercase;letter-spacing:.1em"></div>
-    <button type="button" class="ghost" id="teamNext" style="color:var(--fg)">Next</button>`;
-  return `<section class="panel" id="teamPanel"><h3>Your team</h3>${TEAM.err?`<div class="ds">${esc(TEAM.err)}</div>`:`<div class="ds">Share how you're going with your coach, so they can plan sessions around the squad.</div>${mine}${ask}`}</section>`}
-const _p2vp=viewProfile;viewProfile=function(){const h=_p2vp();const i=h.indexOf('<section class="panel"><h3>Send feedback');return i<0?h+teamPanel():h.slice(0,i)+teamPanel()+h.slice(i)};
-document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||!t.dataset.teamfood)return;const on=t.checked;
-  const {error}=await sb.from('team_members').update({share_food:on}).eq('team_id',t.dataset.teamfood).eq('user_id',UID);
-  if(error){t.checked=!on;toast(/share_food/.test(error.message)?'Food sharing isn\'t switched on for this team yet.':'Could not change that. Try again.');return}
-  toast(on?'Food totals are now shared with the staff':'Food is private again',3500);TEAM.list=null;render()});
-document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
-  if(c('#teamNext')){const v=(($('#teamCode')||{}).value||'').replace(/\s/g,'').toUpperCase();if(v.length<6){toast('Type the 6-letter code from your coach');return}TEAM.ask=v;render();return}
-  if(c('#teamBack')){TEAM.ask=null;render();return}
-  if(c('#teamYes')){if(TEAM.busy)return;TEAM.busy=true;render();const nm=(PROFILE&&PROFILE.answers&&PROFILE.answers.name)||null;
-    const {data,error}=await sb.rpc('keel_join_team',{join_code:TEAM.ask,my_name:nm});TEAM.busy=false;
-    if(error){toast(error.message||'Could not join. Check the code.',4000);render();return}
-    TEAM.ask=null;toast(data&&data.role==='coach'?`You're a coach on ${data.name}`:`You've joined ${data&&data.name||'the team'}`,3500);TEAM.list=null;render();return}
-  if(x=c('[data-teamshare]')){const on=x.dataset.on==='1';const {error}=await sb.from('team_members').update({share:on}).eq('team_id',x.dataset.teamshare).eq('user_id',UID);
-    if(error){toast('Could not change that. Try again.');return}toast(on?'Sharing again':'Sharing paused. The staff see nothing new or old until you share again.',4000);TEAM.list=null;render();return}
-  if(x=c('[data-teamleave]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Tap again to leave';return}
-    const {error}=await sb.from('team_members').delete().eq('team_id',x.dataset.teamleave).eq('user_id',UID);if(error){toast('Could not leave. Try again.');return}toast('You have left the team');TEAM.list=null;render();return}
-});
-// ================= P2: S&C programme from your team (see supabase/sc.sql) =================
-// The team's S&C coach builds a programme in the staff dashboard and puts players on it.
-// Players see today's session here with videos, at the load % their coach set, and log it back.
-const MYP={list:null,loading:false,urls:{}};
-const MYP_DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-async function mypLoad(){if(!sb||!UID||MYP.loading)return;MYP.loading=true;try{const {data,error}=await sb.rpc('keel_my_programmes');MYP.list=error?[]:(data||[])}catch(e){MYP.list=[]}MYP.loading=false;render()}
-function mypAt(a,k){const s=a.start;const wk=Math.floor((parse(k)-parse(s))/(7*864e5))+1;const W=(a.programme.plan&&a.programme.plan.weeks)||[];const dow=(parse(k).getDay()+6)%7+1;
-  const week=W[wk-1];return {wk,dow,started:k>=s,finished:wk>W.length,days:week?(week.days||[]).filter(d=>d.dow===dow):[],W}}
-const mypLogged=(a,wk,dow)=>(a.logs||[]).find(l=>l.week===wk&&l.dow===dow);
-function mypNext(a,k){for(let i=1;i<=14;i++){const kk=iso(addD(parse(k),i));const t=mypAt(a,kk);if(t.finished)return null;if(t.started&&t.days.length)return {k:kk,d:t.days[0]}}return null}
-function mypLoadNote(pct){if(pct===100)return '';const d=100-pct;return d>0?`Your coach has you at ${pct}% today: go about ${d}% lighter than written${pct<=85?' and drop a set where there are 4 or more':''}.`:`Your coach has you at ${pct}%: you can push about ${-d}% more than written if it feels good.`}
-const mypSets=(sets,pct)=>{const n=+sets;return n&&pct<=85&&n>=4?n-1:sets};
-function mypSession(a,d,k,t){const ex=id=>(a.exercises||[]).find(e=>e.id===id)||{name:'Exercise'};const lg=mypLogged(a,t.wk,t.dow);
-  return `<div class="cmp" style="gap:10px"><div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><b style="font-size:17px">${esc(d.title||'Session')}</b><span class="ds">${d.min?d.min+' min':''}${d.rpe?' · effort '+d.rpe+'/10':''} · week ${t.wk} of ${t.W.length}</span></div>
-   ${a.load!==100?`<div class="ds" style="color:var(--accent)">${esc(mypLoadNote(a.load))}</div>`:''}
-   <div style="display:flex;flex-direction:column;gap:6px">${(d.items||[]).map(it=>{const e=ex(it.ex);return `<div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line,#262935);border-radius:10px">
-     ${e.video?`<button type="button" class="ghost" data-mypvid="${esc(e.id)}" data-mypa="${esc(a.assignment)}" aria-label="Watch ${esc(e.name)}" style="flex:none;width:38px;height:38px;border-radius:50%;padding:0;color:var(--fg)">▶</button>`:''}
-     <div style="flex:1;min-width:0"><b style="font-size:15px">${esc(e.name)}</b><div class="ds">${esc([it.sets?mypSets(it.sets,a.load)+' × '+(it.reps||''):it.reps,it.load,it.rest?'rest '+it.rest:''].filter(Boolean).join(' · '))}</div>${it.note?`<div class="ds" style="font-style:italic">${esc(it.note)}</div>`:''}${e.cues&&!it.note?`<div class="ds">${esc(e.cues)}</div>`:''}</div></div>`}).join('')}</div>
-   ${lg?`<div class="ds">${lg.done?`Logged: ${lg.dur||'?'} min, effort ${lg.rpe||'?'}/10.`:'Marked as missed.'} <button type="button" class="linkbtn" data-myplog="${esc(a.assignment)}" data-k="${k}">Change</button></div>`
-     :k===iso(todayDate())||k<iso(todayDate())?`<button type="button" class="primary" data-myplog="${esc(a.assignment)}" data-k="${k}">Log this session</button>`:''}</div>`}
-function mypCard(where){if(sampleMode)return '';if(MYP.list==null){setTimeout(mypLoad,0);return ''}if(!MYP.list.length)return '';const k=iso(todayDate());
-  return MYP.list.map(a=>{const t=mypAt(a,k);if(t.finished)return '';const nx=mypNext(a,k);
-    let body;if(!t.started)body=`<div class="ds">Starts ${esc(fmtD(parse(a.start),{weekday:'long',day:'numeric',month:'short'}))}.</div>`;
-    else if(t.days.length)body=t.days.map(d=>mypSession(a,d,k,t)).join('');
-    else body=`<div class="ds">No S&amp;C session today.${nx?` Next: <b>${esc(nx.d.title||'Session')}</b> on ${esc(fmtD(parse(nx.k),{weekday:'long'}))}.`:''}</div>`;
-    const week=where==='plan'&&t.started?`<div style="display:flex;gap:6px;flex-wrap:wrap">${[1,2,3,4,5,6,7].map(dw=>{const kk=iso(addD(parse(k),dw-t.dow));const tt=mypAt(a,kk);const d=tt.days[0];if(!d)return '';const lg=mypLogged(a,tt.wk,dw);
-      return `<span class="chip" style="padding:4px 10px;border-radius:99px;border:1px solid var(--line,#262935);font-size:13px;${kk===k?'border-color:var(--accent);':''}">${MYP_DOW[dw-1]} · ${esc(d.title||'')}${lg?(lg.done?' ✓':' ✕'):''}</span>`}).join('')}</div>`:'';
-    return `<section class="panel" id="mypCard"><h3>From your team · S&amp;C</h3><div class="ds">${esc(a.programme.name)}${a.team?' · '+esc(a.team):''}</div>${week}${body}</section>`}).join('')}
-async function mypVideo(aid,eid){const a=(MYP.list||[]).find(x=>x.assignment===aid);const e=a&&(a.exercises||[]).find(x=>x.id===eid);if(!e||!e.video)return;
-  let u=MYP.urls[e.video];if(!u){const {data,error}=await sb.storage.from('keel-videos').createSignedUrl(e.video,3600);if(error){toast('Could not load the video');return}u=MYP.urls[e.video]=data.signedUrl}
-  openSheet(`<div class="vh"><b>${esc(e.name)}</b><span>${esc(e.equipment||'')}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
-   <video src="${esc(u)}" controls autoplay playsinline muted loop style="width:100%;border-radius:12px;background:#000;max-height:60vh"></video>${e.cues?`<div class="ds">${esc(e.cues)}</div>`:''}`)}
-function mypLogSheet(aid,k){const a=(MYP.list||[]).find(x=>x.assignment===aid);if(!a)return;const t=mypAt(a,k);const d=t.days[0];if(!d)return;const lg=mypLogged(a,t.wk,t.dow)||{};
-  openSheet(`<div class="vh"><b>${esc(d.title||'Session')}</b><span>${esc(fmtD(parse(k),{weekday:'long',day:'numeric',month:'short'}))}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
-   <div class="seg" role="group"><button type="button" data-mypdone="1" aria-pressed="${lg.done!==false}">Done</button><button type="button" data-mypdone="0" aria-pressed="${lg.done===false}">Missed it</button></div>
-   <div class="field"><label class="label" for="mypDur">Minutes</label><input id="mypDur" type="number" inputmode="numeric" min="5" max="240" value="${lg.dur||d.min||45}"></div>
-   <div class="field"><label class="label" for="mypRpe">How hard was it? (1 easy, 10 flat out)</label><select id="mypRpe">${[1,2,3,4,5,6,7,8,9,10].map(v=>`<option ${v===(lg.rpe||d.rpe||6)?'selected':''}>${v}</option>`).join('')}</select></div>
-   <div class="field"><label class="label" for="mypNote">Note for your coach (optional)</label><input id="mypNote" type="text" maxlength="300" placeholder="e.g. Hamstring felt tight on the Nordics"></div>
-   <button type="button" class="primary" data-mypsave="${esc(aid)}" data-k="${k}">Save</button>`)}
-async function mypSave(aid,k){const a=(MYP.list||[]).find(x=>x.assignment===aid);const t=mypAt(a,k);const d=t.days[0];
-  const done=!document.querySelector('[data-mypdone="0"][aria-pressed="true"]');const dur=done?Math.max(5,Math.min(240,+($('#mypDur')||{}).value||d.min||45)):null;const rpe=done?+($('#mypRpe')||{}).value||6:null;
-  const row={assignment_id:aid,team_id:a.team_id,player_id:UID,day:k,week:t.wk,dow:t.dow,title:d.title||'Session',done,dur,rpe,note:(($('#mypNote')||{}).value||'').trim()||null};
-  const {error}=await sb.from('sc_logs').upsert(row,{onConflict:'assignment_id,week,dow'});if(error){toast('Could not save. Try again.',3500);return}
-  // count it in your day's load (and so your balance) like any other session
-  const cur=(D()[k]&&D()[k].extras)||[];const keep=cur.filter(x=>x.sc!==aid);if(done)keep.push({kind:'S&C',desc:d.title||'Session',dur,rpe,sc:aid});await persistDay(k,{extras:keep});
-  const L=(a.logs||[]).filter(l=>!(l.week===t.wk&&l.dow===t.dow));L.push({week:t.wk,dow:t.dow,day:k,done,dur,rpe});a.logs=L;
-  closeSheet();toast(done?'Logged. Your coach can see it.':'Marked as missed',3000);render()}
-const _mypDash=viewDashboard;viewDashboard=function(){const h=_mypDash();const c=mypCard('today');return c+h};
-const _mypTrain=viewTrainingTab;viewTrainingTab=function(){const h=_mypTrain();const c=mypCard('plan');return c+h};
-document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
-  if(x=c('[data-mypvid]')){await mypVideo(x.dataset.mypa,x.dataset.mypvid);return}
-  if(x=c('[data-myplog]')){mypLogSheet(x.dataset.myplog,x.dataset.k);return}
-  if(x=c('[data-mypdone]')){document.querySelectorAll('[data-mypdone]').forEach(b=>b.setAttribute('aria-pressed',b===x?'true':'false'));return}
-  if(x=c('[data-mypsave]')){x.disabled=true;await mypSave(x.dataset.mypsave,x.dataset.k);return}
-});
-// ================= P2: nutrition from your team (see supabase/nutrition.sql) =================
-// The team's nutritionist sets targets and sends meal plans. Targets replace the app's own; plan days
-// replace the app's plan for those dates, so "Ate" ticks and totals work as normal.
-const MYN={d:null,loading:false};
-async function mynLoad(){if(!sb||!UID||MYN.loading||sampleMode)return;MYN.loading=true;try{const {data,error}=await sb.rpc('keel_my_nutrition');MYN.d=error?{}:(data||{})}catch(e){MYN.d={}}MYN.loading=false;applyTeamNut();render()}
-function applyTeamNut(){const t=MYN.d&&MYN.d.targets;if(!t||!t.targets)return;['rest','training','match'].forEach(k=>{const x=t.targets[k];if(x&&DAYT[k])['kcal','protein','carbs','fat'].forEach(m=>{if(isNum(x[m]))DAYT[k][m]=Math.round(+x[m])})})}
-const _mynAP=applyProfile;applyProfile=function(p){_mynAP(p);applyTeamNut()};
-function mynDay(k){if(sampleMode)return null;const ps=((MYN.d&&MYN.d.plans)||[]).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)));
-  for(const p of ps){const d=((p.plan&&p.plan.days)||[]).find(x=>x.date===k);if(d)return Object.assign({team:true,from:p.sent_by_name,teamName:p.team},d)}return null}
-const _mynPD=planDay;planDay=function(k){return mynDay(k)||_mynPD(k)};
-function mynCard(){if(sampleMode)return '';if(MYN.d==null){setTimeout(mynLoad,0);return ''}const t=MYN.d.targets;const today=iso(todayDate());
-  const dates=[];((MYN.d.plans)||[]).forEach(p=>((p.plan&&p.plan.days)||[]).forEach(d=>{if(d.date>=today&&!dates.includes(d.date))dates.push(d.date)}));dates.sort();
-  if(!t&&!dates.length)return '';
-  const tl=t?`<div class="ds">Your targets are set by ${esc(t.set_by_name||'your nutritionist')}${t.team?' ('+esc(t.team)+')':''}: ${['training','match','rest'].map(k=>`${DAYT[k].label.toLowerCase()} ${DAYT[k].kcal} kcal, ${DAYT[k].protein} g protein`).join(' · ')}.</div>${t.note?`<div class="ds" style="font-style:italic">“${esc(t.note)}”</div>`:''}`:'';
-  const notes=[...new Set(((MYN.d.plans)||[]).filter(p=>p.last_day>=today&&p.note).map(p=>p.note))];
-  const days=dates.slice(0,4).map(k=>{const d=mynDay(k);return `<div style="display:flex;flex-direction:column;gap:6px"><b style="font-size:15px">${k===today?'Today':esc(fmtD(parse(k),{weekday:'long',day:'numeric',month:'short'}))} <span class="ds" style="font-weight:400">· ${esc((DAYT[d.dayType]||{}).label||'')}</span></b>${planMealsHTML(k,true)}</div>`}).join('');
-  return `<section class="panel" id="mynCard"><h3>From your team · Nutrition</h3>${tl}${notes.map(n=>`<div class="ds" style="font-style:italic">“${esc(n)}”</div>`).join('')}${days}</section>`}
-const _mynFood=viewFood;viewFood=function(){const h=_mynFood();return mynCard()+h};
-const _mynDash=viewDashboard;viewDashboard=function(){if(MYN.d==null&&!sampleMode)setTimeout(mynLoad,0);return _mynDash()};
-// ================= P2: rehab plan from your team's physio (see supabase/rehab.sql) =================
-const MYR={list:null,loading:false};
-async function myrLoad(){if(!sb||!UID||MYR.loading||sampleMode)return;MYR.loading=true;try{const {data,error}=await sb.rpc('keel_my_rehab');MYR.list=error?[]:(data||[])}catch(e){MYR.list=[]}MYR.loading=false;render()}
-function myrCard(){if(sampleMode)return '';if(MYR.list==null){setTimeout(myrLoad,0);return ''}if(!MYR.list.length)return '';const k=iso(todayDate());
-  return MYR.list.map(r=>{const st=(r.stages||[])[r.stage]||{};const n=(r.stages||[]).length;const lg=(r.logs||[]).find(l=>l.day===k);const ex=id=>(r.exercises||[]).find(e=>e.id===id);
-    return `<section class="panel" id="myrCard"><h3>From your team · Rehab</h3><div class="ds">${esc(r.area)}${r.side?' ('+esc(String(r.side).toLowerCase())+')':''}${r.by?' · '+esc(r.by):''}${r.target_day?' · aiming to be back '+esc(fmtD(parse(r.target_day),{weekday:'short',day:'numeric',month:'short'})):''}</div>
-     <div style="display:flex;gap:4px">${(r.stages||[]).map((s,i)=>`<span style="flex:1;height:7px;border-radius:99px;background:${i<r.stage?'var(--ok)':i===r.stage?'var(--warn)':'var(--line,#323646)'}"></span>`).join('')}</div>
-     <div class="cmp" style="gap:8px"><b style="font-size:17px">Stage ${r.stage+1} of ${n}: ${esc(st.name||'')}</b>${st.goal?`<div class="ds">${esc(st.goal)}</div>`:''}${st.criteria?`<div class="ds"><b>To move on:</b> ${esc(st.criteria)}</div>`:''}
-      ${r.pain_rule?`<div class="ds" style="color:var(--warn)">${esc(r.pain_rule)}</div>`:''}${r.note?`<div class="ds" style="font-style:italic">“${esc(r.note)}”</div>`:''}
-      <div style="display:flex;flex-direction:column;gap:6px">${(st.items||[]).map(it=>{const e=it.ex&&ex(it.ex);return `<div style="display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line,#262935);border-radius:10px">
-        ${e&&e.video?`<button type="button" class="ghost" data-myrvid="${esc(e.id)}" data-myrr="${esc(r.id)}" aria-label="Watch ${esc(e.name)}" style="flex:none;width:38px;height:38px;border-radius:50%;padding:0;color:var(--fg)">▶</button>`:''}
-        <div style="flex:1;min-width:0"><b style="font-size:15px">${esc(e?e.name:it.name)}</b><div class="ds">${esc([it.sets&&it.reps?it.sets+' × '+it.reps:it.reps,it.freq].filter(Boolean).join(' · '))}</div>${it.note?`<div class="ds" style="font-style:italic">${esc(it.note)}</div>`:e&&e.cues?`<div class="ds">${esc(e.cues)}</div>`:''}</div></div>`}).join('')}</div>
-      ${lg?`<div class="ds">Today: ${lg.done?'done':'missed'}${lg.pain!=null?', pain '+lg.pain+'/10':''}. <button type="button" class="linkbtn" data-myrlog="${esc(r.id)}">Change</button></div>`:`<button type="button" class="primary" data-myrlog="${esc(r.id)}">Log today's rehab</button>`}</div></section>`}).join('')}
-async function myrVideo(rid,eid){const r=(MYR.list||[]).find(x=>x.id===rid);const e=r&&(r.exercises||[]).find(x=>x.id===eid);if(!e||!e.video)return;
-  let u=MYP.urls[e.video];if(!u){const {data,error}=await sb.storage.from('keel-videos').createSignedUrl(e.video,3600);if(error){toast('Could not load the video');return}u=MYP.urls[e.video]=data.signedUrl}
-  openSheet(`<div class="vh"><b>${esc(e.name)}</b><span>${esc(e.equipment||'')}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div><video src="${esc(u)}" controls autoplay playsinline muted loop style="width:100%;border-radius:12px;background:#000;max-height:60vh"></video>${e.cues?`<div class="ds">${esc(e.cues)}</div>`:''}`)}
-function myrSheet(rid){const r=(MYR.list||[]).find(x=>x.id===rid);if(!r)return;const k=iso(todayDate());const lg=(r.logs||[]).find(l=>l.day===k)||{};
-  openSheet(`<div class="vh"><b>Today's rehab</b><span>${esc(r.area)}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
-   <div class="seg" role="group"><button type="button" data-myrdone="1" aria-pressed="${lg.done!==false}">Done</button><button type="button" data-myrdone="0" aria-pressed="${lg.done===false}">Didn't get to it</button></div>
-   <div class="field"><label class="label" for="myrPain">Pain during it (0 none, 10 worst)</label><select id="myrPain">${[0,1,2,3,4,5,6,7,8,9,10].map(v=>`<option ${v===(lg.pain!=null?lg.pain:2)?'selected':''}>${v}</option>`).join('')}</select></div>
-   <div class="field"><label class="label" for="myrNote">Note for the physio (optional)</label><input id="myrNote" type="text" maxlength="300" placeholder="e.g. Tight on the last set, fine after"></div>
-   <button type="button" class="primary" data-myrsave="${esc(rid)}">Save</button>`)}
-async function myrSave(rid){const r=(MYR.list||[]).find(x=>x.id===rid);const k=iso(todayDate());const done=!document.querySelector('[data-myrdone="0"][aria-pressed="true"]');const pain=+($('#myrPain')||{}).value;
-  const row={plan_id:rid,team_id:r.team_id,player_id:UID,day:k,stage:r.stage,done,pain:isNaN(pain)?null:pain,note:(($('#myrNote')||{}).value||'').trim()||null};
-  const {error}=await sb.from('rehab_logs').upsert(row,{onConflict:'plan_id,day'});if(error){toast('Could not save. Try again.',3500);return}
-  r.logs=(r.logs||[]).filter(l=>l.day!==k);r.logs.unshift({day:k,stage:r.stage,done,pain:row.pain});closeSheet();
-  toast(pain>3&&done?'Saved. That\'s above 3/10, so let your physio know how it felt.':'Saved. Your physio can see it.',4000);render()}
-const _myrDash=viewDashboard;viewDashboard=function(){return myrCard()+_myrDash()};
-const _myrRec=viewRecover;viewRecover=function(){return myrCard()+_myrRec()};
-document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
-  if(x=c('[data-myrvid]')){await myrVideo(x.dataset.myrr,x.dataset.myrvid);return}
-  if(x=c('[data-myrlog]')){myrSheet(x.dataset.myrlog);return}
-  if(x=c('[data-myrdone]')){document.querySelectorAll('[data-myrdone]').forEach(b=>b.setAttribute('aria-pressed',b===x?'true':'false'));return}
-  if(x=c('[data-myrsave]')){x.disabled=true;await myrSave(x.dataset.myrsave);return}
 });
 const P2REC=/type=recovery/.test(location.hash+location.search);
 (async()=>{

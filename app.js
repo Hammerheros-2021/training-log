@@ -1934,6 +1934,12 @@ async function persistDay(k,fields){const cur=days[k]||{date:k};let base=cur;
   if(daysCol){try{await daysCol.doc(k).set(doc)}catch(e){toast('Could not save. Try again.');return false}}
   return true}
 
+// ================= note which version someone opens (for the owner's testers list) =================
+(function(){const VER=/\/p2\//.test(location.pathname)?'p2':/\/p1\//.test(location.pathname)?'p1':'main';let done=false;
+  const t=setInterval(async()=>{if(done)return;try{if(!(typeof sb!=='undefined'&&sb&&UID&&PROFILE))return;done=true;clearInterval(t);const today=new Date().toISOString().slice(0,10);
+    const {data}=await sb.from('entries').select('data').match({user_id:UID,kind:'meta',key:'seen'}).maybeSingle();const cur=(data&&data.data)||{};if(cur[VER]===today)return;
+    await sb.from('entries').upsert({user_id:UID,kind:'meta',key:'seen',data:{...cur,[VER]:today,last:VER,at:new Date().toISOString()},updated_at:new Date().toISOString()})}catch(e){}},3000);setTimeout(()=>clearInterval(t),120000)})();
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
