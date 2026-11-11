@@ -487,8 +487,8 @@ async function parseDiary(){
 async function parseFoodPhoto(file){
   const meal=fState.meal||(iso(sel)===iso(todayDate())?guessMeal():'Dinner');
   fState.busy=true;fState.msg='Looking at your plate… this can take up to a minute.';render();
-  try{const out=await sample.json(`This is a photo of a meal (${meal}). Identify each food and estimate its portion and nutrition.\n${foodRules()}\nAlso add a "seen" field to the JSON: one plain sentence describing what you can see on the plate. If it is not food, reply {"items":[],"seen":"what it is instead"}.`,{images:file});
-    const items=cleanItems(out&&out.items,meal,true,'photo').map(i=>({...i,meal}));
+  try{const out=await sample.json(`This is a photo of a meal (${meal}). Identify each food and estimate its portion and nutrition.\n${PHOTO_RULES}\n${foodRules()}\nAlso add a "seen" field to the JSON: one plain sentence describing what you can see on the plate. If it is not food, reply {"items":[],"seen":"what it is instead"}.`,{images:file});
+    const items=p2PhotoFix(cleanItems(out&&out.items,meal,true,'photo').map(i=>({...i,meal})),out&&out.items);
     if(!items.length){fState={...fState,busy:false,msg:'No food recognised. Try a closer photo from above, or describe it in the diary.'};render();return}
     PR={seen:out&&out.seen?String(out.seen).slice(0,200):'',meal,items:items.map(x=>({...x,pct:100,orig:x.name}))};fState={...fState,busy:false,msg:''};render();showPR();
   }catch(e){fState={...fState,busy:false,msg:foodErr(e)};toast(foodErr(e))}
@@ -1666,7 +1666,7 @@ async function prLog(){if(!PR)return;PR.busy=true;showPR();const k=iso(sel);
   try{const changed=PR.items.filter(x=>!x.off&&x.name.trim()&&x.name.trim()!==x.orig);
     if(changed.length&&sample){const out=await sample.json(`Estimate nutrition for these foods from one plate (${PR.meal}), keeping the same portion sizes as described.\n${changed.map(x=>`- ${x.name} (${x.qty||'normal portion'})`).join('\n')}\n${typeof foodRules==='function'?foodRules():FOOD_RULES}`);
       const fresh=cleanItems(out&&out.items,PR.meal,true,'photo');changed.forEach((x,i)=>{const f=fresh[i];if(f){NK.forEach(q=>x[q]=f[q]);x.plants=f.plants}})}
-    const items=PR.items.filter(x=>!x.off).map(x=>{const o={...x};delete o.pct;delete o.off;delete o.orig;o.name=x.name.trim()||x.orig;const f=x.pct/100;NK.forEach(q=>{if(isNum(o[q]))o[q]=q==='kcal'?Math.round(+o[q]*f):Math.round(+o[q]*f*10)/10});if(x.pct<100)o.qty=`${x.pct}% of ${o.qty||'a portion'}`;o.meal=PR.meal;return o});
+    const items=PR.items.filter(x=>!x.off).map(x=>{const o={...x};delete o.pct;delete o.off;delete o.orig;o.name=x.name.trim()||x.orig;const f=x.pct/100;NK.forEach(q=>{if(isNum(o[q]))o[q]=q==='kcal'?Math.round(+o[q]*f):Math.round(+o[q]*f*10)/10});if(x.g0){o.qty=`${Math.round(x.g0*x.pct/100)} g`}else if(x.pct!==100)o.qty=`${x.pct}% of ${o.qty||'a portion'}`;delete o.g0;delete o.g;delete o.fixed;o.meal=PR.meal;return o});
     if(items.length)await addFood(items,k);PR=null;showPR();toast(items.length?`Logged ${items.length} item${items.length>1?'s':''}`:'Nothing logged');render()}
   catch(e){PR.busy=false;showPR();toast(foodErr(e))}}
 // ---- quick add that learns what you eat, and when ----
@@ -3298,6 +3298,35 @@ function p2TestersHTML(){if(!IS_OWNER)return '';const L=P2TS.list;const VN={main
     ${L?`<div class="ds" style="margin-bottom:8px">${n} account${n===1?'':'s'} · ${act} active in the last 3 days</div>${rows}`:P2TS.err?`<div class="ds">${esc(P2TS.err)}</div>`:''}
     <button type="button" class="ghost" data-p2testers style="width:100%;margin-top:8px">${P2TS.busy?'Loading…':L?'Refresh':'Show who\'s using Keel'}</button></section>`}
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-p2testers]')&&!P2TS.busy)p2LoadTesters()});
+
+// ================= saving a day: instant on screen, saved in order, merged with the server copy =================
+const P2Q={},P2P={};
+function persistDay(k,fields){days[k]={...(days[k]||{date:k}),...fields,date:k};(P2P[k]=P2P[k]||[]).push(fields);
+  const job=(P2Q[k]||Promise.resolve()).then(async()=>{let server=null;
+    if(typeof daysCol!=='undefined'&&daysCol&&sb&&UID){try{const {data,error}=await sb.from('entries').select('data').match({user_id:UID,kind:'day',key:k}).maybeSingle();if(!error&&data&&data.data)server=data.data}catch(e){}}
+    const doc={...(server||days[k]||{}),...fields,date:k,savedAt:new Date().toISOString()};let ok=true;
+    if(typeof daysCol!=='undefined'&&daysCol){try{await daysCol.doc(k).set(doc)}catch(e){toast('Could not save. Try again.');ok=false}}
+    const q=P2P[k]||[];const i=q.indexOf(fields);if(i>=0)q.splice(i,1);days[k]={...doc,...Object.assign({},...q)};return ok});
+  P2Q[k]=job.catch(()=>false);return job}
+
+// ================= P2: photo check with grams, foods kept separate, sanity checks =================
+const PHOTO_RULES=`List every food as its own item: never combine foods (halloumi, chorizo and mushrooms are three items, not one). For each item add "g": your best estimate of its weight in grams as served. Dense foods like cheese, cured meats, nuts, butter and oil are easy to underestimate: look carefully at size and thickness. Use standard values for counted foods: one medium egg about 70 kcal, one large egg about 80 kcal; a slice of bread 70-110 kcal depending on size. If food was clearly fried, add the cooking oil or butter as its own item (usually 5-10 g).`;
+const P2UNIT=[[/\beggs?\b/i,{per:78,hi:95}],[/\bslices? of (white |brown |wholemeal )?(bread|toast)\b/i,{per:95,hi:140}]];
+function p2PhotoFix(items,raw){const rs=(Array.isArray(raw)?raw:[]).filter(x=>x&&x.name);
+  return items.map((x,i)=>{const r=rs[i]||{};const g=Math.round(+r.g||+r.grams||0)||null;const o={...x,g0:g,g};
+    // counted foods: keep calories per item realistic
+    for(const [rx,u] of P2UNIT){if(rx.test(x.name)||rx.test(x.qty||'')){const n=+((/(\d+)/.exec(x.qty||x.name)||[])[1])||1;if(isNum(o.kcal)&&o.kcal/n>u.hi){const f=(u.per*n)/o.kcal;NK.forEach(q=>{if(isNum(o[q]))o[q]=q==='kcal'?Math.round(o[q]*f):Math.round(o[q]*f*10)/10});o.fixed=true}}}
+    return o})}
+function photoReviewHTML(){if(!PR)return '';
+  return `<div class="cfwrap" id="prWrap"><div class="cfsheet prsheet" role="dialog" aria-label="Check your plate"><h2>Here's what I see</h2>${PR.seen?`<p class="prseen">${esc(PR.seen)}</p>`:''}
+    <div class="p1prtot"><small class="label">This plate, on top of today so far</small>${p1PRBars()}</div>
+    <p class="ds" style="margin:0;font-size:12px">Check the grams: weights are the biggest source of error in a photo. Change any that look wrong.</p>
+    <div class="pritems">${PR.items.map((x,i)=>`<div class="pritem ${x.off?'off':''}"><div class="prtop"><input type="text" value="${esc(x.name)}" data-prname="${i}" aria-label="Food name"><span class="num" id="prk-${i}">${Math.round(kcalOf(x)*x.pct/100)} kcal</span><button type="button" class="x" data-proff="${i}" aria-label="${x.off?'Add back':'Didn\'t eat this'}">${x.off?'+':'×'}</button></div>
+      ${x.off?'':`<div class="p2prg">${x.g0?`<label><input type="number" inputmode="numeric" min="0" step="5" value="${Math.round(x.g0*x.pct/100)}" data-prg="${i}" aria-label="Grams of ${esc(x.name)}"><span>g</span></label>`:`<span class="ds">${esc(x.qty||'')}</span>`}<div class="p1prsl"><input type="range" min="0" max="200" step="5" value="${x.pct}" data-prsl="${i}" aria-label="How much of ${esc(x.name)}"><b class="num" id="prp-${i}">${x.pct}%</b></div></div>${x.fixed?'<small class="ds p2fix">Calories adjusted to a normal size for this food</small>':''}`}</div>`).join('')}</div>
+    <div class="actions"><button type="button" class="ghost" id="prNo" style="flex:1;color:var(--fg)">Cancel</button><button type="button" class="donebtn" id="prYes" ${PR.busy?'disabled':''}>${PR.busy?'Working…':'Log it'}</button></div></div></div>`}
+document.addEventListener('input',e=>{const t=e.target;if(!PR||!t||!t.dataset)return;
+  if(t.dataset.prg!=null){const x=PR.items[+t.dataset.prg];if(!x||!x.g0)return;const g=Math.max(0,+t.value||0);x.pct=Math.max(0,Math.min(400,Math.round(g/x.g0*100)));const sl=document.querySelector(`[data-prsl="${t.dataset.prg}"]`);if(sl)sl.value=Math.min(200,x.pct);p1PRLive()}
+  if(t.dataset.prsl!=null){const i=+t.dataset.prsl,x=PR.items[i];if(x&&x.g0){const gi=document.querySelector(`[data-prg="${i}"]`);if(gi&&document.activeElement!==gi)gi.value=Math.round(x.g0*x.pct/100)}}});
 
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}

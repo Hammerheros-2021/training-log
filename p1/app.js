@@ -2984,6 +2984,16 @@ async function persistDay(k,fields){const cur=days[k]||{date:k};let base=cur;
     const {data}=await sb.from('entries').select('data').match({user_id:UID,kind:'meta',key:'seen'}).maybeSingle();const cur=(data&&data.data)||{};if(cur[VER]===today)return;
     await sb.from('entries').upsert({user_id:UID,kind:'meta',key:'seen',data:{...cur,[VER]:today,last:VER,at:new Date().toISOString()},updated_at:new Date().toISOString()})}catch(e){}},3000);setTimeout(()=>clearInterval(t),120000)})();
 
+// ================= saving a day: instant on screen, saved in order, merged with the server copy =================
+const P2Q={},P2P={};
+function persistDay(k,fields){days[k]={...(days[k]||{date:k}),...fields,date:k};(P2P[k]=P2P[k]||[]).push(fields);
+  const job=(P2Q[k]||Promise.resolve()).then(async()=>{let server=null;
+    if(typeof daysCol!=='undefined'&&daysCol&&sb&&UID){try{const {data,error}=await sb.from('entries').select('data').match({user_id:UID,kind:'day',key:k}).maybeSingle();if(!error&&data&&data.data)server=data.data}catch(e){}}
+    const doc={...(server||days[k]||{}),...fields,date:k,savedAt:new Date().toISOString()};let ok=true;
+    if(typeof daysCol!=='undefined'&&daysCol){try{await daysCol.doc(k).set(doc)}catch(e){toast('Could not save. Try again.');ok=false}}
+    const q=P2P[k]||[];const i=q.indexOf(fields);if(i>=0)q.splice(i,1);days[k]={...doc,...Object.assign({},...q)};return ok});
+  P2Q[k]=job.catch(()=>false);return job}
+
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
