@@ -3411,6 +3411,80 @@ async function serverPlan(prompts,req){
 function watchPlanJob(){clearTimeout(planTimer);const t0=Date.now();const tick=async()=>{let st='wait';try{st=await Promise.race([checkPlanJob(),new Promise(r=>setTimeout(()=>r('wait'),15000))])}catch(e){}
   if(st==='wait'&&Date.now()-t0>7*60000){pState={...pState,busy:false,msg:'That took too long. Tap Plan to try again.'};render();return}
   if(st==='wait')planTimer=setTimeout(tick,6000)};planTimer=setTimeout(tick,6000)}
+// ================= P3 drop 2: meal plan as day tiles, simpler "your food", picture ideas, easier bed times, one-week Plan, more Patterns =================
+function p3Hash(s){let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))|0;return Math.abs(h)}
+function p3Plate(name,size){const P=[['#B5652E','#E3B04B','#5E8A4E'],['#8A3A24','#D49A44','#3E7A45'],['#E3CC8E','#5E8A4E','#C2483A'],['#C9A46A','#7FA65A','#E3D3B0'],['#9C3B22','#F2D24B','#4E7A45'],['#6E8F78','#E8C27A','#B8463A']][p3Hash(name)%6];const s=size||84;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="88" fill="#F4EEE4"/><circle cx="100" cy="100" r="70" fill="#FBF7F0"/><circle cx="86" cy="92" r="38" fill="${P[0]}"/><circle cx="126" cy="118" r="22" fill="${P[1]}"/><circle cx="80" cy="132" r="13" fill="${P[2]}"/><circle cx="122" cy="80" r="9" fill="${P[2]}"/></svg>`}
+planHTML=function(){const p=plan();const k=kitchen();const t=iso(todayDate());const busy=!!pState.busy;const set=meta.settings||{};
+  const days=p?(p.days||[]).filter(d=>d.date>=t):[];
+  const top=`<section class="card p3ph${busy?' busy':''}"><div class="p3phr"><div><h2>Meal plan</h2><small class="ds">${busy?esc(pState.msg||'Planning…'):days.length?`${fmtD(parse(days[0].date),{weekday:'short',day:'numeric'})} to ${fmtD(parse(days[days.length-1].date),{weekday:'short',day:'numeric'})} · a guide, not a rule`:'Nothing planned for the coming days'}</small></div>
+      ${sample?`<button type="button" class="primary p3pbtn" id="pBuild" ${busy?'disabled':''}>${busy?'Planning…':days.length?'Re-plan':'Plan 3 days'}</button>`:''}</div>
+    ${busy?'<div class="p3bar" aria-hidden="true"><i></i></div>':''}${!busy&&pState.msg?`<div class="hsum" role="status">${esc(pState.msg)}</div>`:''}
+    <details class="p3pset"><summary>Settings · ${k.length?`${k.length} foods available`:'add your food'}</summary><div class="form">
+      <button type="button" class="ghost" data-fview="kitchen">${ico('carrot')} Your food ›</button>${eatSetHTML()}
+      <div class="row2"><div class="field"><label class="label" for="s-tt">Usual training time</label><input id="s-tt" type="time" value="${esc(set.trainTime||'06:30')}" data-setting="trainTime"></div><div class="field"><span class="label">Overnight fast</span><div class="seg small">${[12,13,14,16].map(h=>`<button type="button" data-p3fast="${h}" aria-pressed="${(+set.fastH||14)===h}">${h} h</button>`).join('')}</div></div></div></div></details></section>`;
+  const dayH=days.map((pd,i)=>{const dt=DAYT[pd.dayType]?pd.dayType:dayTypeFor(pd.date);const tot={kcal:0,protein:0,carbs:0,fat:0};(pd.meals||[]).forEach(m=>{tot.kcal+=kcalOf(m);['protein','carbs','fat'].forEach(x=>tot[x]+=+m[x]||0)});
+    const R=(lab,v,key)=>{const tg=nutTarget(key,dt);const mx=tg.t||tg.hi||tg.lo||1;return `<div class="p3pr">${ring(v,mx,54,4,'fade',Math.round(v),'')}<small>${lab}</small></div>`};
+    const nm=(pd.meals||[]).length;const lbl=pd.date===t?'Today':pd.date===iso(addD(todayDate(),1))?'Tomorrow':fmtD(parse(pd.date),{weekday:'long'});
+    return `<details class="card p3pday" ${i===0?'open':''}><summary><div><b>${lbl}</b><small>${fmtD(parse(pd.date),{day:'numeric',month:'short'})} · ${esc(DAYT[dt].label)}${pd.session&&!/^rest$/i.test(pd.session)?` · ${esc(pd.session)}`:''}</small></div><span class="p3pk">${nm} meals · ${Math.round(tot.kcal)} kcal</span></summary>
+      <div class="p3prs">${R('kcal',tot.kcal,'kcal')}${R('Protein',tot.protein,'protein')}${R('Net carbs',tot.carbs,'carbs')}${R('Fat',tot.fat,'fat')}</div>
+      ${pd.note?`<div class="note" style="margin:0 16px 8px">${esc(pd.note)}</div>`:''}${planMealsHTML(pd.date)}</details>`}).join('');
+  const shop=(p&&p.shopping)||[];const left=shop.filter(s=>!s.got).length;
+  const shopH=shop.length&&days.length?`<details class="card p3shop"><summary><b>Shopping list</b><small>${left?`${left} to get`:'All got'}</small></summary><div class="shop">${shop.map((s,i)=>`<label class="toggle"><input type="checkbox" data-shop="${i}" ${s.got?'checked':''}> <span style="flex:1"><b>${esc(s.name)}</b>${s.qty?` · ${esc(s.qty)}`:''}${s.why?`<br><small style="color:var(--muted)">${esc(s.why)}</small>`:''}</span></label>`).join('')}</div></details>`:'';
+  return top+dayH+shopH};
+document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-p3fast]');if(!b)return;const st=Object.assign({},meta.settings||{},{fastH:+b.dataset.p3fast});document.querySelectorAll('[data-p3fast]').forEach(x=>x.setAttribute('aria-pressed',x===b));await persistMeta('settings',st)});
+// Ideas: picture cards that scroll sideways
+p1IdeasHTML=function(){if(meta.ideas&&!P1I.shop&&!P1I.bake){P1I.shop=meta.ideas.shop||null;P1I.bake=meta.ideas.bake||null}
+  const card=(n,sub,attr)=>`<button type="button" class="p3icard" ${attr}><span class="p3iimg">${p3Plate(n,96)}</span><b>${esc(n)}</b><small>${esc(sub||'')}</small></button>`;
+  const bakes=(P1I.bake||[]).map((b,i)=>card(b.name,[b.prep?b.prep+' min':'',b.per||''].filter(Boolean).join(' · '),`data-p1bake="${i}"`)).join('');
+  const shops=(P1I.shop||[]).map(x=>card(x.name,x.why,'')).join('');
+  return `<section class="p3ideas"><div class="p3ih"><h3>Ideas</h3><div class="p3ib"><button type="button" class="p3chip" data-p1idea="bake" ${P1I.busy?'disabled':''}>${ico('chef-hat')}${P1I.busy==='bake'?'Thinking…':'Recipes'}</button><button type="button" class="p3chip" data-p1idea="shop" ${P1I.busy?'disabled':''}>${ico('shopping-basket')}${P1I.busy==='shop'?'Thinking…':'Next shop'}</button></div></div>
+    ${bakes?`<div class="p3iscroll">${bakes}</div>`:''}${shops?`<div class="p3iscroll">${shops}</div>`:''}${!bakes&&!shops?'<p class="ds" style="margin:0">New recipes beyond your fridge, or what to pick up next time.</p>':''}</section>`};
+// Your food: snap, say or type; staples folded
+kitchenHTML=function(){const items=kitchen();const where=KWHERE;
+  const grouped=where.map(w=>{const its=items.map((x,i)=>({...x,i})).filter(x=>(where.includes(x.where)?x.where:'Other')===w);if(!its.length)return '';
+    return `<div class="kgrp"><div class="kgh">${w} <span>${its.length}</span></div><div class="kchips">${its.map(x=>`<span class="kchip">${esc(x.name)}${x.qty?` <small>${esc(x.qty)}</small>`:''}<button type="button" data-del-kit="${x.i}" aria-label="Remove ${esc(x.name)}">×</button></span>`).join('')}</div></div>`}).join('');
+  const st=typeof staplesHTML==='function'?staplesHTML(new Set(items.map(x=>x.name.toLowerCase()))):'';
+  return `<article class="card p3kit"><div class="chead"><div style="flex:1"><h2>Your food</h2><div class="sub">${items.length?`${items.length} items${meta.kitchen&&meta.kitchen.updatedAt?` · updated ${fmtD(new Date(meta.kitchen.updatedAt))}`:''}`:'What you have in'}</div></div></div>
+    <div class="form" style="gap:10px">${sample?`<div class="p3ka"><label class="p3kbtn">${ico('camera')}<span>Snap fridge</span><input type="file" id="p3kFile" accept="image/*" capture="environment"></label><button type="button" class="p3kbtn" id="p3kType">${ico('mic')}<span>Say or type</span></button></div>`:''}
+      <div class="p3ktype" ${kState.text||kState.open?'':'hidden'}><textarea id="k-say" aria-label="What you bought or ran out of" placeholder="Got chicken, peppers and rice. Out of milk." style="min-height:56px">${esc(kState.text||'')}</textarea>${sample?`<div class="actions">${speakBtn('k-say')}<button type="button" class="primary" id="kUpdate" ${kState.busy?'disabled':''}>${kState.busy?'Updating…':'Update'}</button></div>`:''}</div>
+      ${kState.msg?`<div class="hsum" role="status">${esc(kState.msg)}</div>`:''}</div>
+    ${grouped?`<div class="kwrap">${grouped}</div>`:''}
+    ${st?`<details class="wu" style="margin:0 16px 16px"><summary>Add common foods</summary>${st}</details>`:''}</article>`};
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#p3kType')){kState.open=true;const w=document.querySelector('.p3ktype');if(w){w.hidden=false;const t=w.querySelector('textarea');if(t)t.focus()}}});
+document.addEventListener('change',async e=>{if(e.target.id!=='p3kFile'||!e.target.files||!e.target.files[0])return;const f=e.target.files[0];kState.busy=true;kState.msg='Looking in your fridge…';render();
+  try{const out=await sample.json(kitchenPrompt(kitchen(),'This is a photo of my fridge, cupboard or shopping. Add every food you can see to the list, keep what is already there.'),{images:f});const r=await applyKitchenOut(out,kitchen().length);kState={...kState,busy:false,msg:r.msg}}
+  catch(x){kState={...kState,busy:false,msg:foodErr(x)}}render()});
+// Check-in: bed and wake times with − and + (15 min), tap the time to type it; phone away is optional
+function p3Tm(v,d){const m=tmin(v);if(m==null)return v;const n=((m+d)%1440+1440)%1440;return fmtT(n)}
+const _p3CiDraw2=p1CiDraw;p1CiDraw=function(){_p3CiDraw2();const host=document.querySelector('#p1Host .ksheet');if(!host)return;
+  host.querySelectorAll('input[type="time"][data-p1in]').forEach(inp=>{if(inp.closest('.p3step'))return;const w=document.createElement('div');w.className='p3step';const k=inp.dataset.p1in;
+    const mk=(d,l)=>{const b=document.createElement('button');b.type='button';b.className='p3sb';b.textContent=l;b.setAttribute('aria-label',(d<0?'Earlier':'Later')+' by 15 minutes');b.addEventListener('click',()=>{let v=inp.value;if(!v){const c=P1.ci||{};v=k==='screenOff'&&c.bed?p3Tm(c.bed,-60):k==='wake'?'07:00':'23:00'}else v=p3Tm(v,d);inp.value=v;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}))});return b};
+    inp.parentNode.insertBefore(w,inp);w.appendChild(mk(-15,'−'));w.appendChild(inp);w.appendChild(mk(15,'+'))})};
+// Plan: this week first, the full 16 weeks folded
+const _p3VP=viewPlan;viewPlan=function(){const now=todayDate(),td=iso(now),LL=L(),DD=D();const mon=addD(now,-((now.getDay()+6)%7));const pl0=planFor(now);
+  const rows=[0,1,2,3,4,5,6].map(i=>{const d=addD(mon,i),k=iso(d),pl=planFor(d),ty=pl&&!pl.pre?pl.type:'R',lg=LL[k];const ex=(DD[k]&&DD[k].extras)||[];
+    const st=lg?(lg.status==='done'?'Done':lg.status==='partial'?'Partly done':'Missed'):ex.length?'Extra logged':k<td&&ty!=='R'?'Not logged':k===td?'Today':'';
+    return `<button type="button" class="p3wd${k===td?' today':''}${ty==='R'?' rest':''}" data-goto="${k}"><span class="p3wdd"><small>${fmtD(d,{weekday:'short'})}</small><b>${d.getDate()}</b></span><i style="--c:var(${TVAR[ty]||'--line'})"></i><span class="p3wdt"><b>${ty==='R'?'Rest':esc(TNAME[ty])}</b><small>${esc(st)}${ty!=='R'&&k>=td?` · ${esc(trainTimeFor(k))}`:''}</small></span><span aria-hidden="true">›</span></button>`}).join('');
+  return `<section class="card p3week"><div class="chead"><div style="flex:1"><h2>This week</h2><div class="sub">${pl0&&!pl0.pre?`Week ${pl0.wk} of 16 · ${esc(PHN[pl0.p]||'')}`:now<FIRST?`Plan starts ${fmtD(FIRST)}`:''}</div></div></div><div class="p3wl">${rows}</div></section>
+    <details class="card p3all"><summary><b>All 16 weeks</b><small>The whole plan at a glance</small></summary>${_p3VP()}</details>`};
+const _p3PN=planNav;planNav=function(cur){return _p3PN(cur).replace('Your weeks','This week').replace('>Overview<','>Week<')};
+// Patterns: this week against last, and what your best days have in common
+function p3PatCards(){const DD=D(),now=todayDate();const day=i=>DD[iso(addD(now,-i))];
+  const wk=off=>{const a=[];for(let i=off;i<off+7;i++)a.push(day(i));return a};
+  const mean=(arr,f)=>{const v=arr.map(x=>{try{return x?f(x):null}catch(e){return null}}).filter(v=>v!=null&&!isNaN(v));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
+  const M=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h',1],['Balance',d=>readiness(d),v=>Math.round(v),1],['Protein',d=>(d.food||[]).length?foodTotals(d).protein:null,v=>Math.round(v)+' g',1],['Water',d=>+d.water||null,v=>v.toFixed(1)+' L',1]];
+  const w0=wk(0),w1=wk(7);const rows=M.map(([n,f,fmt])=>{const a=mean(w0,f),b=mean(w1,f);if(a==null)return '';const ch=b!=null&&b!==0?(a-b)/Math.abs(b):null;
+    return `<div class="p3cmp"><small>${n}</small><b>${fmt(a)}</b><span class="${ch==null?'':ch>0.03?'up':ch<-0.03?'down':''}">${ch==null?'new':ch>0.03?'▲ '+Math.round(ch*100)+'%':ch<-0.03?'▼ '+Math.round(-ch*100)+'%':'steady'}</span></div>`}).join('');
+  const all=[];for(let i=0;i<56;i++){const d=day(i);if(d&&readiness(d)!=null)all.push(d)}let best='';
+  if(all.length>=10){const s=[...all].sort((a,b)=>readiness(b)-readiness(a));const q=Math.max(3,Math.floor(s.length/4));const top=s.slice(0,q),bot=s.slice(-q);
+    const bits=[];const sl=[mean(top,d=>sleepHours(d)),mean(bot,d=>sleepHours(d))];if(sl[0]!=null&&sl[1]!=null&&sl[0]-sl[1]>=.3)bits.push(`slept <b>${sl[0].toFixed(1)} h</b> (vs ${sl[1].toFixed(1)})`);
+    const bm=[mean(top,d=>bedMin(d.bed)),mean(bot,d=>bedMin(d.bed))];if(bm[0]!=null&&bm[1]!=null&&bm[1]-bm[0]>=20)bits.push(`were in bed by <b>${fmtT(Math.round(bm[0])%1440)}</b> (vs ${fmtT(Math.round(bm[1])%1440)})`);
+    const wa=[mean(top,d=>+d.water||null),mean(bot,d=>+d.water||null)];if(wa[0]!=null&&wa[1]!=null&&wa[0]-wa[1]>=.3)bits.push(`drank <b>${wa[0].toFixed(1)} L</b> of water (vs ${wa[1].toFixed(1)})`);
+    best=`<article class="card p3best"><div class="chead"><div style="flex:1"><h2>Your best days</h2><div class="sub">Your top ${q} balance days against your lowest ${q}</div></div></div><p class="p3bp">${bits.length?'On your best days you '+bits.join(', ')+'.':'Your best and worst days look alike on sleep, bedtime and water. Keep logging and it will sharpen.'}</p></article>`}
+  return (rows?`<article class="card p3wk"><div class="chead"><div style="flex:1"><h2>This week vs last</h2><div class="sub">Daily averages</div></div></div><div class="p3cmps">${rows}</div></article>`:'')+best}
+const _p3PV=p1PatternsView;p1PatternsView=function(){const h=_p3PV();const i=h.indexOf('</article>');return i<0?h+p3PatCards():h.slice(0,i+10)+p3PatCards()+h.slice(i+10)};
+fullPlanTip=function(){return ''};
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}

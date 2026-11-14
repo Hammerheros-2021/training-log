@@ -1491,6 +1491,55 @@ html[data-look="dusk"] h1,html[data-look="dusk"] h2,html[data-look="keel"] h1,ht
 .qline{display:none!important}
 details.p3supin{background:transparent!important;margin:0 16px 12px!important;padding:0!important;border-top:1px solid var(--line)!important;border-radius:0!important}
 html[data-look] #fab{display:none!important}
+
+/* ================= P3 drop 2 ================= */
+.p3ph{padding:16px!important}
+.p3phr{display:flex;align-items:center;gap:12px}.p3phr>div{flex:1;min-width:0}.p3phr h2{margin:0}
+.p3pbtn{flex:none;width:auto!important;padding:10px 18px!important}
+.p3bar{height:3px;border-radius:2px;background:var(--line);overflow:hidden;margin-top:12px}.p3bar i{display:block;height:3px;width:40%;background:var(--fade);border-radius:2px;animation:p3slide 1.6s ease-in-out infinite}
+@keyframes p3slide{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+.p3pset{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}.p3pset>summary{cursor:pointer;color:var(--text-muted);font-size:13px;list-style:none}.p3pset>summary::-webkit-details-marker{display:none}
+.p3pset>summary::after{content:" ▾"}.p3pset[open]>summary::after{content:" ▴"}
+.p3pset .form{padding:12px 0 0!important}
+details.p3pday,details.p3shop,details.p3all{padding:0!important;overflow:hidden}
+.p3pday>summary,.p3shop>summary,.p3all>summary{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;list-style:none}
+.p3pday>summary::-webkit-details-marker,.p3shop>summary::-webkit-details-marker,.p3all>summary::-webkit-details-marker{display:none}
+.p3pday>summary>div,.p3shop>summary>b,.p3all>summary>b{flex:1;min-width:0}
+.p3pday>summary b{display:block;font:400 20px/24px var(--font-display)}.p3pday>summary small,.p3shop>summary small,.p3all>summary small{font-size:12px;color:var(--text-muted)}
+.p3pk{font-size:12px;color:var(--text-muted);white-space:nowrap}
+.p3pday>summary::after,.p3shop>summary::after,.p3all>summary::after{content:"";width:8px;height:8px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);transform:rotate(45deg);margin:-4px 4px 0;transition:transform .2s}
+.p3pday[open]>summary::after,.p3shop[open]>summary::after,.p3all[open]>summary::after{transform:rotate(225deg);margin-top:4px}
+.p3prs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:0 12px 12px}
+.p3pr{display:flex;flex-direction:column;align-items:center;gap:4px}.p3pr small{font-size:11px;color:var(--text-muted)}.p3pr .ring .rl b{font-size:14px!important}.p3pr .ring .rl small{display:none}
+.p3shop .shop{padding:0 16px 12px}
+.p3ideas{margin:0 0 var(--space-4)}
+.p3ih{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}.p3ih h3{margin:0}.p3ib{display:flex;gap:6px}
+.p3iscroll{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;margin:0 calc(-1 * max(20px,env(safe-area-inset-left,0px)));padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:20px}
+.p3iscroll+.p3iscroll{margin-top:8px}
+.p3icard{flex:none;width:150px;scroll-snap-align:start;display:flex;flex-direction:column;gap:4px;padding:0 0 10px;border:0;border-radius:18px;overflow:hidden;background:var(--surface);color:var(--text);text-align:left;font:inherit}
+.p3iimg{display:grid;place-items:center;height:110px;background:color-mix(in srgb,var(--fade-blue) 22%,var(--surface))}
+.p3icard b{font:500 13px/17px var(--font-body);padding:0 10px}.p3icard small{font-size:11px;line-height:15px;color:var(--text-muted);padding:0 10px}
+.p3ka{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.p3kbtn{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:16px;border:1px solid var(--line);background:transparent;color:var(--text);font:500 14px var(--font-body);cursor:pointer;overflow:hidden}
+.p3kbtn:first-child{background:var(--text);color:var(--bg);border-color:var(--text)}
+.p3kbtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.p1blk .row2:has(.p3step){grid-template-columns:1fr!important;display:grid;gap:12px}
+.p3step{display:flex;align-items:center;gap:8px}.p3step input{flex:1;min-width:0;text-align:center;font:400 19px/1 var(--font-display)!important;padding-left:8px!important;padding-right:8px!important}
+.p3sb{flex:none;width:40px;height:44px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--text);font:400 20px/1 var(--font-body)}
+.p3week{padding-bottom:6px!important}
+.p3wl{display:flex;flex-direction:column;padding:0 8px 8px}
+.p3wd{display:flex;align-items:center;gap:12px;padding:10px 8px;border:0;border-top:1px solid var(--line);background:transparent;color:var(--text);text-align:left;font:inherit;min-height:56px}
+.p3wd:first-child{border-top:0}.p3wd.today{background:color-mix(in srgb,var(--text) 5%,transparent);border-radius:12px}
+.p3wdd{width:34px;display:flex;flex-direction:column}.p3wdd small{font-size:11px;color:var(--text-muted)}.p3wdd b{font:400 18px/20px var(--font-display)}
+.p3wd i{width:4px;height:30px;border-radius:2px;background:var(--c)}.p3wd.rest i{background:var(--line)}
+.p3wdt{flex:1;display:flex;flex-direction:column}.p3wdt b{font:500 14px/18px var(--font-body)}.p3wdt small{font-size:12px;color:var(--text-muted)}
+.p3wd>span:last-child{color:var(--text-muted)}
+.p3all>.legend,.p3all>.pgrid,.p3all>.banner{margin:0 12px 12px}
+.p3cmps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 16px 16px}
+.p3cmp{display:flex;flex-direction:column;gap:2px;padding:12px;border-radius:14px;background:color-mix(in srgb,var(--text) 4%,transparent)}
+.p3cmp small{font-size:12px;color:var(--text-muted)}.p3cmp b{font:300 24px/28px var(--font-display)}.p3cmp span{font-size:12px;color:var(--text-muted)}
+.p3cmp span.up{color:var(--status-good)}.p3cmp span.down{color:var(--status-caution)}
+.p3bp{margin:0;padding:0 16px 16px;font-size:15px;line-height:22px}
 </style>
 </head>
 <body class="kloading">
@@ -1516,6 +1565,6 @@ html[data-look] #fab{display:none!important}
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p3d"></script>
+<script src="/p3/app.js?v=p3f"></script>
 </body>
 </html>
