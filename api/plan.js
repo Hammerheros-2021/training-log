@@ -5,6 +5,7 @@ import { waitUntil } from '@vercel/functions';
 
 // Meal plans use the fast model by default (PLAN_MODEL can override); everything else keeps ANTHROPIC_MODEL.
 const MODEL = process.env.PLAN_MODEL || 'claude-haiku-5-5';
+const FALLBACK = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
 const SB = () => (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 
 async function signedInUser(token) {
@@ -25,7 +26,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // One day's plan. Retries when Claude is busy or the account's per-minute limit is hit (429 / 529 / overloaded),
 // waiting as long as Anthropic asks, so a busy minute doesn't fail the whole plan.
 async function ask(prompt, deadline) {
-  let last = '';
+  let last = '', model = MODEL;
   for (let attempt = 0; attempt < 6; attempt++) {
     const left = deadline - Date.now();
     if (left < 5000) break;
@@ -34,7 +35,7 @@ async function ask(prompt, deadline) {
       method: 'POST',
       signal: AbortSignal.timeout(left),
       headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\n\nReply with the JSON only, no other text.' }] }),
+      body: JSON.stringify({ model, max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\n\nReply with the JSON only, no other text.' }] }),
     }); } catch (e) { last = 'Planning took too long'; break; }
     let j = {}; try { j = await r.json(); } catch (e) {}
     if (r.ok) {
@@ -42,6 +43,8 @@ async function ask(prompt, deadline) {
       try { return looseJSON((j.content || []).filter(b => b.type === 'text').map(b => b.text).join('')); } catch (e) { last = e.message; continue; }
     }
     last = (j.error && j.error.message) || `Claude request failed (${r.status})`;
+    // If the fast model isn't available on this account, switch to the usual model and try again.
+    if (model !== FALLBACK && [400, 404].includes(r.status) && /model/i.test(last)) { model = FALLBACK; continue; }
     if (![429, 500, 502, 503, 529].includes(r.status)) break;
     const wait = Math.min(60, Math.max(4, +(r.headers.get('retry-after') || 0) || 5 * (attempt + 1))) * 1000;
     if (Date.now() + wait > deadline) break;
