@@ -4937,14 +4937,14 @@ document.addEventListener('click',async e=>{
 // Joining uses the team's player code. Before anything is shared, the person sees exactly what the coach
 // will and won't see. Sharing can be paused or the team left at any time. See supabase/teams.sql.
 const TEAM={list:null,busy:false,err:'',ask:null,loading:false};
-const TEAM_SEES=['Your balance each day and how it is trending','Sleep times and sleep quality','The check-in sliders: energy, mood, stress and how your body feels','Niggles: where, which side and how sore (not your notes)','Sessions: type, minutes, effort, done or missed, and how they felt','That you\'re unwell and how badly (not what it is)','Morning pulse and HRV if you log them','Recovery: sessions, mobility, sauna and cold water (type and minutes)','Your name, age, sport and goal from sign-up'];
-const TEAM_NEVER=['Food, unless you turn on food sharing below (and then only daily totals)','Drinks with alcohol, notes and photos','Cycle tracking','Your weight, Koach\'s chats and overview'];
+const TEAM_SEES=['Your balance each day and how it is trending','Sleep times and sleep quality','The check-in sliders: energy, mood, stress and how your body feels','Niggles: where, which side and how sore (not your notes)','Sessions: what they were, minutes, effort, done or missed, and how they felt','Habits you tick','That you\'re unwell and how badly (not what it is)','Morning pulse and HRV if you log them','Recovery: sessions, mobility, sauna and cold water (type and minutes)','Your name, age, sport and goal from sign-up'];
+const TEAM_NEVER=['Food, unless you turn on food sharing below (daily totals; meals only if you also turn that on)','Drinks with alcohol, notes and photos','Cycle tracking','Your weight, Koach\'s chats and overview'];
 async function teamLoad(){if(!sb||TEAM.loading)return;TEAM.loading=true;try{const {data,error}=await sb.rpc('keel_my_teams');if(error)throw error;TEAM.list=data||[];TEAM.err=''}catch(e){TEAM.list=[];TEAM.err=/keel_my_teams|function|schema/i.test(String(e&&e.message))?'Teams are not switched on for this app yet.':''}TEAM.loading=false;render()}
 function teamPanel(){
   if(TEAM.list==null){setTimeout(teamLoad,0);return `<section class="panel" id="teamPanel"><h3>Your team</h3><div class="ds">Loading…</div></section>`}
   const mine=TEAM.list.map(m=>`<div class="cmp"><span class="q">${esc(m.name||'Team')} <span class="ds">· ${m.role==='coach'?'Staff':m.share?'Sharing with the staff':'Sharing paused'}</span></span>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${m.role==='coach'?`<a class="primary" href="/coach/" style="flex:none;text-decoration:none;padding:8px 16px;font-size:15px">Open the coach dashboard</a>`:`<button type="button" class="ghost" data-teamshare="${m.team_id}" data-on="${m.share?0:1}" style="color:var(--fg)">${m.share?'Pause sharing':'Share again'}</button>`}
-    <button type="button" class="ghost danger" data-teamleave="${m.team_id}">Leave</button></div>${m.role!=='coach'&&m.share?`<label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-top:4px"><input type="checkbox" data-teamfood="${m.team_id}" ${m.share_food?'checked':''} style="margin-top:3px"><span>Share food totals with the nutritionist and staff<br><span class="ds">Daily calories, protein, carbs, fat, fibre, plants, water and a few vitamins. Never meals, photos or drinks with alcohol.</span></span></label>`:''}</div>`).join('');
+    <button type="button" class="ghost danger" data-teamleave="${m.team_id}">Leave</button></div>${m.role!=='coach'&&m.share?`<label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-top:4px"><input type="checkbox" data-teamfood="${m.team_id}" ${m.share_food?'checked':''} style="margin-top:3px"><span>Share food totals with the nutritionist and staff<br><span class="ds">Daily calories, protein, carbs, fat, fibre, plants, water and a few vitamins. Not your meals (unless you switch that on below), photos or drinks with alcohol.</span></span></label>${m.share_food&&'share_meals' in m?`<label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-top:4px;padding-left:24px"><input type="checkbox" data-teammeals="${m.team_id}" ${m.share_meals?'checked':''} style="margin-top:3px"><span>Also share my meals<br><span class="ds">What you ate, when and how much, so the nutritionist can give you specific advice. Still never photos, notes or alcohol.</span></span></label>`:''}`:''}</div>`).join('');
   const ask=TEAM.ask?`<div class="cmp" style="gap:12px"><b>Before you join</b><div class="ds" style="font-size:13px">The team's staff (manager, coaches, S&amp;C, physio, nutritionist, mindset coach) will see:</div><ul style="margin:0 0 0 18px;font-size:14px;line-height:1.5">${TEAM_SEES.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     <div class="ds" style="font-size:13px">They will never see:</div><ul style="margin:0 0 0 18px;font-size:14px;line-height:1.5">${TEAM_NEVER.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     <div class="ds">This includes what you've already logged. You can pause sharing or leave the team here at any time.</div>
@@ -5079,6 +5079,74 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
   if(x=c('[data-myrsave]')){x.disabled=true;await myrSave(x.dataset.myrsave);return}
 });
 const P2REC=/type=recovery/.test(location.hash+location.search);
+if(typeof ICO!=='undefined'&&!ICO.msgs)ICO.msgs='<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>';
+// ================= P3: team calendar and messages (see supabase/teams.sql version 4) =================
+// Players see whole-squad events and their own groups' events, read squad and group messages,
+// and have a private thread with the staff.
+const MYT={d:null,loading:false,open:null};
+async function mytLoad(){if(!sb||!UID||MYT.loading||sampleMode)return;MYT.loading=true;
+  try{let tl=TEAM.list;if(tl==null){const r=await sb.rpc('keel_my_teams');tl=TEAM.list=r.data||[]}const mine=(tl||[]).filter(t=>t.role!=='coach');
+    if(!mine.length){MYT.d={teams:[],events:[],msgs:[],groups:[],reads:{}}}
+    else{const ids=mine.map(t=>t.team_id);const from=iso(addD(todayDate(),-1)),to=iso(addD(todayDate(),42));
+      const [ev,ms,gr,rd]=await Promise.all([sb.from('team_events').select('*').in('team_id',ids).gte('day',from).lte('day',to).order('day').order('start_time'),
+        sb.from('team_messages').select('*').in('team_id',ids).order('created_at',{ascending:false}).limit(300),sb.from('team_groups').select('id,name,team_id'),sb.from('team_message_reads').select('*').eq('user_id',UID)]);
+      if(ev.error&&/relation|schema/i.test(ev.error.message||'')){MYT.d={teams:[],events:[],msgs:[],groups:[],reads:{},off:true}}
+      else{const reads={};(rd.data||[]).forEach(r=>reads[r.team_id+'|'+r.thread]=r.read_at);MYT.d={teams:mine,events:ev.data||[],msgs:(ms.data||[]).reverse(),groups:gr.data||[],reads}}}}
+  catch(e){MYT.d={teams:[],events:[],msgs:[],groups:[],reads:{}}}MYT.loading=false;render()}
+const mytThread=m=>m.channel==='group'?'group:'+m.group_id:m.channel==='direct'?'direct:'+m.player_id:m.channel;
+const mytGroup=id=>((MYT.d&&MYT.d.groups)||[]).find(g=>g.id===id);
+const mytKind={training:'Training',match:'Match',gym:'Gym / S&C',recovery:'Recovery',meeting:'Meeting',other:'Other'};
+const mytIntensity=['','Very light','Light','Moderate','Hard','Very hard'];
+function mytThreads(){const d=MYT.d;if(!d)return [];const out=[];d.teams.forEach(t=>{const multi=d.teams.length>1;const nm=s=>multi?s+' · '+t.name:s;
+  out.push({team:t.team_id,key:'squad',name:nm('Whole squad'),sub:'From the staff to everyone'});
+  d.groups.filter(g=>g.team_id===t.team_id).forEach(g=>out.push({team:t.team_id,key:'group:'+g.id,name:nm(g.name),sub:'Your group'}));
+  out.push({team:t.team_id,key:'direct:'+UID,name:nm('You and the staff'),sub:'Private. Any of the staff can read and reply.',canPost:true})});
+  out.forEach(th=>{th.ms=d.msgs.filter(m=>m.team_id===th.team&&mytThread(m)===th.key);const rd=d.reads[th.team+'|'+th.key];th.unread=th.ms.filter(m=>m.author_id!==UID&&(!rd||m.created_at>rd)).length});return out}
+function mytUnread(){return mytThreads().reduce((a,t)=>a+t.unread,0)}
+function mytEvLine(e,big){const g=mytGroup(e.group_id);const sub=[e.start_time?String(e.start_time).slice(0,5)+(e.end_time?'–'+String(e.end_time).slice(0,5):''):'',e.location,g&&g.name].filter(Boolean).join(' · ');
+  return `<button type="button" class="p3tev" data-mytev="${esc(e.id)}"><span class="p3tk p3tk-${esc(e.kind)}"></span><span style="flex:1;min-width:0"><b>${esc(e.title)}</b><small>${esc(mytKind[e.kind]||'')}${sub?' · '+esc(sub):''}</small></span>${e.intensity?`<span class="p3tst">${typeof p3StarRow==='function'?p3StarRow(e.intensity,5,big?90:70):''}</span>`:''}</button>`}
+function mytTodayCard(){if(sampleMode)return '';if(MYT.d==null){setTimeout(mytLoad,0);return ''}const d=MYT.d;if(!d.teams.length||d.off)return '';
+  const t=iso(todayDate()),tm=iso(addD(todayDate(),1));const es=d.events.filter(e=>e.day===t||e.day===tm);const nx=es.length?null:d.events.find(e=>e.day>t);const u=mytUnread();
+  const last=d.msgs.filter(m=>m.author_id!==UID).slice(-1)[0];
+  return `<section class="panel p3team"><h3>From your team</h3>
+   ${es.length?es.map(e=>`<div class="ds" style="margin-top:2px">${e.day===t?'Today':'Tomorrow'}</div>${mytEvLine(e)}`).join(''):nx?`<div class="ds">Next up: ${esc(fmtD(parse(nx.day),{weekday:'long',day:'numeric',month:'short'}))}</div>${mytEvLine(nx)}`:'<div class="ds">Nothing on the team calendar in the next few weeks.</div>'}
+   <button type="button" class="p3tmsg" data-mytmsgs="1">${ico('msgs')}<span style="flex:1;min-width:0"><b>Messages${u?` · ${u} new`:''}</b><small>${last?esc((last.author_name?last.author_name.split(' ')[0]+': ':'')+last.body.slice(0,70)):'From the staff, and a private line to them'}</small></span>${u?`<em class="p3tub">${u}</em>`:''}</button></section>`}
+function mytPlanCard(){if(sampleMode||!MYT.d||!MYT.d.teams.length||MYT.d.off)return '';const t=iso(todayDate());const es=MYT.d.events.filter(e=>e.day>=t);if(!es.length)return '';
+  const days=[...new Set(es.map(e=>e.day))].slice(0,21);
+  return `<section class="panel p3team"><h3>Team calendar</h3><div class="ds">Set by your team's staff. Tap an event for the details.</div>${days.map(k=>`<div class="p3tday"><b>${k===t?'Today':esc(fmtD(parse(k),{weekday:'long',day:'numeric',month:'short'}))}</b>${es.filter(e=>e.day===k).map(e=>mytEvLine(e,true)).join('')}</div>`).join('')}</section>`}
+function mytEvSheet(id){const e=MYT.d.events.find(x=>x.id===id);if(!e)return;const g=mytGroup(e.group_id);
+  openSheet(`<div class="vh"><b>${esc(e.title)}</b><span>${esc(mytKind[e.kind]||'')}</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
+   <div class="cmp" style="gap:8px"><div><b>${esc(fmtD(parse(e.day),{weekday:'long',day:'numeric',month:'long'}))}</b>${e.start_time?` · ${esc(String(e.start_time).slice(0,5))}${e.end_time?' to '+esc(String(e.end_time).slice(0,5)):''}`:''}</div>
+   ${e.location?`<div class="ds">${esc(e.location)}</div>`:''}${g?`<div class="ds">For ${esc(g.name)}</div>`:'<div class="ds">Whole squad</div>'}
+   ${e.intensity?`<div style="display:flex;align-items:center;gap:10px">${typeof p3StarRow==='function'?p3StarRow(e.intensity,5,120):''}<span class="ds">${mytIntensity[e.intensity]}</span></div>`:''}
+   ${e.notes?`<div style="white-space:pre-wrap">${esc(e.notes)}</div>`:''}</div>`)}
+function mytMsgSheet(){const ths=mytThreads();const cur=ths.find(t=>t.team+'|'+t.key===MYT.open);
+  if(!cur){openSheet(`<div class="vh"><b>Messages</b><span>From your team</span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
+    ${ths.map(t=>{const l=t.ms[t.ms.length-1];return `<button type="button" class="p3tmsg" data-mytopen="${esc(t.team+'|'+t.key)}"><span style="flex:1;min-width:0"><b>${esc(t.name)}</b><small>${l?esc((l.author_name?l.author_name.split(' ')[0]+': ':'')+l.body.slice(0,70)):esc(t.sub)}</small></span>${t.unread?`<em class="p3tub">${t.unread}</em>`:''}</button>`}).join('')}`);return}
+  let ld='';const body=cur.ms.map(m=>{const dk=iso(new Date(m.created_at));const sep=dk!==ld?`<div class="p3tdd">${dk===iso(todayDate())?'Today':esc(fmtD(parse(dk),{weekday:'short',day:'numeric',month:'short'}))}</div>`:'';ld=dk;const me=m.author_id===UID;
+    return sep+`<div class="p3tb${me?' me':''}"><small>${me?'You':esc(m.author_name||'Staff')} · ${esc(new Date(m.created_at).toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'}))}</small><div>${esc(m.body).replace(/\n/g,'<br>')}</div></div>`}).join('');
+  openSheet(`<div class="vh"><button type="button" class="linkbtn" data-mytopen="">‹</button><b>${esc(cur.name)}</b><span></span><button type="button" class="x" data-sclose aria-label="Close">×</button></div>
+   <div class="ds">${esc(cur.sub)}${cur.canPost?'':' Only the staff post here.'}</div><div class="p3tlist" id="mytScroll">${body||'<div class="ds">No messages yet.</div>'}</div>
+   ${cur.canPost?`<div class="p3tcomp"><textarea id="mytBody" rows="2" maxlength="2000" placeholder="Message the staff"></textarea><button type="button" class="primary" data-mytsend="${esc(cur.team)}">Send</button></div>`:''}`);
+  const s=document.getElementById('mytScroll');if(s)s.scrollTop=s.scrollHeight;
+  const now=new Date().toISOString();MYT.d.reads[cur.team+'|'+cur.key]=now;sb.from('team_message_reads').upsert({team_id:cur.team,user_id:UID,thread:cur.key,read_at:now},{onConflict:'team_id,user_id,thread'}).then(()=>{},()=>{})}
+const _mytDash=viewDashboard;viewDashboard=function(){return mytTodayCard()+_mytDash()};
+const _mytTrain=viewTrainingTab;viewTrainingTab=function(){const h=_mytTrain();return mytPlanCard()+h};
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-mytev]')){mytEvSheet(x.dataset.mytev);return}
+  if(c('[data-mytmsgs]')){MYT.open=null;mytMsgSheet();return}
+  if(x=c('[data-mytopen]')){MYT.open=x.dataset.mytopen||null;mytMsgSheet();return}
+  if(x=c('[data-mytsend]')){const b=(document.getElementById('mytBody')||{}).value||'';if(!b.trim())return;x.disabled=true;
+    const {data,error}=await sb.from('team_messages').insert({team_id:x.dataset.mytsend,channel:'direct',player_id:UID,body:b.trim().slice(0,2000)}).select().single();
+    if(error){x.disabled=false;toast('Could not send. Try again.',3000);return}MYT.d.msgs.push(data);mytMsgSheet();return}
+  if(c('[data-sclose]')&&MYT.d){setTimeout(render,0)}
+});
+// also share meals (separate opt-in, only when food sharing is on)
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||!t.dataset.teammeals)return;const on=t.checked;
+  const {error}=await sb.from('team_members').update({share_meals:on}).eq('team_id',t.dataset.teammeals).eq('user_id',UID);
+  if(error){t.checked=!on;toast(/share_meals/.test(error.message)?'Meal sharing isn\'t switched on for this team yet.':'Could not change that. Try again.');return}
+  toast(on?'Your meals are now shared with the staff':'Meals are private again. Totals are still shared.',3500);TEAM.list=null;render()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&MYT.d&&MYT.d.teams.length){MYT.d=null;render()}});
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
