@@ -124,7 +124,7 @@ function applyLook(){const e=lookNow();if(document.documentElement.dataset.look!
 applyLook();setInterval(()=>{const b=document.documentElement.dataset.look;applyLook();if(b!==document.documentElement.dataset.look&&typeof render==='function')render()},5*60000);
 const lookCard=()=>{const v=lookPref();return `<section class="card"><header><div><h2>Appearance</h2><p>The same looks as the Keel app. Saved on this device.</p></div></header><div class="looks">${LOOKS.map(([id,n,d])=>`<button type="button" data-look="${id}" aria-pressed="${v===id}"><span class="sw sw-${id}" aria-hidden="true"></span><span><b>${n}</b><small>${d}</small></span></button>`).join('')}</div></section>`};
 const sideLooks=()=>{const v=lookPref();return `<div class="sideLooks" role="group" aria-label="Look">${LOOKS.map(([id,n])=>`<button type="button" data-look="${id}" aria-pressed="${v===id}" title="${n}" aria-label="${n}"><span class="sw sw-${id}"></span></button>`).join('')}</div>`};
-document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-look]');if(!b)return;try{localStorage.setItem('keelLook',b.dataset.look)}catch(x){}applyLook();render()});
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button[data-look]');if(!b)return;try{localStorage.setItem('keelLook',b.dataset.look)}catch(x){}applyLook();render()});
 const ST={good:['var(--good)','Ready'],caution:['var(--caution)','Cap the effort'],alert:['var(--alert)','Back off'],none:['var(--faint)','No check-in']};
 const AV={avail:['var(--good)','Available','check'],mod:['var(--caution)','Modify','niggle'],out:['var(--alert)','Unavailable','sick']};
 const lastCheckin=(p,k)=>{for(let i=0;i<60;i++){const kk=addK(k,-i);if(checkedIn(p.D[kk]))return kk}return null};
@@ -183,7 +183,8 @@ function barChart(pts,o){o=o||{};const W=o.w||560,H=o.h||150,l=34,r=10,t=10,b=22
 let sb=null,SESSION=null,TEAMS=[],TEAM=null,SQUAD=[],NOTES=[],LOADING=false,ERR='';
 const S={k:todayK(),sort:'status',filter:'all',metric:'bal',days:28,nums:false,ptab:null,demoAs:'manager',noteKind:'note'};
 const DEMO_ID='demo';
-const players=()=>SQUAD.filter(p=>p.role==='member');
+const players=()=>SQUAD.filter(p=>p.role==='member'&&inGrp(p));
+function allPlayers(){return SQUAD.filter(p=>p.role==='member')}
 const sharing=()=>players().filter(p=>p.share);
 const staffList=()=>SQUAD.filter(p=>p.role==='coach');
 function mkPlayer(o){const p=Object.assign({D:{},L:{},_di:{},notes:[]},o);p.E=engine(p.D,p.L);return p}
@@ -248,24 +249,24 @@ function buildDemo(){
 async function loadTeams(){const {data,error}=await sb.rpc('keel_my_teams');if(error){ERR=/keel_my_teams|function|schema/i.test(error.message||'')?'setup':error.message;return []}
   ERR='';const all=data||[];if(all.length&&!('staff' in all[0]))ERR='upgrade';return all.filter(t=>t.role==='coach')}
 async function loadSquad(t){
-  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();await loadSC(t);await loadNut(t);await loadRehab(t);SQUAD.forEach(p=>p._di={});return}
+  if(t.team_id===DEMO_ID){const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();await loadSC(t);await loadNut(t);await loadRehab(t);await loadHub(t);SQUAD.forEach(p=>p._di={});return}
   const from=addK(todayK(),-80),to=todayK();
   const {data:sq,error:e1}=await sb.rpc('keel_team_squad',{t:t.team_id});if(e1)throw e1;
   const rows=[];for(let off=0;off<50000;off+=1000){const {data,error}=await sb.rpc('keel_team_data',{t:t.team_id,from_day:from,to_day:to}).range(off,off+999);if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break}
-  const by={};(sq||[]).forEach(m=>{by[m.user_id]=mkPlayer({id:m.user_id,name:m.display_name||(m.about&&m.about.name)||'Player',pos:m.pos||'',role:m.role,staff:m.staff,share:m.share,food:!!m.share_food,joined:m.joined_at,about:m.about||{}})});
+  const by={};(sq||[]).forEach(m=>{by[m.user_id]=mkPlayer({id:m.user_id,name:m.display_name||(m.about&&m.about.name)||'Player',pos:m.pos||'',role:m.role,staff:m.staff,share:m.share,food:!!m.share_food,meals:!!m.share_meals,joined:m.joined_at,about:m.about||{}})});
   rows.forEach(r=>{const p=by[r.user_id];if(!p)return;(r.kind==='day'?p.D:p.L)[r.key]=Object.assign({date:r.key},r.data)});
   SQUAD=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name));
-  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes();await loadSC(t);await loadNut(t);await loadRehab(t);SQUAD.forEach(p=>p._di={})}
+  const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes();await loadSC(t);await loadNut(t);await loadRehab(t);try{await loadHub(t)}catch(e){HUB.missing=true}SQUAD.forEach(p=>p._di={})}
 function attachNotes(){SQUAD.forEach(p=>{p.notes=NOTES.filter(n=>n.player_id===p.id);p._di={}})}
-async function selectTeam(id){TEAM=TEAMS.find(t=>t.team_id===id)||TEAMS[0];try{localStorage.setItem('keelCoachTeam',TEAM.team_id)}catch(e){}LOADING=true;render();
+async function selectTeam(id){TEAM=TEAMS.find(t=>t.team_id===id)||TEAMS[0];S.grp='';S.calGrp=null;try{localStorage.setItem('keelCoachTeam',TEAM.team_id)}catch(e){}LOADING=true;render();
   try{await loadSquad(TEAM)}catch(e){toast('Could not load the squad: '+(e.message||e),5000);SQUAD=[];NOTES=[]}LOADING=false;render()}
 
 // ================= views =================
-const VIEWS=[['today','Overview','today','Squad'],['sc','S&C','load','Backroom'],['physio','Physio','avail','Backroom'],['nutrition','Nutrition','food','Backroom'],['mindset','Mindset','mind','Backroom'],['recovery','Recovery','moon','Backroom'],['trends','Squad trends','trends','Tools'],['setup','Team','setup','Tools']];
+const VIEWS=[['today','Overview','today','Squad'],['calendar','Calendar','cal','Squad'],['messages','Messages','msg','Squad'],['sc','S&C','load','Backroom'],['physio','Physio','avail','Backroom'],['nutrition','Nutrition','food','Backroom'],['mindset','Mindset','mind','Backroom'],['recovery','Recovery','moon','Backroom'],['trends','Squad trends','trends','Tools'],['setup','Team','setup','Tools']];
 function route(){const h=location.hash.slice(1).split('/');const v=h[0];return {v:VIEWS.some(x=>x[0]===v)||v==='player'?v:(v?'today':homeView()),id:decodeURIComponent(h[1]||'')}}
 const isDemo=()=>TEAM&&TEAM.team_id===DEMO_ID;
 function shell(body,title){const rt=route();const cur=rt.v==='player'?'':rt.v;const mine=homeView();
-  let grp='';const nav=VIEWS.map(([v,l,ic,g])=>{const h=g!==grp?`<div class="navh">${g}</div>`:'';grp=g;return h+`<a href="#${v}" ${cur===v?'aria-current="page"':''}>${ico(ic)}<span>${l}</span>${v===mine?'<em>You</em>':''}</a>`}).join('');
+  let grp='';const nav=VIEWS.map(([v,l,ic,g])=>{const h=g!==grp?`<div class="navh">${g}</div>`:'';grp=g;const ub=v==='messages'?unreadTotal():0;return h+`<a href="#${v}" ${cur===v?'aria-current="page"':''}>${ico(ic)}<span>${l}</span>${ub?`<em class="ubn">${ub}</em>`:v===mine?'<em>You</em>':''}</a>`}).join('');
   const teamSel=`<select class="sel" id="teamSel" aria-label="Team">${TEAMS.map(t=>`<option value="${esc(t.team_id)}" ${TEAM&&t.team_id===TEAM.team_id?'selected':''}>${esc(t.name)}</option>`).join('')}</select>`;
   const canFwd=S.k<todayK();const ms=myStaff();
   const demo=isDemo()?`<div class="demo-note">${ico('zap','width:16px;height:16px;flex:none')}<span style="flex:1"><b>Demo squad.</b> Made-up players to show what each member of the backroom team sees.</span>
@@ -274,11 +275,11 @@ function shell(body,title){const rt=route();const cur=rt.v==='player'?'':rt.v;co
   const upg=ERR==='upgrade'?`<div class="demo-note" style="border-color:var(--caution)"><span><b>One more database step.</b> Run the updated <b>supabase/teams.sql</b> in Supabase once (same as before) to switch on staff roles, food sharing and notes.</span></div>`:'';
   return `<div class="shell"><aside class="side"><div class="logo">${kwm()}<span>Staff</span></div><nav class="nav">${nav}</nav>
     <div class="foot">${sideLooks()}${ms?`<span class="chip" style="align-self:flex-start">${esc(STAFF_LONG[ms]||'Staff')}</span>`:''}<span>${esc(SESSION&&SESSION.user.email||'')}</span><button id="signOut">Sign out</button></div></aside>
-  <div class="main"><div class="top">${kwm('mlogo')}<h1>${esc(title)}</h1><span class="sp"></span>${teamSel}
+  <div class="main"><div class="top">${kwm('mlogo')}<h1>${esc(title)}</h1><span class="sp"></span>${groupFilter()}${teamSel}
     <div class="datenav"><button id="dPrev" aria-label="Day before">‹</button><b>${S.k===todayK()?'Today':esc(fmtK(S.k))}</b><button id="dNext" aria-label="Day after" ${canFwd?'':'disabled'}>›</button></div>
     <button class="btn ghost sm" id="reload" aria-label="Refresh" title="Refresh">${ico('refresh','width:16px;height:16px')}</button></div>
   <main class="page">${upg}${demo}${ask}${body}</main></div>
-  <nav class="tabs">${VIEWS.filter(v=>v[0]!=='trends').map(([v,l,ic])=>`<a href="#${v}" ${cur===v?'aria-current="page"':''}>${ico(ic)}<span>${l}</span></a>`).join('')}</nav></div>`}
+  <nav class="tabs">${VIEWS.filter(v=>v[0]!=='trends').map(([v,l,ic])=>{const ub=v==='messages'?unreadTotal():0;return `<a href="#${v}" ${cur===v?'aria-current="page"':''}>${ico(ic)}<span>${l}</span>${ub?`<em class="ubt">${ub}</em>`:''}</a>`}).join('')}</nav></div>`}
 const roleSelect=(id,cur)=>`<select class="sel" id="${id}">${cur?'':'<option value="">Choose…</option>'}${Object.entries(STAFF_LONG).filter(([s])=>s!=='manager'||cur==='manager'||isManager()).map(([s,l])=>`<option value="${s}" ${cur===s?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
 function needTeam(){return `<div class="card"><div class="empty"><h2 style="margin-bottom:8px">No players sharing yet</h2><p>Hand out your team's player code on the <a href="#setup">Team</a> page. Players appear here as soon as they join.</p></div></div>`}
 const seg=(key,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button data-set="${key}" data-val="${v}" aria-pressed="${String(S[key])===String(v)}">${l}</button>`).join('')}</div>`;
@@ -397,8 +398,8 @@ const avgOf=(arr)=>{const v=arr.filter(x=>x!=null);return v.length?avg(v):null};
 const fx=(v,d)=>v==null?'–':(d?r1(v):Math.round(v));
 const fu=(v,u,d)=>v==null?'–':fx(v,d)+' '+u;
 function sessionsOn(p,k){const out=[],lg=p.L[k],d=p.D[k];const fb=d&&d.sfb;
-  if(lg)out.push({k,what:TYPE_NAMES[lg.type]||'Session',dur:+lg.dur||0,rpe:+lg.rpe||0,st:lg.status||'done',fb});
-  (d&&d.extras||[]).forEach(x=>out.push({k,what:x.kind||'Extra',dur:+x.dur||0,rpe:+x.rpe||0,st:'done',fb}));return out}
+  if(lg)out.push({k,what:TYPE_NAMES[lg.type]||'Session',desc:[lg.dist?lg.dist+' km':'',lg.pace?lg.pace+' /km':''].filter(Boolean).join(' · '),dur:+lg.dur||0,rpe:+lg.rpe||0,st:lg.status||'done',fb});
+  (d&&d.extras||[]).forEach(x=>out.push({k,what:x.kind||'Extra',desc:x.desc&&x.desc!==x.kind?x.desc+(x.km?' · '+x.km+' km':''):(x.km?x.km+' km':''),dur:+x.dur||0,rpe:+x.rpe||0,st:'done',fb}));return out}
 function spark(vals,o){o=o||{};const W=o.w||110,H=o.h||26,mx=o.max!=null?o.max:Math.max(1,...vals.filter(v=>v!=null)),mn=o.min||0;let d='',pen=false;
   vals.forEach((v,i)=>{if(v==null){pen=false;return}const x=2+(W-4)*i/Math.max(1,vals.length-1),y=H-2-(H-4)*(v-mn)/Math.max(1e-6,mx-mn);d+=(pen?'L':'M')+x.toFixed(1)+' '+y.toFixed(1);pen=true});
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><path d="${d}" fill="none" stroke="${o.col||'var(--blue)'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
@@ -524,16 +525,16 @@ function viewPlayer(id){const p=SQUAD.find(x=>x.id===id);if(!p)return `<div clas
   const kpi=(v,lab,sub)=>`<div class="kpi" style="flex-direction:column;align-items:flex-start;gap:0"><div class="v">${v}</div><div class="l">${lab}</div>${sub?`<div class="d">${sub}</div>`:''}</div>`;
   const b7=keys.slice(-7).map(kk=>dayInfo(p,kk).s).filter(v=>v!=null),sl7=keys.slice(-7).map(kk=>E.sleep(kk)).filter(v=>v!=null);
   const head=`<a class="back" href="javascript:history.back()">${ico('back','width:15px;height:15px')}Back</a>
-   <div class="phead">${ring(i.s,92,i.st)}<div class="who"><h1>${esc(p.name)}</h1><div class="muted">${esc([p.pos,age?age+' years':null].filter(Boolean).join(' · '))}</div>
-    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><span class="chip" style="color:${c}">${i.ci?esc(l):'No check-in '+(k===todayK()?'today':'that day')}</span><span class="chip ${i.av==='out'?'alert':i.av==='mod'?'caution':'good'}">${AV[i.av][1]}</span>${rs.map(n=>`<span class="chip caution">${ico('clock')}${esc(n.body.length>40?n.body.slice(0,40)+'…':n.body)}</span>`).join('')}</div></div></div>
+   <div class="phead">${ring(i.s,92,i.st)}<div class="who" style="position:relative"><h1>${esc(p.name)}</h1><div class="muted">${esc([p.pos,age?age+' years':null].filter(Boolean).join(' · '))}</div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><span class="chip" style="color:${c}">${i.ci?esc(l):'No check-in '+(k===todayK()?'today':'that day')}</span><span class="chip ${i.av==='out'?'alert':i.av==='mod'?'caution':'good'}">${AV[i.av][1]}</span>${rs.map(n=>`<span class="chip caution">${ico('clock')}${esc(n.body.length>40?n.body.slice(0,40)+'…':n.body)}</span>`).join('')}${groupsOf(p.id).map(grpChip).join('')}</div></div><button class="btn ghost sm" data-msgplayer="${esc(p.id)}">${ico('msg','width:15px;height:15px')}Message</button></div>
    ${kpiRow([kpi(b7.length?Math.round(avg(b7)):'–','Balance, 7-day average',E.usualBal(k)!=null?`Usual ${Math.round(E.usualBal(k))}`:''),kpi(sl7.length?r1(avg(sl7))+'<small>h</small>':'–','Sleep, 7-day average',E.debt(k)!=null?`${E.debt(k)} h short over the week`:''),kpi(Math.round(E.load7(k)),'Load, last 7 days',E.chronicWeek(k)!=null?`Usual ${Math.round(E.chronicWeek(k))}`:''),`<div class="kpi" style="flex-direction:column;align-items:flex-start;gap:6px"><div>${acwrChip(a)}</div><div class="l">This week against usual</div></div>`])}
-   <div class="toolbar">${seg('ptab',[['overview','Overview'],['sc','S&C'],['physio','Physio'],['nutrition','Nutrition'],['mindset','Mindset']])}</div>`;
+   <div class="toolbar">${seg('ptab',[['overview','Overview'],['day','Day by day'],['sc','S&C'],['physio','Physio'],['nutrition','Nutrition'],['mindset','Mindset']])}</div>`;
   const bal=`<section class="card"><header><div><h2>Balance</h2><p>Last 4 weeks, from their own check-ins</p></div></header>${lineChart(keys.map(kk=>({k:kk,y:dayInfo(p,kk).s})),{min:0,max:100,ticks:[0,55,75,100],fmt:Math.round,bands:[[75,100,'var(--good)'],[55,75,'var(--caution)'],[0,55,'var(--alert)']],dotColor:v=>v>=75?'var(--good)':v>=55?'var(--caution)':'var(--alert)',color:'var(--text-body)',label:'Balance'})}</section>`;
   const sleep=`<section class="card"><header><div><h2>Sleep</h2><p>Hours each night against what they need</p></div></header>${barChart(keys.map(kk=>({k:kk,y:E.sleep(kk)})),{max:10,fmt:v=>r1(v),ref:E.need(k),refLabel:`Needs about ${E.need(k)} h`,tip:p=>p.y?p.y+' h':'No entry',label:'Sleep'})}</section>`;
   const load=`<section class="card"><header><div><h2>Training load</h2><p>Minutes × effort each day</p></div></header>${barChart(keys.map(kk=>({k:kk,y:E.load(kk)})),{tip:p=>`Load ${Math.round(p.y||0)}`,label:'Load'})}</section>`;
   const line=(f,t,sub,col)=>`<section class="card"><header><div><h2>${t}</h2><p>${sub}</p></div></header>${lineChart(keys.map(kk=>({k:kk,y:p.D[kk]&&isNum(p.D[kk][f])?+p.D[kk][f]:null})),{min:1,max:5,ticks:[1,3,5],color:col,label:t})}</section>`;
   const sess=[];keys.slice().reverse().forEach(kk=>sess.push(...sessionsOn(p,kk)));
-  const sessT=`<section class="card"><header><div><h2>Sessions</h2><p>Last 4 weeks</p></div></header>${sess.length?`<table class="list"><tr><th>Day</th><th>What</th><th>Min</th><th>Effort</th><th>Felt</th></tr>${sess.slice(0,16).map(s=>`<tr><td>${esc(fmtK(s.k))}</td><td>${esc(s.what)}${s.st==='missed'?' <span class="chip alert">Missed</span>':''}</td><td class="num">${s.dur||'–'}</td><td class="num">${s.rpe||'–'}</td><td>${esc(s.fb&&isNum(s.fb.feel)?FEEL[s.fb.feel]:'–')}${s.fb&&s.fb.effort==='harder'?' <span class="chip caution">Harder than planned</span>':''}</td></tr>`).join('')}</table>`:'<div class="empty">No sessions logged.</div>'}</section>`;
+  const sessT=`<section class="card"><header><div><h2>Sessions</h2><p>Last 4 weeks</p></div></header>${sess.length?`<table class="list"><tr><th>Day</th><th>What</th><th>Min</th><th>Effort</th><th>Felt</th></tr>${sess.slice(0,16).map(s=>`<tr><td>${esc(fmtK(s.k))}</td><td>${esc(s.what)}${s.desc?`<span class="tiny muted"> · ${esc(s.desc)}</span>`:''}${s.st==='missed'?' <span class="chip alert">Missed</span>':''}</td><td class="num">${s.dur||'–'}</td><td class="num">${s.rpe||'–'}</td><td>${esc(s.fb&&isNum(s.fb.feel)?FEEL[s.fb.feel]:'–')}${s.fb&&s.fb.effort==='harder'?' <span class="chip caution">Harder than planned</span>':''}</td></tr>`).join('')}</table>`:'<div class="empty">No sessions logged.</div>'}</section>`;
   const nigs=[];keys.slice().reverse().forEach(kk=>{const d=p.D[kk];(d&&d.niggles||[]).forEach(n=>nigs.push({k:kk,...n}))});
   const nigT=`<section class="card"><header><div><h2>Niggles</h2><p>Last 4 weeks</p></div></header>${nigs.length?`<table class="list"><tr><th>Day</th><th>Where</th><th>Side</th><th>Pain</th></tr>${nigs.slice(0,16).map(n=>`<tr><td>${esc(fmtK(n.k))}</td><td>${esc(n.area)}</td><td>${esc(n.side||'')}</td><td>${painChip(+n.pain||0)}</td></tr>`).join('')}</table>`:'<div class="empty">None logged. Good.</div>'}</section>`;
   const pain=(()=>{const areas=[...new Set(nigs.map(n=>n.area))];if(!areas.length)return '';return `<section class="card"><header><div><h2>Pain over time</h2><p>${areas.map(esc).join(', ')}</p></div></header>${lineChart(keys.map(kk=>{const d=p.D[kk];return {k:kk,y:d?(d.niggles&&d.niggles.length?maxPain(d):(checkedIn(d)?0:null)):null}}),{min:0,max:10,ticks:[0,3,5,10],color:'var(--caution)',label:'Pain',tip:p=>`Worst pain ${p.y}/10`})}</section>`})();
@@ -542,16 +543,16 @@ function viewPlayer(id){const p=SQUAD.find(x=>x.id===id);if(!p)return `<div clas
     foodBody=kpiRow([kpi(lg.filter(x=>keys.slice(-7).includes(x.k)).length+'<small>/ 7</small>','Days logged this week'),kpi(fx(avgOf(lg.map(x=>x.f.protein)))+'<small>g</small>','Protein a day'),kpi(plantsWeek(p,k),'Plants this week'),kpi(fx(avgOf(lg.map(x=>x.f.water!=null?+x.f.water:null)),1)+'<small>L</small>','Water a day')])
      +`<div class="grid g2"><section class="card"><header><div><h2>Calories</h2><p>Bars in blue are training days</p></div></header>${barChart(fk.map(x=>({k:x.k,y:x.f?x.f.kcal:0,c:isTrainDay(p,x.k)?'var(--blue)':'var(--line-2)'})),{tip:q=>q.y?`${Math.round(q.y)} kcal${isTrainDay(p,q.k)?' · training day':''}`:'Not logged',label:'Calories'})}</section>
       <section class="card"><header><div><h2>Protein</h2><p>Grams a day</p></div></header>${barChart(fk.map(x=>({k:x.k,y:x.f?x.f.protein:0})),{tip:q=>q.y?`${Math.round(q.y)} g`:'Not logged',label:'Protein'})}</section></div>`}
-  const body={overview:(fl.length?`<section class="card"><header><div><h2>Worth knowing</h2></div></header><div class="flags">${fl.map(f=>`<div class="flag"><span class="ic" style="background:color-mix(in srgb,${f.col} 15%,transparent);color:${f.col}">${ico(f.ic)}</span><span class="who"><b>${esc(f.t)}</b><span>${esc(f.s)}</span></span></div>`).join('')}</div></section>`:'')+`<div class="grid g2">${bal}${sleep}${load}${line('energy','How they feel','Energy, 1 to 5')}</div>`,
+  const body={day:dayDetail(p),overview:(fl.length?`<section class="card"><header><div><h2>Worth knowing</h2></div></header><div class="flags">${fl.map(f=>`<div class="flag"><span class="ic" style="background:color-mix(in srgb,${f.col} 15%,transparent);color:${f.col}">${ico(f.ic)}</span><span class="who"><b>${esc(f.t)}</b><span>${esc(f.s)}</span></span></div>`).join('')}</div></section>`:'')+`<div class="grid g2">${bal}${sleep}${load}${line('energy','How they feel','Energy, 1 to 5')}</div>`,
     sc:playerSC(p)+`<div class="grid g2">${load}${bal}</div>${sessT}`,
     physio:rehabWorkspace(p)+`<div class="grid g2">${pain||nigT}${line('sore','Body soreness','1 fresh to 5 very sore','var(--caution)')}</div>${pain?nigT:''}`,
     nutrition:foodBody+nutWorkspace(p),
     mindset:`<div class="grid g2">${line('mood','Mood','1 low to 5 great')}${line('stress','Stress','1 calm to 5 very stressed','var(--caution)')}${line('energy','Energy','1 drained to 5 full of it')}${sleep}</div>`}[tab];
-  return head+body+notesCard(p)+`<p class="tiny muted">${p.food?'Food is shared as daily totals only. ':''}Notes, cycle tracking and${p.food?'':' food,'} drinks with alcohol stay private to ${esc(first(p.name))}.</p>`}
+  return head+body+notesCard(p)+`<p class="tiny muted">${p.food?(p.meals?'Food is shared with meals. ':'Food is shared as daily totals only. '):''}Notes, cycle tracking and${p.food?'':' food,'} drinks with alcohol stay private to ${esc(first(p.name))}.</p>`}
 
 // ---------- team ----------
 let SETUP={busy:false};
-function viewSetup(){return viewSetup0()+lookCard()}
+function viewSetup(){return viewSetup0()+(TEAM&&ERR!=='setup'?groupsCard():'')+lookCard()}
 function viewSetup0(){const real=TEAMS.filter(t=>t.team_id!==DEMO_ID);
   const create=`<section class="card"><header><div><h2>${real.length?'Add another team':'Create your team'}</h2><p>You'll be its manager, with a player code and a staff code to hand out.</p></div></header>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="in" id="tName" placeholder="e.g. Glencar/Manorhamilton Seniors" style="flex:1;min-width:220px"><button class="btn" id="tCreate" ${SETUP.busy?'disabled':''}>${SETUP.busy?'Creating…':'Create team'}</button></div></section>`;
@@ -585,14 +586,14 @@ function hubStrip(){const ps=sharing();if(!ps.length)return '';const k=S.k;
    ${t('mindset','mind','Mindset',mood?`${mood} worth a quiet word`:'Nobody stands out','var(--blue)')}</div>`}
 function restrCard(){const k=S.k;const rs=[];sharing().forEach(p=>activeRestr(p,k).forEach(n=>rs.push({p,n})));if(!rs.length)return '';
   return `<section class="card"><header><div><h2>Restrictions in place</h2><p>Set by the staff. They count towards availability.</p></div></header><div class="flags">${rs.map(({p,n})=>`<button class="flag" data-player="${esc(p.id)}"><span class="ic" style="background:color-mix(in srgb,var(--caution) 15%,transparent);color:var(--caution)">${ico('clock')}</span><span class="who"><b>${esc(p.name)} · ${esc(n.body)}</b><span>${esc(staffLabel(n.author_staff))} · ${n.until_day?'until '+esc(fmtK(n.until_day,{weekday:'short',day:'numeric',month:'short'})):'until further notice'}</span></span></button>`).join('')}</div></section>`}
-function viewOverview(){const h=viewToday();const i=h.indexOf('<div class="grid g-today">');if(i<0)return h;return h.slice(0,i)+hubStrip()+restrCard()+h.slice(i)}
+function viewOverview(){const h=viewToday();const i=h.indexOf('<div class="grid g-today">');if(i<0)return h;return h.slice(0,i)+hubStrip()+comingUp()+restrCard()+h.slice(i)}
 
 function render(){if(render._busy){setTimeout(render,0);return}render._busy=true;try{render2()}finally{render._busy=false}}
 function render2(){TIPS={};tipN=0;const rt=route();const root=$('#root');
   if(!SESSION){root.innerHTML=gateHTML();return}
   const title=rt.v==='player'?'Player':(VIEWS.find(v=>v[0]===rt.v)||VIEWS[0])[1];
-  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,sc:viewSCHub,physio:viewPhysioHub,recovery:viewRecovery,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
-  const sy=scrollY;root.innerHTML=shell(body,title);if(render._v===location.hash)scrollTo(0,sy);else scrollTo(0,0);render._v=location.hash}
+  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,calendar:viewCalendar,messages:viewMessages,sc:viewSCHub,physio:viewPhysioHub,recovery:viewRecovery,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
+  const sy=scrollY;root.innerHTML=shell(body,title);try{enhancePickers();const ms=$('#msgScroll');if(ms)ms.scrollTop=ms.scrollHeight}catch(e){}if(render._v===location.hash)scrollTo(0,sy);else scrollTo(0,0);render._v=location.hash}
 let GATE={mode:'in',msg:''};
 function gateHTML(){if(GATE.mode==='up')return `<div class="gate"><form class="gcard" id="signup">${kwm()}<div><h1>Join the backroom team</h1><p class="muted small" style="margin-top:4px">For coaches, S&amp;C, physios, nutritionists and mindset coaches. You need the staff code from your team's manager.</p></div>
   <div class="field"><label for="su-name">Your name</label><input class="in" id="su-name" autocomplete="name" required></div>
@@ -658,7 +659,7 @@ const demoTeam=()=>({team_id:DEMO_ID,name:'Demo squad',role:'coach',staff:null})
 
 // ================= S&C workspace: library, programmes, assigning, Koach load suggestions =================
 const SC={ex:[],progs:[],assigns:[],logs:[],missing:false,urls:{}};
-const SC_CATS=[['strength','Strength'],['power','Power'],['speed','Speed'],['conditioning','Conditioning'],['core','Core'],['mobility','Mobility'],['prehab','Prehab'],['recovery','Recovery']];
+const SC_CATS=[['strength','Strength'],['power','Power'],['speed','Speed'],['conditioning','Conditioning'],['core','Core'],['mobility','Mobility'],['prehab','Prehab'],['rehab','Rehab'],['recovery','Recovery']];
 const KIND=[['strength','Gym'],['conditioning','Conditioning'],['speed','Speed'],['mobility','Mobility'],['recovery','Recovery']];
 const DOWS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const exById=id=>SC.ex.find(e=>e.id===id);
@@ -698,7 +699,7 @@ const playerName=id=>{const p=SQUAD.find(x=>x.id===id);return p?p.name:'Player'}
 function viewSCHub(){const t=route().id||'squad';
   const tabs=`<div class="toolbar"><div class="seg">${[['squad','Squad load'],['koach','Koach suggestions'],['programmes','Programmes'],['library','Exercise library']].map(([v,l])=>`<a href="#sc/${v}" aria-pressed="${t===v}" class="segl">${l}</a>`).join('')}</div></div>`;
   if(SC.missing&&t!=='squad')return tabs+`<section class="card"><header><div><h2>One more database step</h2><p>Programmes and the exercise library need their own tables.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/sc.sql</b> and click Run, then confirm.</li><li>Refresh this page.</li></ol></section>`;
-  return tabs+({squad:viewSC,koach:viewKoach,programmes:()=>S.progEdit?viewProgEditor():viewProgrammes(),library:viewLibrary}[t]||viewSC)()}
+  return tabs+({squad:viewSC,koach:viewKoach,programmes:()=>S.progEdit?viewProgEditor():viewProgrammes(),library:()=>bulkCard(S.libCat&&S.libCat!=='all'?S.libCat:'strength','programmes')+viewLibrary()}[t]||viewSC)()}
 
 function viewKoach(){const k=S.k;const rows=SC.assigns.map(a=>{const p=SQUAD.find(x=>x.id===a.player_id);if(!p||!p.share)return null;const [pct,why]=koachLoad(p,k);return {a,p,pct,why}}).filter(Boolean).sort((x,y)=>Math.abs(y.pct-y.a.load_pct)-Math.abs(x.pct-x.a.load_pct));
   if(!rows.length)return `<section class="card"><div class="empty"><h2 style="margin-bottom:6px">No one is on a programme yet</h2><p>Build or draft one under <b>Programmes</b>, then assign it to players. Koach then suggests a load for each of them every day.</p></div></section>`;
@@ -715,13 +716,13 @@ function viewProgrammes(){const k=S.k;
     return `<section class="card"><header><div><h2>${esc(p.name)}</h2><p>${esc(p.goal||'')}</p></div><button class="btn ghost sm" data-progopen="${esc(p.id)}">Open</button></header>
      <div class="kpis" style="--n:4;gap:10px">${[[weeks.length,'weeks'],[spw,'sessions a week'],[as.length,'players on it'],[due?Math.round(done/due*100)+'%':'–','done this week']].map(([v,l])=>`<div class="kpi" style="padding:12px 14px;flex-direction:column;align-items:flex-start;gap:0"><div class="v" style="font-size:24px">${v}</div><div class="l">${l}</div></div>`).join('')}</div></section>`};
   return `<section class="card"><header><div><h2>Programmes</h2><p>Build one yourself, or let Koach draft it from your exercise library and edit before anyone sees it.</p></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-prognew="1">New programme</button><button class="btn sm" data-koachdraft="1">${ico('zap','width:15px;height:15px')}Draft with Koach</button></div></header>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-imp="1">${ico('upload','width:15px;height:15px')}Import your own</button><button class="btn ghost sm" data-prognew="1">New programme</button><button class="btn sm" data-koachdraft="1">${ico('zap','width:15px;height:15px')}Draft with Koach</button></div></header>
     ${S.koachForm?`<form id="koachForm" class="grid" style="gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px">
       <div class="grid g3" style="gap:12px"><div class="field"><label>What's it for?</label><select class="in" id="kfPhase"><option>In-season (matches most weekends)</option><option>Pre-season build</option><option>Off-season</option><option>Return from injury</option><option>Older or newer players: gentle start</option></select></div>
       <div class="field"><label>Gym sessions a week</label><select class="in" id="kfDays"><option>1</option><option selected>2</option><option>3</option></select></div><div class="field"><label>Weeks</label><select class="in" id="kfWeeks"><option>2</option><option selected>4</option><option>6</option><option>8</option></select></div></div>
       <div class="field"><label>Anything Koach should know</label><input class="in" id="kfNote" placeholder="e.g. Tuesday and Thursday pitch sessions, match Sunday, limited kit: barbell, dumbbells, bands"></div>
       <div style="display:flex;gap:8px"><button class="btn" type="submit" ${S.koachBusy?'disabled':''}>${S.koachBusy?'Koach is drafting…':'Draft it'}</button><button class="btn ghost" type="button" data-koachdraft="0">Cancel</button></div></form>`:''}</section>
-   ${SC.progs.length?`<div class="grid g2">${SC.progs.map(card).join('')}</div>`:'<div class="card"><div class="empty">No programmes yet.</div></div>'}`}
+   ${importCard()}${SC.progs.length?`<div class="grid g2">${SC.progs.map(card).join('')}</div>`:'<div class="card"><div class="empty">No programmes yet.</div></div>'}`}
 
 function blankProg(){return {id:null,name:'New programme',goal:'',plan:{weeks:[{days:[{dow:1,title:'Lower body',kind:'strength',min:50,rpe:7,items:[]},{dow:4,title:'Upper body',kind:'strength',min:45,rpe:7,items:[]}]}]}}}
 function viewProgEditor(){const d=S.draft;if(!d)return '';const W=d.plan.weeks;const wi=Math.min(S.wk||0,W.length-1);const w=W[wi]||{days:[]};
@@ -868,7 +869,7 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
   if(x=c('[data-itemdel]')){const it=x.closest('.pitem');draftDay(it).items.splice(+it.dataset.ii,1);render();return}
   if(x=c('[data-pickall]')){document.querySelectorAll('[data-pick]').forEach(b=>b.checked=x.dataset.pickall==='1');return}
   if(c('[data-assign]')){const ids=[...document.querySelectorAll('[data-pick]:checked')].map(b=>b.dataset.pick);if(!ids.length){toast('Tick the players first');return}
-    const start=$('#asStart').value||mondayAfter(todayK()),load=+$('#asLoad').value||100;const rows=ids.map(pid=>({team_id:TEAM.team_id,programme_id:S.draft.id,player_id:pid,start_day:start,load_pct:load}));
+    const start=$('#asStart').value||mondayAfter(todayK()),load=+$('#asLoad').value||100;const gid=S.pickGroup&&!HUB.missing&&grpMembers(S.pickGroup).every(u=>ids.includes(u)||!allPlayers().some(p=>p.id===u))?S.pickGroup:null;const rows=ids.map(pid=>Object.assign({team_id:TEAM.team_id,programme_id:S.draft.id,player_id:pid,start_day:start,load_pct:load},gid&&grpMembers(gid).includes(pid)?{group_id:gid}:{}));S.pickGroup=null;
     if(isDemo())rows.forEach(r=>SC.assigns.push(Object.assign({id:uid(),active:true},r)));else{const {data,error}=await sb.from('sc_assignments').insert(rows).select();if(error){toast(error.message,4000);return}SC.assigns.push(...data)}
     toast(`${ids.length} player${ids.length>1?'s':''} added. They'll see it in Keel from ${fmtK(start,{weekday:'long',day:'numeric',month:'short'})}`,4500);render();return}
   if(x=c('[data-unassign]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Sure?';return}
@@ -946,7 +947,7 @@ function nutWorkspace(p){if(NUT.missing)return `<section class="card"><div class
     ${ed&&ed.why?`<div class="flag" style="margin-bottom:10px"><span class="ic" style="background:color-mix(in srgb,var(--blue-2) 18%,transparent);color:var(--blue)">${ico('zap')}</span><span class="who"><b>Koach's suggestion</b><span>${esc(ed.why.join(' · '))}</span></span></div>`:''}
     <div style="overflow-x:auto"><table class="list"><tr><th></th>${MAC.map(m=>`<th>${m[1]}${m[2]?' ('+m[2]+')':''}</th>`).join('')}</tr>${DT.map(([dt,l])=>`<tr><td><b style="color:var(--text)">${l}</b></td>${MAC.map(([m])=>`<td>${cell(dt,m)}</td>`).join('')}</tr>`).join('')}</table></div>
     ${ed?`<div class="field" style="margin-top:12px"><label>Note for the player (optional)</label><input class="in" id="ntNote" value="${esc(ed.note||'')}" placeholder="e.g. Bump protein at breakfast; carbs up the day before matches"></div>
-     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" data-nutsave="${esc(p.id)}">Approve and send to ${esc(first(p.name))}</button><button class="btn ghost" data-nutcancel="1">Cancel</button></div>`:(tg&&tg.note?`<p class="small" style="margin-top:10px">Note: ${esc(tg.note)}</p>`:'')}</section>`;
+     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn" data-nutsave="${esc(p.id)}">Approve and send to ${esc(first(p.name))}</button>${HUB.groups.length?`<select class="sel" id="nutGrp"><option value="">Just ${esc(first(p.name))}</option>${HUB.groups.map(g=>`<option value="${esc(g.id)}">Also everyone in ${esc(g.name)}</option>`).join('')}</select>`:''}<button class="btn ghost" data-nutcancel="1">Cancel</button></div>`:(tg&&tg.note?`<p class="small" style="margin-top:10px">Note: ${esc(tg.note)}</p>`:'')}</section>`;
   const pe=S.nutP&&S.nutP.pid===p.id?S.nutP:null;const sent=plansOf(p.id);
   const tgFor=dt=>((tg?tg.targets:(own||APP_DEF))[dt])||APP_DEF[dt];
   const planEditor=pe?`<div class="demo-note" style="border-color:var(--blue-2)">${ico('zap','width:16px;height:16px;flex:none')}<span>${pe.koach?'<b>Koach\'s draft.</b> ':''}Check each meal, change what you like, then send. Totals compare each day with its targets.</span></div>
@@ -1008,7 +1009,9 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
     const row={team_id:TEAM.team_id,player_id:pid,targets:t,note:S.nutT.note||null,set_by_name:myName(),active:true,updated_at:new Date().toISOString()};
     if(isDemo()){NUT.targets=NUT.targets.filter(y=>y.player_id!==pid);NUT.targets.push(Object.assign({id:uid()},row))}
     else{const {data,error}=await sb.from('nut_targets').upsert(row,{onConflict:'team_id,player_id'}).select().single();if(error){toast(error.message,4000);return}NUT.targets=NUT.targets.filter(y=>y.player_id!==pid);NUT.targets.push(data)}
-    S.nutT=null;toast(`Sent. ${first(playerName(pid))}'s Food tab now uses these targets.`,4000);render();return}
+    const ng=($('#nutGrp')||{}).value;let extra=0;if(ng){for(const op of grpMembers(ng).filter(u=>u!==pid&&allPlayers().some(p=>p.id===u))){const r2=Object.assign({},row,{player_id:op});
+        if(isDemo()){NUT.targets=NUT.targets.filter(y=>y.player_id!==op);NUT.targets.push(Object.assign({id:uid()},r2));extra++}else{const {data,error}=await sb.from('nut_targets').upsert(r2,{onConflict:'team_id,player_id'}).select().single();if(!error){NUT.targets=NUT.targets.filter(y=>y.player_id!==op);NUT.targets.push(data);extra++}}}}
+    S.nutT=null;toast(extra?`Sent to ${first(playerName(pid))} and ${extra} more in ${grpById(ng).name}.`:`Sent. ${first(playerName(pid))}'s Food tab now uses these targets.`,4000);render();return}
   if(x=c('[data-npnew]')){const p=SQUAD.find(y=>y.id===x.dataset.npnew);S.nutP={pid:p.id,days:blankDays(p,3),koach:false,note:''};render();return}
   if(x=c('[data-npkoach]')){await koachMealPlan(SQUAD.find(y=>y.id===x.dataset.npkoach));return}
   if(x=c('[data-npcopy]')){const s=NUT.plans.find(y=>y.id===x.dataset.npcopy);const p=SQUAD.find(y=>y.id===s.player_id);const fresh=blankDays(p,(s.plan.days||[]).length||3);
@@ -1049,7 +1052,8 @@ const rhLogs=id=>RH.logs.filter(l=>l.plan_id===id);
 function rhAdherence(r,k){const ls=rhLogs(r.id);let d=0;for(let i=0;i<7;i++){if(ls.some(l=>l.day===addK(k,-i)&&l.done))d++}return d}
 function rhStep(r){const n=(r.stages||[]).length;return `<div class="rhsteps">${(r.stages||[]).map((s,i)=>`<span class="rhstep ${i<r.stage?'done':i===r.stage?'now':''}" title="${esc(s.name)}"></span>`).join('')}</div><div class="tiny muted" style="margin-top:4px">Stage ${r.stage+1} of ${n}: ${esc((r.stages[r.stage]||{}).name||'')}</div>`}
 function viewPhysioHub(){const t=route().id||'squad';
-  const tabs=`<div class="toolbar"><div class="seg">${[['squad','Squad'],['rehab','Rehab plans']].map(([v,l])=>`<a href="#physio/${v}" aria-pressed="${t===v}" class="segl">${l}</a>`).join('')}</div></div>`;
+  const tabs=`<div class="toolbar"><div class="seg">${[['squad','Squad'],['rehab','Rehab plans'],['library','Rehab library']].map(([v,l])=>`<a href="#physio/${v}" aria-pressed="${t===v}" class="segl">${l}</a>`).join('')}</div></div>`;
+  if(t==='library')return tabs+(SC.missing?'<section class="card"><div class="empty">Run <b>supabase/sc.sql</b> in Supabase first: the rehab library shares the exercise library and its videos.</div></section>':viewRehabLib());
   if(t!=='rehab')return tabs+viewPhysio();
   if(RH.missing)return tabs+`<section class="card"><header><div><h2>One more database step</h2><p>Rehab plans need their own tables.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/rehab.sql</b> and click Run, then confirm.</li><li>Refresh this page.</li></ol></section>`;
   const act=RH.plans.filter(r=>r.status==='active');const k=todayK();const cands=sharing().filter(p=>!rehabOf(p.id)&&dayInfo(p,S.k).pain>=3);
@@ -1061,7 +1065,7 @@ function viewPhysioHub(){const t=route().id||'squad';
 // player page physio tab: the rehab workspace
 function rehabWorkspace(p){if(RH.missing)return `<section class="card"><div class="empty">Run <b>supabase/rehab.sql</b> in Supabase to build rehab plans.</div></section>`;
   const r=rehabOf(p.id);const ed=S.rh&&S.rh.pid===p.id?S.rh:null;
-  if(ed)return rehabEditor(p,ed);
+  if(ed)return rehabEditor(p,ed)+rehabImportBox();
   if(!r){const i=dayInfo(p,S.k);const area=i.nig?i.nig.d.niggles[0].area:'';const guess=RH_AREAS.find(a=>area&&a.toLowerCase().startsWith(area.toLowerCase().split(/[ /]/)[0]))||'';
     return `<section class="card"><header><div><h2>Rehab plan</h2><p>Not in rehab.${area?` Logged niggle: ${esc(area)} ${i.pain}/10.`:''}</p></div><button class="btn sm" data-rhnew="${esc(p.id)}" data-area="${esc(guess)}" data-side="${esc(i.nig?i.nig.d.niggles[0].side||'':'')}">Start a rehab plan</button></header></section>`}
   const ls=rhLogs(r.id);const keys=lastN(S.k,21);const cur=r.stages[r.stage]||{};
@@ -1151,10 +1155,301 @@ function viewRecovery(){const ps=sharing();if(!ps.length)return needTeam();const
     ${rows.map(r=>`<tr><td><button data-player="${esc(r.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(r.p.name)}</b></button></td><td class="num">${Math.round(r.load)}</td><td>${r.n?`<span class="chip ${r.n>=2?'good':''}">${r.n} · ${r.min} min</span>`:`<span class="chip ${r.load>1800?'caution':''}">None</span>`}</td><td class="small">${esc(r.types.join(', ')||'–')}</td>
       <td class="num">${r.sl!=null?r1(r.sl)+' h':'–'}</td><td>${r.debt!=null?sevChip(-r.debt,-2,-5,r.debt+' h'):'–'}</td><td class="num">${fx(r.so,1)}</td></tr>`).join('')}</table></div></section>`}
 
+
+// ================= Version 7: groups, calendar, message centre, uploads, more from the app =================
+// Tables in supabase/teams.sql (version 4). Demo squad gets made-up groups, events and messages.
+S.calW=S.calW||3;
+const HUB={missing:false,groups:[],gm:[],events:[],msgs:[],reads:{},loaded:false};
+const EV_KIND=[['training','Training','var(--k-green,var(--good))'],['match','Match','var(--alert)'],['gym','Gym / S&C','var(--blue)'],['recovery','Recovery','color-mix(in srgb,var(--blue) 55%,var(--alert))'],['meeting','Meeting','var(--caution)'],['other','Other','var(--muted)']];
+const evCol=k=>(EV_KIND.find(x=>x[0]===k)||EV_KIND[5])[2];
+const evLab=k=>(EV_KIND.find(x=>x[0]===k)||EV_KIND[5])[1];
+const GCOL=['#6E8F78','#4F6B8A','#9A7230','#9A5C6E','#6E5E8F','#3F7480','#8A6A48'];
+const grpById=id=>HUB.groups.find(g=>g.id===id);
+const grpMembers=id=>HUB.gm.filter(m=>m.group_id===id).map(m=>m.user_id);
+const groupsOf=pid=>HUB.groups.filter(g=>HUB.gm.some(m=>m.group_id===g.id&&m.user_id===pid));
+const grpChip=g=>g?`<span class="chip" style="color:${esc(g.colour||GCOL[0])};background:color-mix(in srgb,${esc(g.colour||GCOL[0])} 14%,transparent)">${esc(g.name)}</span>`:'';
+const hhmm=t=>t?String(t).slice(0,5):'';
+const HAB_LABEL={checkin:'Check in',water:'Water target',bed:'Bed on time',phone:'Phone away early',veg:'5 veg and fruit',walk:'Walk outside',stretch:'Stretch',steps:'10,000 steps',read:'Read before bed',nodrink:'Alcohol-free day'};
+const habName=id=>HAB_LABEL[id]||String(id).replace(/[-_]/g,' ').replace(/^./,c=>c.toUpperCase());
+Object.assign(IC,{cal:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',msg:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',grp:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.5c2.8 0 5 2 5 5"/>',upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',send:'<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',plus:'<path d="M12 5v14M5 12h14"/>',star:'<path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z"/>'});
+// a 5-star fade, like Match ready in the app
+function starFade(v,max,w){const W=w||110,st=W/5,sc=st*0.92/24,H=Math.round(24*sc);const id='sf'+Math.random().toString(36).slice(2,7);
+  const paths=[0,1,2,3,4].map(i=>`<path transform="translate(${i*st} 0) scale(${sc})" d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17.1 6.1 20.3l1.3-6.5L2.5 9.3l6.6-.8z"/>`).join('');const fw=Math.min(W,(v/max)*5*st);
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${v} of ${max}" style="display:block"><defs><linearGradient id="${id}g" x1="0" x2="${W}" y1="0" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--logo-a,#E23D9E)"/><stop offset=".55" style="stop-color:var(--logo-b,#5B6CFF)"/><stop offset="1" style="stop-color:var(--logo-c,#34E3A0)"/></linearGradient><clipPath id="${id}c">${paths}</clipPath></defs><rect width="${W}" height="${H}" fill="var(--none)" clip-path="url(#${id}c)"/><rect width="${fw.toFixed(1)}" height="${H}" fill="url(#${id}g)" clip-path="url(#${id}c)"/></svg>`}
+const INTENSITY=['','Very light','Light','Moderate','Hard','Very hard'];
+
+// ---------- load ----------
+async function loadHub(t){HUB.missing=false;HUB.loaded=true;
+  if(t.team_id===DEMO_ID){Object.assign(HUB,buildDemoHub());return}
+  const from=addK(todayK(),-60),to=addK(todayK(),120);
+  const [g,gm,ev,ms,rd]=await Promise.all([sb.from('team_groups').select('*').eq('team_id',t.team_id).order('name'),sb.from('team_group_members').select('*').eq('team_id',t.team_id),
+    sb.from('team_events').select('*').eq('team_id',t.team_id).gte('day',from).lte('day',to).order('day').order('start_time'),
+    sb.from('team_messages').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1500),sb.from('team_message_reads').select('*').eq('team_id',t.team_id)]);
+  if(g.error){HUB.missing=/team_groups|relation|schema/i.test(g.error.message||'');Object.assign(HUB,{groups:[],gm:[],events:[],msgs:[],reads:{}});return}
+  HUB.groups=g.data||[];HUB.gm=gm.data||[];HUB.events=ev.data||[];HUB.msgs=(ms.data||[]).reverse();HUB.reads={};(rd.data||[]).filter(r=>r.user_id===SESSION.user.id).forEach(r=>HUB.reads[r.thread]=r.read_at)}
+async function refreshMsgs(){if(isDemo()||!TEAM||HUB.missing)return;const last=HUB.msgs.length?HUB.msgs[HUB.msgs.length-1].created_at:'1970-01-01';
+  const {data}=await sb.from('team_messages').select('*').eq('team_id',TEAM.team_id).gt('created_at',last).order('created_at');if(data&&data.length){const have=new Set(HUB.msgs.map(m=>m.id));data.forEach(m=>{if(!have.has(m.id))HUB.msgs.push(m)});return true}}
+setInterval(async()=>{if(document.hidden||!SESSION||!TEAM)return;const r=route().v;if(await refreshMsgs()&&(r==='messages'||r==='today'))render()},40000);
+const missingCard=what=>`<section class="card"><header><div><h2>One more database step</h2><p>${what} need the version 4 tables.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/teams.sql</b> (version 4) and click Run, then confirm.</li><li>Refresh this page.</li></ol></section>`;
+
+// ---------- demo ----------
+function buildDemoHub(){const T=todayK();const R=rng(4411);const ago=(d,h)=>new Date(Date.now()-d*864e5-(h||0)*36e5).toISOString();
+  const groups=[{id:'g1',name:'Backs',colour:GCOL[1]},{id:'g2',name:'Forwards',colour:GCOL[2]},{id:'g3',name:'Midfield',colour:GCOL[0]},{id:'g4',name:'Rehab group',colour:GCOL[3]}];
+  const gm=[];SQUAD.filter(p=>p.role==='member').forEach(p=>{const pos=(p.pos||'').toLowerCase();const g=/back|keeper/.test(pos)?'g1':/forward/.test(pos)?'g2':'g3';gm.push({group_id:g,user_id:p.id})});['demo2','demo8','demo16'].forEach(id=>gm.push({group_id:'g4',user_id:id}));
+  const mon=addK(T,-((parse(T).getDay()+6)%7));const events=[];let n=0;const E=(d,kind,title,st,en,loc,intensity,group_id,notes)=>events.push({id:'ev'+(++n),team_id:DEMO_ID,kind,title,day:addK(mon,d),start_time:st,end_time:en,location:loc,intensity,group_id:group_id||null,notes:notes||null});
+  for(let w=-1;w<5;w++){const b=w*7;const deload=w===3;
+    E(b+1,'training','Squad training','19:30','21:00','Main pitch',deload?2:4,null,w===0?'Bring boots and runners. Conditioning block at the end.':null);
+    E(b+0,'gym','Lower body gym','19:00','20:00','Club gym',deload?2:3,'g1');E(b+0,'gym','Lower body gym','20:00','21:00','Club gym',deload?2:3,'g2');
+    E(b+3,'training','Squad training','19:30','21:00','Main pitch',deload?2:3,null);
+    E(b+5,'training','Light session','11:00','12:00','Main pitch',1,null);
+    E(b+6,'match',w%2?'League: away to Kiltyclogher':'League: home to Drumkeerin','14:00','15:30',w%2?'Kiltyclogher':'Glencar Manor',5,null,'Meet at the clubhouse 75 minutes before throw-in.');
+    E(b+0,'recovery','Pool recovery','18:00','18:45','Sligo Leisure Centre',1,null);
+    E(b+2,'recovery','Rehab session','18:30','19:15','Physio room',2,'g4')}
+  E(9,'meeting','Video review','20:00','20:45','Clubhouse',null,null,'Last weekend\'s match. 20 minutes, then team talk.');
+  const pl=SQUAD.filter(p=>p.role==='member');const M=[];let mi=0;const msg=(ch,body,who,st,d,h,extra)=>M.push(Object.assign({id:'m'+(++mi),team_id:DEMO_ID,channel:ch,group_id:null,player_id:null,author_id:st?'staff-'+st:'demo-p',author_name:who,author_staff:st,body,created_at:ago(d,h)},extra||{}));
+  msg('squad','Lads, training moved to 7:30 on Tuesday. Pitch is booked until 9.','Darren','manager',3,4);
+  msg('squad','Hydration this week please: 2.5 L a day minimum, more on training days. It shows in the check-ins.','Sinéad (nutrition)','nutrition',2,8);
+  msg('squad','Match Sunday: meet at 12:45, clubhouse. Full squad, bring both jerseys.','Darren','manager',0,5);
+  msg('group','Backs: speed work Thursday before the pitch session, 15 minutes early please.','Mark (S&C)','sc',1,6,{group_id:'g1'});
+  msg('group','Forwards: gym moved to 8pm Monday so we get the rack to ourselves.','Mark (S&C)','sc',2,3,{group_id:'g2'});
+  msg('group','Rehab group: Wednesday 6:30 in the physio room. Bring a towel and your band.','Aoife (physio)','physio',1,2,{group_id:'g4'});
+  msg('staff','Darragh\'s hamstring is coming along. Stage 2 this week, not for Sunday.','Aoife (physio)','physio',0,9);
+  msg('staff','Fiachra is doing extra gym on his own. I\'ll have a word before Thursday.','Mark (S&C)','sc',1,1);
+  msg('staff','Tadhg has had a rough week at home. Light touch please, I\'m checking in with him.','Niamh (mindset)','mindset',2,5);
+  const d=(pi,thread)=>thread.forEach(([who,st,body,dd,hh])=>msg('direct',body,who,st,dd,hh,{player_id:'demo'+pi,author_id:st?'staff-'+st:'demo'+pi}));
+  d(2,[['Aoife (physio)','physio','How did the bridges feel this morning?',1,10],[first(pl[2].name),null,'Grand, a bit tight on the last set. No pain walking.',1,8],['Aoife (physio)','physio','Good. Stay on stage 2 and we\'ll test it Thursday.',1,7]]);
+  d(10,[['Mark (S&C)','sc','Fiachra, you\'ve done 6 gym sessions this week. Let\'s pull it back to 3 before Sunday.',0,6],[first(pl[10].name),null,'Ah sorry, just trying to get the legs stronger. Will do.',0,4]]);
+  d(6,[[first(pl[6].name),null,'Still sick, won\'t make Tuesday.',0,3]]);
+  d(14,[['Niamh (mindset)','mindset','No pressure this week. Short sessions and get your sleep where you can.',2,6]]);
+  M.sort((a,b)=>a.created_at.localeCompare(b.created_at));
+  const reads={squad:ago(0,4.5),staff:ago(1,0),'group:g1':ago(0,0),'direct:demo2':ago(0,0)};
+  // more from the app: session descriptions, habits and meals for the made-up players
+  const DESC={'Club training':['Pitch session','Small-sided games','Kicking and conditioning'],Match:['League match'],Gym:['Upper body','Lower body','Full body']};
+  const HB=['checkin','water','bed','walk','stretch','veg','read','phone'];
+  const MEALS=[['Breakfast','08:00',[['Porridge with berries','1 bowl',420,16],['Scrambled eggs on toast','3 eggs, 2 slices',520,32],['Greek yoghurt and granola','250 g',380,24]]],['Lunch','13:00',[['Chicken wrap','2 wraps',640,45],['Ham and cheese sandwich','2 slices',520,30],['Tuna pasta salad','1 box',610,38]]],['Snack','16:00',[['Banana','1',105,1],['Protein shake','1 scoop',130,25],['Apple and peanut butter','1 + 1 tbsp',190,4]]],['Dinner','19:00',[['Steak, potatoes and veg','1 plate',780,52],['Salmon, rice and greens','1 plate',690,44],['Chilli con carne with rice','1 plate',820,48]]]];
+  SQUAD.forEach((p,ix)=>Object.keys(p.D).forEach(k=>{const dd=p.D[k];(dd.extras||[]).forEach(x=>{const o=DESC[x.kind];if(o&&!x.desc)x.desc=o[Math.floor(R()*o.length)]});
+    if(dd.energy&&R()<.8)dd.hab=HB.filter(()=>R()<.45);
+    if(p.food&&dd.food&&ix%3!==1){dd.meals=MEALS.map(([meal,at,opts])=>{const [name,qty,kcal,protein]=opts[Math.floor(R()*opts.length)];return {meal,at,name,qty,kcal,protein}})}}));
+  SQUAD.forEach(p=>{p.meals=p.food&&SQUAD.indexOf(p)%3!==1});
+  if(!SC.ex.some(e=>e.category==='rehab'))[['Isometric bridge hold','Mat','Push through heels, hold 30 seconds, no pain'],['Single-leg balance','None','Soft knee, eyes forward, 30 seconds each side'],['Isometric calf raise','Wall','Rise half way and hold, 45 seconds'],['Ankle band mobility','Band','Knee over toes, slow and controlled']].forEach(([name,equipment,cues])=>SC.ex.push({id:uid(),team_id:DEMO_ID,name,category:'rehab',equipment,cues,video_path:null}));
+  return {groups,gm,events,msgs:M,reads,missing:false}}
+
+// ---------- group filter (top bar) ----------
+const inGrp=p=>!S.grp||HUB.gm.some(m=>m.group_id===S.grp&&m.user_id===p.id);
+
+// ---------- calendar ----------
+function weekStart(k){return addK(k,-((parse(k).getDay()+6)%7))}
+function evsOn(k){return HUB.events.filter(e=>e.day===k&&(!S.calGrp||!e.group_id||e.group_id===S.calGrp)).sort((a,b)=>String(a.start_time||'').localeCompare(String(b.start_time||'')))}
+function evPill(e,compact){const g=grpById(e.group_id);return `<button class="evp" data-ev="${esc(e.id)}" style="--ec:${evCol(e.kind)}"><span class="evt">${e.start_time?hhmm(e.start_time)+' ':''}${esc(e.title)}</span>${compact?'':`<span class="evm">${[g?esc(g.name):'',e.intensity?INTENSITY[e.intensity]:''].filter(Boolean).join(' · ')}</span>`}</button>`}
+function viewCalendar(){if(HUB.missing)return missingCard('The team calendar');
+  const nW=S.calW||3,start=addK(weekStart(todayK()),(S.calOff||0)*7),T=todayK();const keys=[];for(let i=0;i<nW*7;i++)keys.push(addK(start,i));
+  const can=!isDemo()||true;const grpSel=HUB.groups.length?`<select class="sel" id="calGrp"><option value="">Everyone's events</option>${HUB.groups.map(g=>`<option value="${esc(g.id)}" ${S.calGrp===g.id?'selected':''}>${esc(g.name)} and whole squad</option>`).join('')}</select>`:'';
+  const head=`<section class="card"><header style="flex-wrap:wrap;align-items:center"><div><h2>Team calendar</h2><p>Players see the whole-squad events and their own groups' events in Keel. ${fmtK(keys[0],{day:'numeric',month:'short'})} to ${fmtK(keys[keys.length-1],{day:'numeric',month:'short'})}</p></div>
+    <div class="toolbar">${seg('calW',[[2,'2 weeks'],[3,'3 weeks'],[4,'4 weeks']])}<div class="datenav"><button id="calPrev" aria-label="Earlier">‹</button><b style="min-width:70px">${S.calOff?'':'Now'}${S.calOff?(S.calOff>0?'+':'')+S.calOff+' wk':''}</b><button id="calNext" aria-label="Later">›</button></div>${grpSel}${can?`<button class="btn sm" data-evnew="${T}">${ico('plus','width:15px;height:15px')}Add</button>`:''}</div></header>
+    <div class="legend" style="margin-bottom:12px">${EV_KIND.map(([k,l,c])=>`<span><i style="background:${c}"></i>${l}</span>`).join('')}</div>
+    <div class="calgrid"><div class="calh">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<span>${d}</span>`).join('')}</div>
+    ${Array.from({length:nW},(_,w)=>`<div class="calw">${keys.slice(w*7,w*7+7).map(k=>{const es=evsOn(k);return `<div class="cald ${k===T?'today':''} ${k<T?'past':''}" data-evday="${k}"><div class="caln">${parse(k).getDate()===1||k===keys[0]?fmtK(k,{day:'numeric',month:'short'}):parse(k).getDate()}</div>${es.map(e=>evPill(e)).join('')}<button class="caladd" data-evnew="${k}" aria-label="Add on ${esc(fmtK(k))}">+</button></div>`}).join('')}</div>`).join('')}</div>
+    <div class="calagenda">${keys.filter(k=>k>=T||S.calOff<0).map(k=>{const es=evsOn(k);if(!es.length)return '';return `<div class="agd"><b>${k===T?'Today':esc(fmtK(k,{weekday:'long',day:'numeric',month:'short'}))}</b>${es.map(e=>evPill(e)).join('')}</div>`}).join('')||'<div class="empty">Nothing on yet.</div>'}</div></section>`;
+  const wkLoad=Array.from({length:nW},(_,w)=>{const ks=keys.slice(w*7,w*7+7);const es=ks.flatMap(evsOn).filter(e=>e.kind!=='meeting');const hard=es.filter(e=>(e.intensity||0)>=4).length;const sum=es.reduce((a,e)=>a+(e.intensity||0),0);return {w,ks,n:es.length,hard,sum,m:es.filter(e=>e.kind==='match').length}});
+  const mx=Math.max(1,...wkLoad.map(x=>x.sum));
+  const plan=`<section class="card"><header><div><h2>Planned intensity</h2><p>Each event's intensity (1 to 5) added up per week. Players see it as stars on the event.</p></div></header>
+    ${wkLoad.map(x=>`<div class="lrow" style="grid-template-columns:150px minmax(0,1fr) 90px 90px"><div class="nm"><b>Week of ${esc(fmtK(x.ks[0],{day:'numeric',month:'short'}))}</b><small>${x.n} sessions · ${x.m} match${x.m===1?'':'es'}</small></div><div class="lbar"><i style="width:${Math.round(x.sum/mx*100)}%"></i></div><span class="small">${x.sum} total</span><span class="small">${x.hard} hard</span></div>`).join('')}</section>`;
+  return head+plan+(S.ev?evModalHTML():'')}
+function evModalHTML(){const e=S.ev;const g=HUB.groups;return `<div class="modal" data-evmodal="1"><div class="mbox" style="max-width:620px"><header style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><h2 style="flex:1">${e.id?'Edit event':'New event'}</h2><button class="btn ghost sm" data-evclose="1">Close</button></header>
+  <div class="grid" style="gap:12px"><div class="seg" style="flex-wrap:wrap">${EV_KIND.map(([k,l])=>`<button type="button" data-evkind="${k}" aria-pressed="${e.kind===k}">${l}</button>`).join('')}</div>
+   <div class="field"><label>Title</label><input class="in" id="evTitle" value="${esc(e.title||'')}" maxlength="80" placeholder="e.g. Squad training"></div>
+   <div class="grid g3" style="gap:12px"><div class="field"><label>Day</label><input class="in" type="date" id="evDay" value="${esc(e.day)}"></div><div class="field"><label>Starts</label><input class="in" type="time" id="evStart" value="${esc(hhmm(e.start_time))}"></div><div class="field"><label>Ends</label><input class="in" type="time" id="evEnd" value="${esc(hhmm(e.end_time))}"></div></div>
+   <div class="grid g2" style="gap:12px"><div class="field"><label>Where</label><input class="in" id="evLoc" value="${esc(e.location||'')}" maxlength="120" placeholder="e.g. Main pitch"></div>
+    <div class="field"><label>Who</label><select class="in" id="evGrp"><option value="">Whole squad</option>${g.map(x=>`<option value="${esc(x.id)}" ${e.group_id===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div></div>
+   <div class="field"><label>Intensity</label><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div class="seg">${[0,1,2,3,4,5].map(v=>`<button type="button" data-evint="${v}" aria-pressed="${(e.intensity||0)===v}">${v?v:'–'}</button>`).join('')}</div>${e.intensity?starFade(e.intensity,5,110)+`<span class="small muted">${INTENSITY[e.intensity]}</span>`:'<span class="small muted">Not set</span>'}</div></div>
+   <div class="field"><label>Notes for the players</label><textarea class="in" id="evNotes" maxlength="1000" placeholder="e.g. Bring runners, conditioning at the end">${esc(e.notes||'')}</textarea></div>
+   ${e.id?'':`<div class="field"><label>Repeat</label><select class="in" id="evRep"><option value="0">Just once</option>${[2,3,4,6,8,12].map(n=>`<option value="${n}">Every week for ${n} weeks</option>`).join('')}</select></div>`}
+   <label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="evTell" ${e.id?'checked':''}> Tell the players in Messages${e.id?' (what changed)':''}</label>
+   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-evsave="1">${e.id?'Save':'Add to the calendar'}</button>${e.id?`<span style="flex:1"></span><button class="btn danger" data-evdel="1">Delete</button>`:''}</div></div></div></div>`}
+function readEv(){const e=S.ev;if(!e||!$('#evTitle'))return e;e.title=$('#evTitle').value.trim();e.day=$('#evDay').value||e.day;e.start_time=$('#evStart').value||null;e.end_time=$('#evEnd').value||null;e.location=$('#evLoc').value.trim()||null;e.group_id=$('#evGrp').value||null;e.notes=$('#evNotes').value.trim()||null;return e}
+function evLine(e){return `${fmtK(e.day,{weekday:'short',day:'numeric',month:'short'})}${e.start_time?' at '+hhmm(e.start_time):''}: ${e.title}${e.location?' ('+e.location+')':''}`}
+async function saveEv(){const e=readEv();if(!e.title){toast('Give it a title');return}const rep=$('#evRep')?+$('#evRep').value:0;const tell=$('#evTell')&&$('#evTell').checked;
+  const row={team_id:TEAM.team_id,kind:e.kind,title:e.title.slice(0,80),day:e.day,start_time:e.start_time,end_time:e.end_time,location:e.location,notes:e.notes,intensity:e.intensity||null,group_id:e.group_id};
+  const rows=[row];for(let i=1;i<rep;i++)rows.push(Object.assign({},row,{day:addK(e.day,i*7)}));
+  if(isDemo()){if(e.id)Object.assign(HUB.events.find(x=>x.id===e.id),row);else rows.forEach(r=>HUB.events.push(Object.assign({id:uid()},r)))}
+  else if(e.id){const {error}=await sb.from('team_events').update(Object.assign({updated_at:new Date().toISOString()},row)).eq('id',e.id);if(error){toast(error.message,4000);return}Object.assign(HUB.events.find(x=>x.id===e.id),row)}
+  else{const {data,error}=await sb.from('team_events').insert(rows).select();if(error){toast(error.message,4000);return}HUB.events.push(...data)}
+  if(tell){const txt=(e.id?'Change to the calendar. ':'New on the calendar. ')+evLine(e)+(rep>1?`, every week for ${rep} weeks`:'')+(e.notes?'. '+e.notes:'');await postMsg(e.group_id?'group':'squad',txt,{group_id:e.group_id||null})}
+  S.ev=null;toast(e.id?'Saved':rows.length>1?`Added ${rows.length} events`:'Added');render()}
+
+// ---------- coming up (Overview) ----------
+function comingUp(){if(HUB.missing||!HUB.events.length)return '';const T=todayK();const es=HUB.events.filter(e=>e.day>=T&&e.day<=addK(T,6)).sort((a,b)=>(a.day+(a.start_time||'')).localeCompare(b.day+(b.start_time||'')));
+  return `<section class="card"><header><div><h2>Next 7 days</h2><p>From the team calendar</p></div><a class="btn ghost sm" href="#calendar">Calendar</a></header>${es.length?`<div class="upnext">${es.slice(0,8).map(e=>{const g=grpById(e.group_id);return `<button class="upi" data-ev="${esc(e.id)}" style="--ec:${evCol(e.kind)}"><span class="upd"><b>${esc(fmtK(e.day,{weekday:'short'}))}</b><small>${parse(e.day).getDate()}</small></span><span class="upt"><b>${esc(e.title)}</b><small>${esc([hhmm(e.start_time),e.location,g&&g.name].filter(Boolean).join(' · '))}</small></span>${e.intensity?starFade(e.intensity,5,70):''}</button>`}).join('')}</div>`:'<div class="empty">Nothing on the calendar this week.</div>'}</section>`}
+
+// ---------- messages ----------
+const thKey=m=>m.channel==='group'?'group:'+m.group_id:m.channel==='direct'?'direct:'+m.player_id:m.channel;
+function threads(){const pl=players();const out=[{key:'squad',name:'Whole squad',sub:'Every player and the staff',ic:'today'}];
+  HUB.groups.forEach(g=>out.push({key:'group:'+g.id,name:g.name,sub:grpMembers(g.id).length+' players',ic:'grp',col:g.colour}));
+  out.push({key:'staff',name:'Staff room',sub:'Backroom team only, players never see it',ic:'note'});
+  const dm=pl.map(p=>({key:'direct:'+p.id,name:p.name,sub:p.pos||'Player',ic:null,p}));
+  out.forEach(t=>t.ms=HUB.msgs.filter(m=>thKey(m)===t.key));dm.forEach(t=>t.ms=HUB.msgs.filter(m=>thKey(m)===t.key));
+  dm.sort((a,b)=>{const la=a.ms.length?a.ms[a.ms.length-1].created_at:'',lb=b.ms.length?b.ms[b.ms.length-1].created_at:'';return lb.localeCompare(la)||a.name.localeCompare(b.name)});
+  return {top:out,dm}}
+const myId=()=>SESSION&&SESSION.user.id;
+const unreadIn=t=>t.ms.filter(m=>m.author_id!==myId()&&!String(m.author_id||'').startsWith('staff-')&&(!HUB.reads[t.key]||m.created_at>HUB.reads[t.key])).length+(isDemo()?t.ms.filter(m=>String(m.author_id||'').startsWith('staff-')&&m.author_staff!==S.demoAs&&(!HUB.reads[t.key]||m.created_at>HUB.reads[t.key])).length:0);
+function unreadTotal(){if(HUB.missing)return 0;const {top,dm}=threads();return top.concat(dm).reduce((a,t)=>a+unreadIn(t),0)}
+function whenTxt(iso_){const d=new Date(iso_);const k=iso(d);return k===todayK()?d.toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'}):fmtK(k,{weekday:'short',day:'numeric',month:'short'})}
+function viewMessages(){if(HUB.missing)return missingCard('Messages');const {top,dm}=threads();const cur=route().id||'';const q=(S.msgQ||'').toLowerCase();
+  const item=t=>{const u=unreadIn(t);const last=t.ms[t.ms.length-1];return `<button class="thr ${cur===t.key?'on':''}" data-thread="${esc(t.key)}">${t.p?`<span class="tav">${esc(t.p.name.split(' ').map(x=>x[0]).join('').slice(0,2))}</span>`:`<span class="tav" ${t.col?`style="color:${esc(t.col)}"`:''}>${ico(t.ic)}</span>`}<span class="tn"><b>${esc(t.name)}</b><small>${last?esc((last.author_name?first(last.author_name)+': ':'')+last.body.slice(0,60)):esc(t.sub)}</small></span>${u?`<em class="ub">${u}</em>`:last?`<small class="tw">${esc(whenTxt(last.created_at))}</small>`:''}</button>`};
+  const list=`<div class="thlist"><input class="in" id="msgQ" placeholder="Find a player" value="${esc(S.msgQ||'')}" style="margin-bottom:8px">${top.filter(t=>!q||t.name.toLowerCase().includes(q)).map(item).join('')}<div class="navh" style="padding:12px 8px 4px">Players</div>${dm.filter(t=>!q||t.name.toLowerCase().includes(q)).map(item).join('')||'<div class="small muted" style="padding:8px">No players yet.</div>'}</div>`;
+  const t=top.concat(dm).find(x=>x.key===cur);
+  let pane;if(!t)pane=`<div class="empty" style="padding:60px 10px">${ico('msg','width:28px;height:28px')}<p style="margin-top:8px">Pick a thread. Post to the whole squad or a group, talk privately with a player, or use the staff room.</p></div>`;
+  else{markRead(t.key);let lastDay='';
+    pane=`<header class="thh"><button class="btn ghost sm thback" data-thread="">‹</button><div style="flex:1;min-width:0"><h2>${esc(t.name)}</h2><p class="small muted">${t.key==='staff'?'Only the backroom team sees this.':t.key==='squad'?'Every player sees this in Keel. Only staff can post here.':t.key.startsWith('group:')?'Players in this group see this in Keel. Only staff can post here.':'Private between '+esc(first(t.name))+' and the staff. Any of the staff can read and reply.'}</p></div>${t.p?`<a class="btn ghost sm" href="#player/${encodeURIComponent(t.p.id)}">Player page</a>`:''}</header>
+     <div class="msgs" id="msgScroll">${t.ms.length?t.ms.map(m=>{const day=iso(new Date(m.created_at));const sep=day!==lastDay?`<div class="mday">${day===todayK()?'Today':esc(fmtK(day,{weekday:'long',day:'numeric',month:'short'}))}</div>`:'';lastDay=day;const mine=m.author_id===myId()||(isDemo()&&m.author_staff===S.demoAs);
+       return sep+`<div class="mb ${mine?'mine':''} ${m.author_staff?'':'pl'}"><div class="mh"><b>${esc(m.author_name||'')}</b>${m.author_staff?`<span class="chip">${esc(staffLabel(m.author_staff))}</span>`:''}<small>${esc(new Date(m.created_at).toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'}))}</small>${mine?`<button class="mdel" data-msgdel="${esc(m.id)}" aria-label="Delete">×</button>`:''}</div><div class="mt">${esc(m.body).replace(/\n/g,'<br>')}</div></div>`}).join(''):'<div class="empty">No messages yet.</div>'}</div>
+     <form class="compose" id="msgForm" data-thread="${esc(t.key)}"><textarea class="in" id="msgBody" rows="2" maxlength="2000" placeholder="${t.key==='staff'?'Message the staff':'Message '+esc(t.key.startsWith('direct:')?first(t.name):t.name)}"></textarea><button class="btn" type="submit" aria-label="Send">${ico('send','width:16px;height:16px')}</button></form>`}
+  return `<section class="card msgwrap ${t?'open':''}">${list}<div class="thpane">${pane}</div></section>`}
+async function markRead(key){const now=new Date().toISOString();const prev=HUB.reads[key];HUB.reads[key]=now;if(isDemo()||(prev&&now.slice(0,16)===prev.slice(0,16)))return;
+  try{await sb.from('team_message_reads').upsert({team_id:TEAM.team_id,user_id:myId(),thread:key,read_at:now},{onConflict:'team_id,user_id,thread'})}catch(e){}}
+async function postMsg(channel,body,extra){extra=extra||{};const row=Object.assign({team_id:TEAM.team_id,channel,body:body.slice(0,2000)},extra);
+  if(isDemo()){HUB.msgs.push(Object.assign({id:uid(),author_id:'staff-'+S.demoAs,author_name:{manager:'Darren',sc:'Mark (S&C)',physio:'Aoife (physio)',nutrition:'Sinéad (nutrition)',mindset:'Niamh (mindset)',coach:'Coach'}[S.demoAs]||'You',author_staff:S.demoAs,created_at:new Date().toISOString(),group_id:null,player_id:null},row));return true}
+  const {data,error}=await sb.from('team_messages').insert(row).select().single();if(error){toast(error.message,4000);return false}HUB.msgs.push(data);return true}
+function threadToChannel(key){if(key==='squad'||key==='staff')return [key,{}];const [k,id]=key.split(':');return k==='group'?['group',{group_id:id}]:['direct',{player_id:id}]}
+
+// ---------- groups (Team page) ----------
+function groupsCard(){if(HUB.missing)return missingCard('Groups');const ps=players().sort((a,b)=>a.name.localeCompare(b.name));const ed=S.grpEd;
+  const form=ed?`<div style="display:flex;flex-direction:column;gap:12px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px">
+     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="field" style="flex:1;min-width:200px"><label>Group name</label><input class="in" id="grpName" value="${esc(ed.name||'')}" maxlength="60" placeholder="e.g. Backs, U20s, Rehab group"></div>
+      <div class="field"><label>Colour</label><div style="display:flex;gap:6px">${GCOL.map(c=>`<button type="button" data-grpcol="${c}" aria-pressed="${ed.colour===c}" style="width:26px;height:26px;border-radius:50%;background:${c};outline:${ed.colour===c?'2px solid var(--text)':'none'};outline-offset:2px"></button>`).join('')}</div></div></div>
+     <div class="pickgrid">${ps.map(p=>`<label class="pick"><input type="checkbox" data-grppick="${esc(p.id)}" ${ed.members.includes(p.id)?'checked':''}><span>${esc(p.name)}<small>${esc(p.pos||'')}</small></span></label>`).join('')||'<div class="small muted">No players yet.</div>'}</div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-grpsave="1">Save group</button><button class="btn ghost" data-grpcancel="1">Cancel</button>${ed.id?`<span style="flex:1"></span><button class="btn danger" data-grpdel="${esc(ed.id)}">Delete group</button>`:''}</div></div>`:'';
+  return `<section class="card"><header><div><h2>Groups</h2><p>Put players in groups (Backs, Forwards, U20s, a rehab group) to give a whole group a programme, targets, events or a message in one go.</p></div>${ed?'':`<button class="btn sm" data-grpnew="1">${ico('plus','width:15px;height:15px')}New group</button>`}</header>${form}
+   ${HUB.groups.length?`<div class="grid g2" style="gap:12px">${HUB.groups.map(g=>{const ms=grpMembers(g.id).map(id=>SQUAD.find(p=>p.id===id)).filter(Boolean);return `<div class="avcol" style="min-height:0"><h3 style="margin:0"><span class="dot" style="background:${esc(g.colour||GCOL[0])}"></span>${esc(g.name)}<span class="num">${ms.length}</span></h3><div class="small muted">${ms.map(p=>esc(p.name)).join(', ')||'Nobody yet'}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost sm" data-grpedit="${esc(g.id)}">Edit</button><a class="btn ghost sm" href="#messages/group:${esc(g.id)}" data-thread="group:${esc(g.id)}">Message</a></div></div>`}).join('')}</div>`:'<div class="empty">No groups yet.</div>'}</section>`}
+async function saveGroup(){const ed=S.grpEd;ed.name=($('#grpName').value||'').trim();if(!ed.name){toast('Name the group');return}ed.members=[...document.querySelectorAll('[data-grppick]:checked')].map(b=>b.dataset.grppick);
+  if(isDemo()){if(!ed.id){ed.id=uid();HUB.groups.push({id:ed.id,name:ed.name,colour:ed.colour})}else Object.assign(grpById(ed.id),{name:ed.name,colour:ed.colour});HUB.gm=HUB.gm.filter(m=>m.group_id!==ed.id).concat(ed.members.map(u=>({group_id:ed.id,user_id:u})))}
+  else{let id=ed.id;if(!id){const {data,error}=await sb.from('team_groups').insert({team_id:TEAM.team_id,name:ed.name,colour:ed.colour}).select().single();if(error){toast(error.message,4000);return}id=data.id;HUB.groups.push(data)}
+    else{const {error}=await sb.from('team_groups').update({name:ed.name,colour:ed.colour}).eq('id',id);if(error){toast(error.message,4000);return}Object.assign(grpById(id),{name:ed.name,colour:ed.colour})}
+    const had=grpMembers(id);const add=ed.members.filter(u=>!had.includes(u)),rem=had.filter(u=>!ed.members.includes(u));
+    if(rem.length){const {error}=await sb.from('team_group_members').delete().eq('group_id',id).in('user_id',rem);if(error){toast(error.message,4000);return}}
+    if(add.length){const {error}=await sb.from('team_group_members').insert(add.map(u=>({group_id:id,team_id:TEAM.team_id,user_id:u})));if(error){toast(error.message,4000);return}}
+    HUB.gm=HUB.gm.filter(m=>m.group_id!==id).concat(ed.members.map(u=>({group_id:id,team_id:TEAM.team_id,user_id:u})))}
+  HUB.groups.sort((a,b)=>a.name.localeCompare(b.name));S.grpEd=null;toast('Group saved');render()}
+// tick a whole group in any player picker
+function enhancePickers(){if(!HUB.groups.length)return;document.querySelectorAll('.pickgrid').forEach(pg=>{if(pg.dataset.grp||!pg.querySelector('[data-pick]'))return;pg.dataset.grp='1';
+  const row=document.createElement('div');row.className='grprow';row.innerHTML=`<span class="small muted">Tick a group:</span>${HUB.groups.map(g=>`<button type="button" class="chip" data-pickgroup="${esc(g.id)}" style="color:${esc(g.colour||GCOL[0])}">${esc(g.name)}</button>`).join('')}`;pg.parentNode.insertBefore(row,pg)})}
+
+// ---------- uploads: several videos at once, and importing a programme ----------
+const nameFromFile=f=>f.replace(/\.[^.]+$/,'').replace(/[-_]+/g,' ').replace(/\s+/g,' ').trim().replace(/\b\w/g,c=>c.toUpperCase()).slice(0,80)||'New exercise';
+async function bulkVideos(files,cat){files=[...files].filter(f=>/^video\//.test(f.type)||/\.(mp4|mov|webm)$/i.test(f.name));if(!files.length){toast('Pick video files (MP4, MOV or WebM)');return}
+  let ok=0;for(const [i,f] of files.entries()){if(f.size>52428800){toast(`${f.name} is over 50 MB, skipped`,3500);continue}
+    S.bulkMsg=`Uploading ${i+1} of ${files.length}: ${f.name}`;render();const path=`${TEAM.team_id}/${uid()}.${(f.name.split('.').pop()||'mp4').toLowerCase()}`;
+    const name=nameFromFile(f.name);const ex=SC.ex.find(e=>e.name.toLowerCase()===name.toLowerCase());
+    if(isDemo()){SC.urls[path]=URL.createObjectURL(f)}else{const {error}=await sb.storage.from('keel-videos').upload(path,f,{contentType:f.type||'video/mp4'});if(error){toast('Upload failed: '+error.message,5000);continue}}
+    if(ex){if(!isDemo()){const {error}=await sb.from('sc_exercises').update({video_path:path}).eq('id',ex.id);if(error){toast(error.message,4000);continue}if(ex.video_path)sb.storage.from('keel-videos').remove([ex.video_path])}ex.video_path=path}
+    else{const row={name,category:cat,video_path:path};if(isDemo())SC.ex.push(Object.assign({id:uid(),team_id:DEMO_ID,equipment:null,cues:null},row));else{const {data,error}=await sb.from('sc_exercises').insert(Object.assign({team_id:TEAM.team_id},row)).select().single();if(error){toast(error.message,4000);continue}SC.ex.push(data)}}
+    ok++}
+  S.bulkMsg='';toast(`${ok} video${ok===1?'':'s'} added. Rename any or add cues with Edit.`,4500);render()}
+function bulkCard(cat,who){return `<section class="card bulk" data-bulkcat="${cat}"><div class="drop" id="dropZone">${ico('upload','width:26px;height:26px')}<div><b>Add several videos at once</b><p class="small muted">Drop clips here or pick them. Each becomes an exercise named after the file (e.g. <i>nordic-curl.mp4</i> becomes Nordic Curl), ready for ${who}. A clip with the same name as an exercise replaces its video.</p></div><label class="btn sm">${ico('upload','width:15px;height:15px')}Pick videos<input type="file" id="bulkFiles" multiple accept="video/mp4,video/quicktime,video/webm" hidden></label></div>${S.bulkMsg?`<div class="small" style="margin-top:8px">${esc(S.bulkMsg)}</div>`:''}</section>`}
+// physio's own library: same exercises and videos, rehab and prehab first
+function viewRehabLib(){const keep=S.libCat;if(!S.libCatP)S.libCatP='all';S.libCat=S.libCatP;const h=viewLibrary();S.libCat=keep;return bulkCard(['all','strength','power','speed','conditioning','core'].includes(S.libCatP)?'rehab':S.libCatP,'rehab plans')+h.replace(/data-set="libCat"/g,'data-set="libCatP"').replace('<h2>Exercise library</h2>','<h2>Rehab library</h2>').replace('Players see the video for every exercise in their session.','Shared with S&amp;C. Link any of these to a rehab stage and the player sees the video.')}
+function normWeeks(o){return {name:String(o.name||'Imported programme').slice(0,80),goal:String(o.goal||'').slice(0,200),plan:{weeks:(o.weeks||[]).map(x=>({days:(x.days||[]).map(d=>({dow:Math.min(7,Math.max(1,+d.dow||1)),title:String(d.title||'Session').slice(0,60),kind:KIND.some(k=>k[0]===d.kind)?d.kind:'strength',min:+d.min||45,rpe:+d.rpe||6,
+  items:(d.items||[]).map(i=>{const byName=!i.ex&&i.name&&SC.ex.find(e=>e.name.toLowerCase()===String(i.name).toLowerCase());const ok=(i.ex&&exById(i.ex))||byName;return {ex:ok?ok.id:null,name:ok?null:String(i.name||'Exercise').slice(0,80),category:ok?null:(SC_CATS.some(c=>c[0]===i.category)?i.category:'strength'),sets:i.sets??'',reps:i.reps??'',load:i.load??'',rest:i.rest??'',note:i.note??''}})}))}))}}}
+// plain-text reader for when Koach can't be reached: "Week 1", "Day 1 / Monday: title", then "Exercise 3x8 @ RPE 7"
+function parseProgText(txt){const DOWS=['mon','tue','wed','thu','fri','sat','sun'];const weeks=[];let w=null,d=null,dn=0;
+  const newW=()=>{w={days:[]};weeks.push(w);dn=0};newW();
+  txt.split(/\r?\n/).map(l=>l.replace(/^[\s\-*•\d.)]+(?=[A-Za-z])/,'').trim()).filter(Boolean).forEach(l=>{const low=l.toLowerCase();
+    if(/^week\s*\d+/.test(low)){if(w.days.length)newW();return}
+    const dm=low.match(/^(day\s*(\d+)|mon|tue|wed|thu|fri|sat|sun)[a-z]*\b[:\-–\s]*(.*)$/);
+    if(dm&&(dm[2]||l.length<40||/[:\-–]/.test(l))){dn++;const dow=dm[2]?[1,4,6,2,5,3,7][(+dm[2]-1)%7]:DOWS.indexOf(dm[1].slice(0,3))+1;d={dow,title:(l.split(/[:\-–]/)[1]||'').trim()||('Session '+dn),kind:'strength',min:50,rpe:7,items:[]};w.days.push(d);return}
+    if(!d){d={dow:1,title:'Session 1',kind:'strength',min:50,rpe:7,items:[]};w.days.push(d)}
+    const sr=l.match(/(\d+)\s*[x×]\s*([\d\-–]+\s*(?:s|sec|m|min|reps?|each)?)/i);const ld=l.match(/(?:\s@|\sat\s)\s*(.+)$/i);
+    const name=l.split(/\s+\d+\s*[x×]|\s+[-–:]\s+|\s+@/i)[0].replace(/,$/,'').trim();
+    d.items.push({name,sets:sr?+sr[1]:'',reps:sr?sr[2].trim():'',load:ld?ld[1].trim():'',rest:'',note:''})});
+  return {name:'Imported programme',goal:'',weeks:weeks.filter(x=>x.days.length)}}
+async function importProgramme(){const txt=($('#impText')||{}).value||'';if(txt.trim().length<10){toast('Paste the programme first, or pick a file');return}S.impBusy=true;S.impText=txt;render();let out=null;
+  if(!isDemo()&&SESSION&&SESSION.access_token){const lib=SC.ex.map(e=>`${e.id}|${e.name}|${e.category}`).join('\n');
+    const prompt=`You are Koach inside Keel. An S&C coach has pasted their own programme (from a spreadsheet, a document or notes). Turn it into Keel's structure exactly as written: keep their exercises, sets, reps, loads, rest and notes. Don't add or change anything. If weeks aren't given, make one week. If days aren't named, spread sessions Mon, Thu, Sat.
+Match each exercise to this library where it's clearly the same movement, giving its id in "ex" (format id|name|category):
+${lib||'(library is empty)'}
+Otherwise leave out "ex" and give "name" and "category" (one of ${SC_CATS.map(c=>c[0]).join(', ')}).
+Reply with JSON only: {"name":"...","goal":"...","weeks":[{"days":[{"dow":1,"title":"...","kind":"strength|conditioning|speed|mobility|recovery","min":45,"rpe":7,"items":[{"ex":"<id>","name":"...","sets":3,"reps":"5","load":"...","rest":"...","note":"..."}]}]}]}
+dow is 1 = Monday to 7 = Sunday.
+The programme:
+${txt.slice(0,15000)}`;
+    try{const r=await fetch('/api/claude',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+SESSION.access_token},body:JSON.stringify({prompt,maxTokens:12000})});const j=await r.json();const m=(j.text||'').match(/\{[\s\S]*\}/);if(m){const o=JSON.parse(m[0]);if(o&&o.weeks&&o.weeks.length)out=o}}catch(e){}}
+  if(!out)out=parseProgText(txt);S.impBusy=false;if(!out.weeks.length){toast('Couldn\'t find any exercises in that. One per line works best.',4500);render();return}
+  S.imp=false;S.impText='';S.draft=Object.assign({id:null},normWeeks(out));S.draftFromKoach=true;S.wk=0;S.progEdit='new';toast('Imported. Check it over, then save and assign.',4000);render()}
+function importCard(){return S.imp?`<section class="card"><header><div><h2>Import your own programme</h2><p>Paste it from a spreadsheet, Word or notes, or pick a .txt or .csv file. Koach lays it out week by week and matches your library; you check it before anyone sees it.</p></div></header>
+  <textarea class="in" id="impText" rows="9" placeholder="Week 1&#10;Monday: Lower body&#10;Trap bar deadlift 4x5 @ RPE 7&#10;RFE split squat 3x8 each&#10;Nordic curl 3x5&#10;Thursday: Upper body&#10;Bench press 4x6&#10;Chin-up 3x8">${esc(S.impText||'')}</textarea>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" data-impgo="1" ${S.impBusy?'disabled':''}>${S.impBusy?'Koach is reading it…':'Import'}</button><label class="btn ghost">Pick a file<input type="file" id="impFile" accept=".txt,.csv,.tsv,text/plain,text/csv" hidden></label><button class="btn ghost" data-imp="0">Cancel</button></div></section>`:''}
+// rehab: paste the physio's own programme into stages
+function parseRehabText(txt){const st=[];let cur=null;txt.split(/\r?\n/).map(l=>l.replace(/^[\s\-*•]+/,'').trim()).filter(Boolean).forEach(l=>{const m=l.match(/^(stage|phase|week)\s*\d*\s*[:\-–]?\s*(.*)$/i);
+  if(m){cur={name:m[2]||l,goal:'',criteria:'',items:[]};st.push(cur);return}if(!cur){cur={name:'Stage 1',goal:'',criteria:'',items:[]};st.push(cur)}
+  if(/^(goal|aim)\s*[:\-–]/i.test(l)){cur.goal=l.split(/[:\-–]/).slice(1).join(':').trim();return}if(/^(to move on|progress when|criteria|exit)\s*[:\-–]/i.test(l)){cur.criteria=l.split(/[:\-–]/).slice(1).join(':').trim();return}
+  const sr=l.match(/(\d+)\s*[x×]\s*([\w\s]+?)(?:,|$|\s{2})/i);const name=l.split(/\s+\d+\s*[x×]|\s+[-–]\s+|,/)[0].trim();const lib=SC.ex.find(e=>e.name.toLowerCase()===name.toLowerCase());
+  cur.items.push({ex:lib?lib.id:null,name:lib?lib.name:name,sets:sr?sr[1]:'',reps:sr?sr[2].trim():'',freq:(l.match(/(daily|every day|\d+\s*(?:times|x)\s*a\s*week|twice a day)/i)||[''])[0],note:''})});return st}
+function rehabImportBox(){return `<section class="card"><header><div><h2>Use your own programme</h2><p>Paste your rehab protocol. Lines starting with Stage or Phase start a new stage; "Goal:" and "To move on:" lines fill those in; every other line is an exercise (e.g. <i>Isometric bridge 4x30s daily</i>). Exercises with the same name as one in the library get its video.</p></div></header>
+  <textarea class="in" id="rhImpText" rows="7" placeholder="Stage 1: Protect&#10;Goal: Pain-free walking&#10;Isometric bridge hold 4x30s daily&#10;To move on: No pain at rest&#10;Stage 2: Strength&#10;Nordic hamstring curl 3x4 3 times a week"></textarea>
+  <div style="display:flex;gap:8px;margin-top:10px"><button class="btn ghost sm" data-rhimp="1">Replace the stages with this</button></div></section>`}
+
+// ---------- more from the app: day by day on the player page ----------
+function dayDetail(p){const days=lastN(S.k,14).slice().reverse();const k=S.pday&&days.includes(S.pday)?S.pday:days[0];const d=p.D[k]||{};const L=p.L[k];
+  const pick=`<div class="toolbar" style="margin-bottom:4px"><div class="seg">${days.slice(0,10).map(kk=>`<button data-set="pday" data-val="${kk}" aria-pressed="${kk===k}">${kk===todayK()?'Today':esc(fmtK(kk,{weekday:'short',day:'numeric'}))}</button>`).join('')}</div></div>`;
+  const ci=checkedIn(d);const row=(l,v)=>v==null||v===''?'':`<tr><td class="muted">${l}</td><td>${v}</td></tr>`;const sc=v=>isNum(v)?`${v}/5`:null;
+  const check=`<section class="card"><header><div><h2>Check-in</h2><p>${ci?'From their morning check-in':'No check-in that day'}</p></div>${ci?ring(dayInfo(p,k).s,52,dayInfo(p,k).st):''}</header>${ci?`<table class="list">${row('Bed and wake',d.bed&&d.wake?esc(d.bed+' to '+d.wake):null)}${row('Sleep',p.E.sleep(k)!=null?r1(p.E.sleep(k))+' h':null)}${row('Took to fall asleep',d.latency!=null?esc(d.latency)+' min':null)}${row('Awake in the night',d.awakeMin!=null?esc(d.awakeMin)+' min':null)}${row('Sleep quality',sc(d.sleepQ))}${row('Energy',sc(d.energy))}${row('Mood',sc(d.mood))}${row('Stress',sc(d.stress))}${row('Body soreness',sc(d.sore))}${row('Resting pulse',d.rhr?esc(d.rhr)+' bpm':null)}${row('Unwell',d.sick?esc(d.sick.sev||'yes'):null)}${row('Niggles',(d.niggles||[]).map(n=>esc(n.area+(n.side?' ('+n.side.toLowerCase()+')':''))+' '+painChip(+n.pain||0)).join(' ')||null)}${row('Farm or work',d.farmHrs?esc(d.farmHrs)+' h physical work':null)}</table>`:''}</section>`;
+  const ss=sessionsOn(p,k);const sess=`<section class="card"><header><div><h2>Sessions</h2><p>What they logged in Keel</p></div></header>${ss.length?`<table class="list"><tr><th>What</th><th>Min</th><th>Effort</th><th>How it went</th></tr>${ss.map(s=>`<tr><td><b style="color:var(--text)">${esc(s.what)}</b>${s.desc?`<div class="tiny muted">${esc(s.desc)}</div>`:''}${s.st==='missed'?' <span class="chip alert">Missed</span>':''}</td><td class="num">${s.dur||'–'}</td><td class="num">${s.rpe||'–'}</td><td>${esc(s.fb&&isNum(s.fb.feel)?FEEL[s.fb.feel]:'–')}</td></tr>`).join('')}</table>`:'<div class="empty">No sessions that day.</div>'}</section>`;
+  const hab=(d.hab||[]);const rec=[...(d.recovery||[]).map(r=>[r.kind,r.min]),...(d.mobility||[]).map(r=>[r.name,r.min]),...(d.hc||[]).map(r=>[r.type,r.min])];
+  const hr=`<section class="card"><header><div><h2>Habits and recovery</h2><p>Ticked in Keel that day</p></div></header>${hab.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${hab.map(h=>`<span class="chip good">${ico('check')}${esc(habName(h))}</span>`).join('')}</div>`:'<p class="small muted" style="margin-bottom:10px">No habits ticked.</p>'}${rec.length?`<table class="list">${rec.map(([n,m])=>`<tr><td>${esc(n||'Recovery')}</td><td class="num">${m?esc(m)+' min':''}</td></tr>`).join('')}</table>`:'<p class="small muted">No recovery logged.</p>'}</section>`;
+  const meals=d.meals&&d.meals.length?d.meals:null;const f=foodOn(p,k);
+  const food=`<section class="card"><header><div><h2>Food</h2><p>${!p.food?'Not shared':meals?'Meals they logged':'Totals only (meals not shared)'}</p></div>${f?`<span class="chip">${fx(f.kcal)} kcal · ${fx(f.protein)} g protein</span>`:''}</header>${!p.food?`<div class="empty">${esc(first(p.name))} keeps food private.</div>`:meals?`<table class="list"><tr><th>Meal</th><th>Food</th><th>Amount</th><th>kcal</th><th>Protein</th></tr>${meals.map(m=>`<tr><td class="muted">${esc(m.meal||'')}${m.at?' · '+esc(m.at):''}</td><td><b style="color:var(--text)">${esc(m.name)}</b>${m.dish?`<div class="tiny muted">${esc(m.dish)}</div>`:''}</td><td class="small">${esc(m.qty||'')}</td><td class="num">${fx(m.kcal)}</td><td class="num">${m.protein!=null?fx(m.protein)+' g':'–'}</td></tr>`).join('')}</table>`:f?`<p class="small">${fx(f.kcal)} kcal, ${fx(f.protein)} g protein, ${fx(f.carbs)} g carbs, ${fx(f.fat)} g fat${f.water!=null?', '+f.water+' L water':''}.</p>`:'<div class="empty">Nothing logged that day.</div>'}</section>`;
+  // habits over two weeks
+  const hc={};days.forEach(kk=>((p.D[kk]||{}).hab||[]).forEach(h=>hc[h]=(hc[h]||0)+1));const hs=Object.entries(hc).sort((a,b)=>b[1]-a[1]);
+  const hab14=hs.length?`<section class="card"><header><div><h2>Habits, last 14 days</h2><p>Days each one was ticked</p></div></header>${hs.map(([h,n])=>`<div class="lrow" style="grid-template-columns:170px minmax(0,1fr) 60px"><div class="nm"><b>${esc(habName(h))}</b></div><div class="lbar"><i style="width:${Math.round(n/14*100)}%"></i></div><span class="small num">${n}/14</span></div>`).join('')}</section>`:'';
+  return pick+`<div class="grid g2">${check}${sess}${food}${hr}</div>`+hab14}
+
+// ---------- shell additions ----------
+function groupFilter(){if(!HUB.groups.length)return '';return `<select class="sel" id="grpSel" aria-label="Group"><option value="">All players</option>${HUB.groups.map(g=>`<option value="${esc(g.id)}" ${S.grp===g.id?'selected':''}>${esc(g.name)}</option>`).join('')}</select>`}
+
+// ---------- events ----------
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-evnew]')){if(e.target.closest('.evp'))return;S.ev={kind:'training',title:'',day:x.dataset.evnew,start_time:'19:30',end_time:'21:00',location:'',group_id:S.calGrp||null,intensity:3,notes:''};render();return}
+  if(x=c('[data-ev]')){const ev=HUB.events.find(y=>y.id===x.dataset.ev);if(!ev)return;S.ev=Object.assign({},ev);if(route().v!=='calendar'){location.hash='calendar'}else render();return}
+  if(c('[data-evclose]')||(e.target.dataset&&e.target.dataset.evmodal)){S.ev=null;render();return}
+  if(x=c('[data-evkind]')){readEv();S.ev.kind=x.dataset.evkind;if(!S.ev.title||EV_KIND.some(k=>k[1]===S.ev.title||S.ev.title==='Squad training'))S.ev.title={training:'Squad training',match:'Match',gym:'Gym session',recovery:'Recovery session',meeting:'Team meeting',other:''}[S.ev.kind];if(S.ev.kind==='match')S.ev.intensity=5;render();return}
+  if(x=c('[data-evint]')){readEv();S.ev.intensity=+x.dataset.evint||null;render();return}
+  if(c('[data-evsave]')){await saveEv();return}
+  if(c('[data-evdel]')){const b=c('[data-evdel]');if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent='Tap again to delete';return}const id=S.ev.id;
+    if(!isDemo()){const {error}=await sb.from('team_events').delete().eq('id',id);if(error){toast(error.message);return}}HUB.events=HUB.events.filter(y=>y.id!==id);S.ev=null;toast('Deleted');render();return}
+  if(c('#calPrev')){S.calOff=(S.calOff||0)-1;render();return}if(c('#calNext')){S.calOff=(S.calOff||0)+1;render();return}
+  if(x=c('[data-thread]')){e.preventDefault();S.thread=x.dataset.thread;const h='messages'+(S.thread?'/'+S.thread:'');if(location.hash!=='#'+h)location.hash=h;else render();return}
+  if(x=c('[data-msgdel]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Delete?';return}if(!isDemo()){const {error}=await sb.from('team_messages').delete().eq('id',x.dataset.msgdel);if(error){toast(error.message);return}}HUB.msgs=HUB.msgs.filter(m=>m.id!==x.dataset.msgdel);render();return}
+  if(c('[data-grpnew]')){S.grpEd={id:null,name:'',colour:GCOL[HUB.groups.length%GCOL.length],members:[]};render();return}
+  if(x=c('[data-grpedit]')){const g=grpById(x.dataset.grpedit);S.grpEd={id:g.id,name:g.name,colour:g.colour||GCOL[0],members:grpMembers(g.id)};render();scrollTo(0,0);return}
+  if(x=c('[data-grpcol]')){S.grpEd.name=($('#grpName')||{}).value||S.grpEd.name;S.grpEd.members=[...document.querySelectorAll('[data-grppick]:checked')].map(b=>b.dataset.grppick);S.grpEd.colour=x.dataset.grpcol;render();return}
+  if(c('[data-grpcancel]')){S.grpEd=null;render();return}
+  if(c('[data-grpsave]')){await saveGroup();return}
+  if(x=c('[data-grpdel]')){if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Tap again to delete';return}const id=x.dataset.grpdel;if(!isDemo()){const {error}=await sb.from('team_groups').delete().eq('id',id);if(error){toast(error.message);return}}
+    HUB.groups=HUB.groups.filter(g=>g.id!==id);HUB.gm=HUB.gm.filter(m=>m.group_id!==id);if(S.grp===id)S.grp='';S.grpEd=null;render();return}
+  if(x=c('[data-pickgroup]')){const ids=grpMembers(x.dataset.pickgroup);const pg=x.closest('.grprow').nextElementSibling;const boxes=[...pg.querySelectorAll('[data-pick]')].filter(b=>ids.includes(b.dataset.pick));const all=boxes.every(b=>b.checked);boxes.forEach(b=>b.checked=!all);S.pickGroup=all?null:x.dataset.pickgroup;return}
+  if(x=c('[data-imp]')){S.imp=x.dataset.imp==='1';render();return}
+  if(c('[data-impgo]')){await importProgramme();return}
+  if(c('[data-rhimp]')){const t=($('#rhImpText')||{}).value||'';const st=parseRehabText(t);if(!st.length||!S.rh){toast('Paste the stages first');return}S.rh.d.stages=st;S.rh.d.stage=0;toast(`${st.length} stage${st.length===1?'':'s'} filled in. Check them, then send.`,4000);render();return}
+  if(x=c('[data-msgplayer]')){S.thread='direct:'+x.dataset.msgplayer;location.hash='messages/'+S.thread;return}
+});
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='calGrp'){S.calGrp=t.value||null;setTimeout(render,0);return}
+  if(t.id==='grpSel'){S.grp=t.value||'';SQUAD.forEach(p=>p._di={});setTimeout(render,0);return}
+  if(t.id==='bulkFiles'){const cat=(t.closest('[data-bulkcat]')||{}).dataset?.bulkcat||'strength';await bulkVideos(t.files,cat==='all'?'strength':cat);return}
+  if(t.id==='impFile'){const f=t.files[0];if(!f)return;S.impText=await f.text();render();return}
+});
+document.addEventListener('input',e=>{if(e.target.id==='msgQ'){S.msgQ=e.target.value;const p=e.target.selectionStart;setTimeout(()=>{render();const i=$('#msgQ');if(i){i.focus();i.setSelectionRange(p,p)}},0)}});
+document.addEventListener('submit',async e=>{const f=e.target;if(f.id!=='msgForm')return;e.preventDefault();const body=($('#msgBody').value||'').trim();if(!body)return;const [ch,ex]=threadToChannel(f.dataset.thread);
+  const btn=f.querySelector('button');btn.disabled=true;if(await postMsg(ch,body,ex)){HUB.reads[f.dataset.thread]=new Date().toISOString();render();const m=$('#msgScroll');if(m)m.scrollTop=m.scrollHeight;const b=$('#msgBody');if(b)b.focus()}else btn.disabled=false});
+document.addEventListener('keydown',e=>{if(e.target.id==='msgBody'&&e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();$('#msgForm').requestSubmit()}});
+document.addEventListener('dragover',e=>{const z=e.target.closest&&e.target.closest('#dropZone');if(z){e.preventDefault();z.classList.add('over')}});
+document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.closest('#dropZone');if(z)z.classList.remove('over')});
+document.addEventListener('drop',async e=>{const z=e.target.closest&&e.target.closest('#dropZone');if(!z)return;e.preventDefault();const cat=z.closest('[data-bulkcat]').dataset.bulkcat;await bulkVideos(e.dataTransfer.files,cat==='all'?'strength':cat)});
+
 // ================= start =================
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
-  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());Object.assign(RH,buildDemoRehab());SQUAD.forEach(p=>p._di={});render();return}
+  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());Object.assign(RH,buildDemoRehab());Object.assign(HUB,buildDemoHub());SQUAD.forEach(p=>p._di={});render();return}
     $('#root').innerHTML='<div class="gate"><div class="gcard"><h1>Not set up yet</h1><p class="muted">The dashboard can\'t reach the database settings.</p></div></div>';return}
   const {data:{session}}=await sb.auth.getSession();SESSION=session;if(!session){render();return}
   await joinPending();

@@ -1,5 +1,7 @@
 -- Keel teams and the staff dashboard (/coach/).
 -- Run in Supabase: SQL Editor > New query > paste all of this > Run. Safe to run again, and it never deletes data.
+-- Version 4 (15 November 2026): groups, the team calendar, the message centre, and more detail from the app:
+-- what each session was, habits ticked, and (only with a separate "Share meals" switch) the meals themselves.
 -- Version 3 (7 November 2026): recovery sessions, mobility and heat/cold shared for the Recovery page.
 -- Version 2 (7 November 2026): staff roles (manager, S&C, physio, nutritionist, mindset), food sharing opt-in,
 -- staff notes and restrictions, and staff sign-up with the staff code.
@@ -37,6 +39,7 @@ create table if not exists public.team_members (
 );
 alter table public.team_members add column if not exists staff text;
 alter table public.team_members add column if not exists share_food boolean not null default false;
+alter table public.team_members add column if not exists share_meals boolean not null default false;
 alter table public.team_members drop constraint if exists team_members_staff_check;
 alter table public.team_members add constraint team_members_staff_check
   check (staff is null or staff in ('manager','sc','physio','nutrition','mindset','coach'));
@@ -108,7 +111,7 @@ create policy "authors or managers delete notes" on public.team_notes for delete
 
 -- nobody can change their own role or team by editing rows: only these columns are writable
 revoke insert, update on public.team_members from anon, authenticated;
-grant update (share, share_food, display_name, pos, staff) on public.team_members to authenticated;
+grant update (share, share_food, share_meals, display_name, pos, staff) on public.team_members to authenticated;
 revoke insert, update, delete on public.teams from anon, authenticated;
 grant update (name) on public.teams to authenticated;
 revoke update on public.team_notes from anon, authenticated;
@@ -120,7 +123,7 @@ create or replace function public.keel_staff_guard() returns trigger language pl
     raise exception 'That can''t be changed';
   end if;
   -- only the player decides what they share
-  if auth.uid() is distinct from new.user_id and (new.share is distinct from old.share or new.share_food is distinct from old.share_food) then
+  if auth.uid() is distinct from new.user_id and (new.share is distinct from old.share or new.share_food is distinct from old.share_food or new.share_meals is distinct from old.share_meals) then
     raise exception 'Only the player can change what they share';
   end if;
   if new.role = 'member' then new.staff := null; return new; end if;
@@ -190,10 +193,10 @@ end $$;
 -- the teams I'm in; codes only for staff
 drop function if exists public.keel_my_teams();
 create or replace function public.keel_my_teams()
-returns table (team_id uuid, name text, role text, share boolean, code text, coach_code text, staff text, share_food boolean)
+returns table (team_id uuid, name text, role text, share boolean, code text, coach_code text, staff text, share_food boolean, share_meals boolean)
 language sql stable security definer set search_path = public as $$
   select t.id, t.name, m.role, m.share,
-    case when m.role = 'coach' then t.code end, case when m.role = 'coach' then t.coach_code end, m.staff, m.share_food
+    case when m.role = 'coach' then t.code end, case when m.role = 'coach' then t.coach_code end, m.staff, m.share_food, m.share_food and m.share_meals
   from team_members m join teams t on t.id = m.team_id
   where m.user_id = auth.uid() order by m.joined_at;
 $$;
@@ -201,14 +204,14 @@ $$;
 -- the squad list for staff: who's in, sharing or not, and the basics from their sign-up
 drop function if exists public.keel_team_squad(uuid);
 create or replace function public.keel_team_squad(t uuid)
-returns table (user_id uuid, role text, display_name text, pos text, share boolean, joined_at timestamptz, about jsonb, staff text, share_food boolean)
+returns table (user_id uuid, role text, display_name text, pos text, share boolean, joined_at timestamptz, about jsonb, staff text, share_food boolean, share_meals boolean)
 language sql stable security definer set search_path = public as $$
   select m.user_id, m.role, coalesce(m.display_name, p.data->'answers'->>'name'), m.pos, m.share, m.joined_at,
     case when m.share then jsonb_strip_nulls(jsonb_build_object(
       'name', p.data->'answers'->'name', 'age', p.data->'answers'->'age', 'sex', p.data->'answers'->'sex',
       'sport', p.data->'answers'->'sport', 'target', p.data->'answers'->'target',
       'week', p.data->'plan'->'week', 'start', p.data->'plan'->'start')) else null end,
-    m.staff, m.share and m.share_food
+    m.staff, m.share and m.share_food, m.share and m.share_food and m.share_meals
   from team_members m left join profiles p on p.id = m.user_id
   where m.team_id = t and keel_is_coach(t);
 $$;
@@ -247,6 +250,17 @@ create or replace function public.keel_food_totals(d jsonb) returns jsonb langua
   from n, pl;
 $$;
 
+
+-- one day's meals for players who also switched on "Share meals": meal, time, food name, amount and macros.
+-- Alcohol is left out, and so are photos and notes.
+create or replace function public.keel_food_meals(d jsonb) returns jsonb language sql immutable as $$
+  select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+    'meal', i->'meal', 'at', i->'at', 'name', left(i->>'name', 80), 'dish', left(i->>'dish', 60), 'qty', left(i->>'qty', 60), 'pct', i->'pct',
+    'kcal', i->'kcal', 'protein', i->'protein', 'carbs', i->'carbs', 'fat', i->'fat')))
+  from jsonb_array_elements(case when jsonb_typeof(d->'food') = 'array' then d->'food' else '[]'::jsonb end) i
+  where coalesce(i->>'src', '') <> 'alcohol';
+$$;
+
 -- day check-ins and session logs for players who share, between two dates, trimmed to what staff need
 create or replace function public.keel_team_data(t uuid, from_day text, to_day text)
 returns table (user_id uuid, kind text, key text, data jsonb)
@@ -261,13 +275,16 @@ language sql stable security definer set search_path = public as $$
         'flags', e.data->'flags', 'dayTags', e.data->'dayTags',
         'niggles', (select jsonb_agg(jsonb_build_object('area', n->'area', 'side', n->'side', 'pain', n->'pain'))
                     from jsonb_array_elements(case when jsonb_typeof(e.data->'niggles') = 'array' then e.data->'niggles' else '[]'::jsonb end) n),
-        'extras', (select jsonb_agg(jsonb_build_object('kind', x->'kind', 'dur', x->'dur', 'rpe', x->'rpe'))
+        'extras', (select jsonb_agg(jsonb_build_object('kind', x->'kind', 'desc', left(x->>'desc', 80), 'dur', x->'dur', 'rpe', x->'rpe', 'km', x->'km', 'sc', x->'sc'))
                    from jsonb_array_elements(case when jsonb_typeof(e.data->'extras') = 'array' then e.data->'extras' else '[]'::jsonb end) x),
         'sick', case when jsonb_typeof(e.data->'sick'->'types') = 'array' and jsonb_array_length(e.data->'sick'->'types') > 0
                      then jsonb_build_object('on', true, 'sev', e.data->'sick'->'sev') end,
         'sfb', case when e.data ? 'sfb' then jsonb_build_object('feel', e.data->'sfb'->'feel', 'energy', e.data->'sfb'->'energy',
                      'effort', e.data->'sfb'->'effort', 'trend', e.data->'sfb'->'trend') end,
         'food', case when m.share_food then keel_food_totals(e.data) end,
+        'meals', case when m.share_food and m.share_meals then keel_food_meals(e.data) end,
+        'hab', case when jsonb_typeof(e.data->'hab') = 'array' then e.data->'hab' end,
+        'trainIntent', e.data->'trainIntent', 'dayType', e.data->'dayType',
         'recovery', (select jsonb_agg(jsonb_build_object('kind', x->'kind', 'min', x->'min'))
                      from jsonb_array_elements(case when jsonb_typeof(e.data->'recovery') = 'array' then e.data->'recovery' else '[]'::jsonb end) x),
         'mobility', (select jsonb_agg(jsonb_build_object('name', x->'name', 'min', x->'min'))
@@ -275,7 +292,8 @@ language sql stable security definer set search_path = public as $$
         'hc', (select jsonb_agg(jsonb_build_object('type', x->'type', 'min', x->'min'))
                from jsonb_array_elements(case when jsonb_typeof(e.data->'hc') = 'array' then e.data->'hc' else '[]'::jsonb end) x)))
       else jsonb_strip_nulls(jsonb_build_object(
-        'date', e.data->'date', 'type', e.data->'type', 'status', e.data->'status', 'dur', e.data->'dur', 'rpe', e.data->'rpe'))
+        'date', e.data->'date', 'type', e.data->'type', 'status', e.data->'status', 'dur', e.data->'dur', 'rpe', e.data->'rpe',
+        'dist', e.data->'dist', 'pace', e.data->'pace', 'feel', e.data->'feel'))
     end
   from entries e
   join team_members m on m.user_id = e.user_id and m.team_id = t and m.role = 'member' and m.share
@@ -288,3 +306,148 @@ revoke execute on function public.keel_create_team(text, text), public.keel_join
 grant execute on function public.keel_create_team(text, text), public.keel_join_team(text, text, text), public.keel_new_code(uuid, text),
   public.keel_team_squad(uuid), public.keel_team_data(uuid, text, text), public.keel_my_teams(),
   public.keel_is_coach(uuid), public.keel_is_manager(uuid), public.keel_in_team(uuid) to authenticated;
+
+-- ================= Version 4: groups, calendar, messages =================
+
+-- groups: e.g. Backs, Forwards, U20s, Rehab group. Staff make them; players can see the names of their own groups.
+create table if not exists public.team_groups (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references public.teams on delete cascade,
+  name text not null check (length(trim(name)) between 1 and 60),
+  colour text,
+  created_by uuid references auth.users on delete set null default auth.uid(),
+  created_at timestamptz not null default now()
+);
+create table if not exists public.team_group_members (
+  group_id uuid not null references public.team_groups on delete cascade,
+  team_id uuid not null references public.teams on delete cascade,
+  user_id uuid not null references auth.users on delete cascade,
+  primary key (group_id, user_id)
+);
+alter table public.team_groups enable row level security;
+alter table public.team_group_members enable row level security;
+
+create or replace function public.keel_in_group(g uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from team_group_members where group_id = g and user_id = auth.uid());
+$$;
+
+drop policy if exists "staff manage groups" on public.team_groups;
+create policy "staff manage groups" on public.team_groups for all using (public.keel_is_coach(team_id)) with check (public.keel_is_coach(team_id));
+drop policy if exists "players see their groups" on public.team_groups;
+create policy "players see their groups" on public.team_groups for select using (public.keel_in_group(id));
+drop policy if exists "staff manage group members" on public.team_group_members;
+create policy "staff manage group members" on public.team_group_members for all using (public.keel_is_coach(team_id))
+  with check (public.keel_is_coach(team_id)
+    and exists (select 1 from team_groups g where g.id = group_id and g.team_id = team_group_members.team_id)
+    and exists (select 1 from team_members m where m.team_id = team_group_members.team_id and m.user_id = team_group_members.user_id));
+drop policy if exists "players see own group rows" on public.team_group_members;
+create policy "players see own group rows" on public.team_group_members for select using (user_id = auth.uid());
+
+-- the team calendar: training, matches, gym, recovery, meetings. For the whole squad or one group.
+create table if not exists public.team_events (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references public.teams on delete cascade,
+  kind text not null default 'training' check (kind in ('training','match','gym','recovery','meeting','other')),
+  title text not null check (length(trim(title)) between 1 and 80),
+  day date not null,
+  start_time time,
+  end_time time,
+  location text check (location is null or length(location) <= 120),
+  notes text check (notes is null or length(notes) <= 1000),
+  intensity int check (intensity is null or intensity between 1 and 5),
+  group_id uuid references public.team_groups on delete set null,
+  created_by uuid references auth.users on delete set null default auth.uid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists team_events_team_day on public.team_events (team_id, day);
+alter table public.team_events enable row level security;
+drop policy if exists "staff manage the calendar" on public.team_events;
+create policy "staff manage the calendar" on public.team_events for all using (public.keel_is_coach(team_id)) with check (public.keel_is_coach(team_id));
+drop policy if exists "players see their calendar" on public.team_events;
+create policy "players see their calendar" on public.team_events for select
+  using (public.keel_in_team(team_id) and (group_id is null or public.keel_in_group(group_id)));
+
+-- the message centre
+-- squad: staff post to every player. group: staff post to one group. staff: backroom team only.
+-- direct: a private thread between one player and the staff (any staff member can read and answer).
+create table if not exists public.team_messages (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references public.teams on delete cascade,
+  channel text not null check (channel in ('squad','group','staff','direct')),
+  group_id uuid references public.team_groups on delete cascade,
+  player_id uuid references auth.users on delete cascade,
+  author_id uuid references auth.users on delete set null default auth.uid(),
+  author_name text,
+  author_staff text,
+  body text not null check (length(trim(body)) between 1 and 2000),
+  created_at timestamptz not null default now(),
+  check ((channel = 'group') = (group_id is not null)),
+  check ((channel = 'direct') = (player_id is not null))
+);
+create index if not exists team_messages_team on public.team_messages (team_id, created_at desc);
+alter table public.team_messages enable row level security;
+
+create or replace function public.keel_can_read_msg(t uuid, ch text, g uuid, p uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case
+    when keel_is_coach(t) then true
+    when ch = 'squad' then keel_in_team(t)
+    when ch = 'group' then keel_in_team(t) and keel_in_group(g)
+    when ch = 'direct' then p = auth.uid() and keel_in_team(t)
+    else false end;
+$$;
+drop policy if exists "read messages" on public.team_messages;
+create policy "read messages" on public.team_messages for select using (public.keel_can_read_msg(team_id, channel, group_id, player_id));
+drop policy if exists "post messages" on public.team_messages;
+create policy "post messages" on public.team_messages for insert with check (
+  author_id = auth.uid() and (
+    (public.keel_is_coach(team_id) and (channel <> 'group' or exists (select 1 from team_groups g where g.id = group_id and g.team_id = team_messages.team_id))
+      and (channel <> 'direct' or exists (select 1 from team_members m where m.team_id = team_messages.team_id and m.user_id = player_id and m.role = 'member')))
+    or (channel = 'direct' and player_id = auth.uid() and public.keel_in_team(team_id))));
+drop policy if exists "delete own messages" on public.team_messages;
+create policy "delete own messages" on public.team_messages for delete using (author_id = auth.uid() or public.keel_is_manager(team_id));
+revoke update on public.team_messages from anon, authenticated;
+
+-- the sender's name and role come from the team, not from what the app sends
+create or replace function public.keel_msg_author() returns trigger language plpgsql security definer set search_path = public as $$
+declare m team_members; begin
+  select * into m from team_members where team_id = new.team_id and user_id = auth.uid();
+  new.author_id := auth.uid();
+  new.author_name := coalesce(m.display_name, (select p.data->'answers'->>'name' from profiles p where p.id = auth.uid()), 'Team member');
+  new.author_staff := case when m.role = 'coach' then coalesce(m.staff, 'coach') end;
+  new.created_at := now();
+  return new;
+end $$;
+drop trigger if exists keel_msg_author on public.team_messages;
+create trigger keel_msg_author before insert on public.team_messages for each row execute function public.keel_msg_author();
+
+-- where each person has read up to, per thread (thread = 'squad', 'staff', 'group:<id>' or 'direct:<player id>')
+create table if not exists public.team_message_reads (
+  team_id uuid not null references public.teams on delete cascade,
+  user_id uuid not null references auth.users on delete cascade default auth.uid(),
+  thread text not null,
+  read_at timestamptz not null default now(),
+  primary key (team_id, user_id, thread)
+);
+alter table public.team_message_reads enable row level security;
+drop policy if exists "own read markers" on public.team_message_reads;
+create policy "own read markers" on public.team_message_reads for all using (user_id = auth.uid()) with check (user_id = auth.uid() and public.keel_in_team(team_id));
+
+-- a Rehab type in the exercise library (for the physio's own clips)
+do $$ begin
+  if to_regclass('public.sc_exercises') is not null then
+    alter table public.sc_exercises drop constraint if exists sc_exercises_category_check;
+    alter table public.sc_exercises add constraint sc_exercises_category_check
+      check (category in ('strength','power','speed','conditioning','mobility','prehab','rehab','recovery','core'));
+  end if;
+end $$;
+
+-- programmes handed to a whole group remember which group, so the dashboard can show it
+alter table if exists public.sc_assignments add column if not exists group_id uuid references public.team_groups on delete set null;
+
+revoke all on public.team_groups, public.team_group_members, public.team_events, public.team_messages, public.team_message_reads from anon;
+grant select, insert, update, delete on public.team_groups, public.team_group_members, public.team_events, public.team_message_reads to authenticated;
+grant select, insert, delete on public.team_messages to authenticated;
+grant execute on function public.keel_in_group(uuid), public.keel_can_read_msg(uuid, text, uuid, uuid), public.keel_food_meals(jsonb) to authenticated;

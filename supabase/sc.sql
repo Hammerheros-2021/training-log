@@ -14,7 +14,7 @@ create table if not exists public.sc_exercises (
   team_id uuid not null references public.teams on delete cascade,
   name text not null check (length(name) between 1 and 80),
   category text not null default 'strength'
-    check (category in ('strength','power','speed','conditioning','mobility','prehab','recovery','core')),
+    check (category in ('strength','power','speed','conditioning','mobility','prehab','rehab','recovery','core')),
   equipment text,
   cues text,
   video_path text,
