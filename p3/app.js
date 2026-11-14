@@ -432,7 +432,7 @@ function planHTML(){
       ${pState.msg?`<div class="hsum" role="status">${esc(pState.msg)}</div>`:''}
     </div></article>`;
   if(!p)return head;
-  const daysH=(p.days||[]).map(pd=>{const dt=DAYT[pd.dayType]?pd.dayType:dayTypeFor(pd.date);const tot={kcal:0,protein:0,carbs:0,fat:0,fibre:0};(pd.meals||[]).forEach(m=>{tot.kcal+=kcalOf(m);['protein','carbs','fat','fibre'].forEach(x=>tot[x]+=+m[x]||0)});
+  const daysH=(p.days||[]).filter(pd=>pd.date>=iso(todayDate())).map(pd=>{const dt=DAYT[pd.dayType]?pd.dayType:dayTypeFor(pd.date);const tot={kcal:0,protein:0,carbs:0,fat:0,fibre:0};(pd.meals||[]).forEach(m=>{tot.kcal+=kcalOf(m);['protein','carbs','fat','fibre'].forEach(x=>tot[x]+=+m[x]||0)});
     const chip=(lab,v,k)=>{const tg=nutTarget(k,dt);return `<span style="color:${SC[status(v,tg)]}">${lab} <b class="num">${Math.round(v)}</b></span>`};
     return `<article class="card"><div class="chead"><div style="flex:1;min-width:0"><h2>${fmtD(parse(pd.date),{weekday:'long',day:'numeric',month:'short'})}</h2><div class="sub">${DAYT[dt].label}${pd.session?` · ${esc(pd.session)}`:''}</div></div>${pd.date===iso(todayDate())?'<span class="kpill" style="--vc:var(--accent)">Today</span>':''}</div>
       <div class="ptot">${chip('kcal',tot.kcal,'kcal')}${chip('Protein',tot.protein,'protein')}${chip('Net carbs',tot.carbs,'carbs')}${chip('Fat',tot.fat,'fat')}${chip('Fibre',tot.fibre,'fibre')}</div>
@@ -3381,6 +3381,36 @@ async function parseFoodPhoto(file){
     if(!items.length){toast('No food recognised. Try a closer photo from above, or say it instead.',4500);return}
     PR={seen:out&&out.seen?String(out.seen).slice(0,200):'',meal,items:items.map(x=>({...x,pct:100,orig:x.name}))};fState={...fState,busy:false,msg:''};showPR();
   }catch(e){const p=P3P.find(x=>x.id===id);if(p)p.err=foodErr(e);p3Pend()}}
+// ================= P3 drop 1b: six looks, tighter Today, My day inside the check-in, tidier food, steadier meal planning =================
+const P3LOOKS=[['bone','Bone','Light paper, forest green'],['forest','Forest','Dark green, emerald fade'],['midnight','Midnight','Dark blue, ice fade'],['dusk','Dusk','Graphite, plum to peach'],['keel','Keel fade','Black, the logo colours'],['platinum','Platinum','Graphite to silver'],['auto','Auto','Bone by day, Forest at night']];
+p3LookPref=function(){let v='auto';try{const q=new URLSearchParams(location.search).get('look');if(q&&P3LOOKS.some(x=>x[0]===q))localStorage.setItem('keelLook',q);v=localStorage.getItem('keelLook')||'auto'}catch(e){}return P3LOOKS.some(x=>x[0]===v)?v:'auto'};
+p3ApplyLook();
+p3LookHTML=function(){const v=p3LookPref();return `<section class="card p3look"><h3>Appearance</h3><div class="p3lk">${P3LOOKS.map(([id,n,d])=>`<button type="button" data-p3look="${id}" aria-pressed="${v===id}"><span class="p3sw p3sw-${id}" aria-hidden="true"></span><b>${n}</b><small>${d}</small></button>`).join('')}</div></section>`};
+// Today: compact tiles in one row; My day lives in the check-in
+p3Today=function(k,s){return p1Top()+p3Koach(k)+injuryBanner()+p3Rings(k,s)+p3Tiles()+p2Habits(k)};
+function p3Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);const w=+d.water||0;let lo=2.5;try{lo=p1WaterTarget().lo}catch(e){}const fd=(d.food||[]).length;
+  const t=(id,icon,name,done,sub)=>`<button type="button" class="p1tile p3tile${done?' done':''}" data-p1tile="${id}"><span class="p1ti">${ico(done?'check':icon)}</span><b>${name}</b><small>${sub||'&nbsp;'}</small></button>`;
+  return `<section class="p3tiles" aria-label="Add">${t('ci','sun','Check in',ci,ci?'Done':'')}${t('food','utensils','Food',false,fd?fd+' logged':'')}${t('water','coffee','Drinks',w>=lo,w?(Math.round(w*10)/10)+' L':'')}${t('move','footprints','Session',false,'')}${t('rec','wind','Recover',false,'')}</section>`}
+const _p3CiDraw=p1CiDraw;p1CiDraw=function(){_p3CiDraw();const host=document.querySelector('#p1Host .ksheet');if(!host||host.querySelector('.p3myday'))return;const yd=D()[iso(addD(parse((P1.ci&&P1.ci.k)||iso(todayDate())),-1))]||{};const done=!!(yd.blocks||[]).length;
+  const b=document.createElement('button');b.type='button';b.className='p1hurt p3myday';b.dataset.p1tile='day';b.innerHTML=`${ico(done?'check':'clipboard-list')} Yesterday: work, driving, family${done?' · saved':''} ›`;
+  const hurt=host.querySelector('#p1Hurt');if(hurt)hurt.insertAdjacentElement('afterend',b);else host.appendChild(b)};
+// Food: supplements sit under the vitamins in Today so far
+function p3FoodTidy(){const app=document.getElementById('app');if(!app)return;const sup=app.querySelector('details[data-ms="p1supp"]');const vit=app.querySelector('details.wu');
+  if(sup&&vit&&vit.nextElementSibling!==sup){vit.insertAdjacentElement('afterend',sup);sup.classList.add('p3supin')}}
+const _p3Render=render;render=function(){_p3Render.apply(this,arguments);try{p3FoodTidy()}catch(e){}};
+// Meal planning: never hang. Time limits on every step, and old plan days are not shown
+async function serverPlan(prompts,req){
+  const jobAt=new Date().toISOString();const lim=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),ms))]);
+  try{await lim(persistMeta('planJob',{at:jobAt}),15000);
+    const {data:{session}}=await lim(sb.auth.getSession(),10000);if(!session)throw {code:'session_expired',message:'Signed out'};
+    const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),30000);
+    const r=await fetch('/api/plan',{method:'POST',signal:ctl.signal,headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({prompts,req,jobAt})});clearTimeout(tm);
+    const j=await r.json().catch(()=>({}));if(!r.ok)throw {code:'upstream_error',message:j.error||('HTTP '+r.status)};
+    pState={busy:true,req,msg:'Planning your next 3 days. Usually 1 to 3 minutes, and it carries on if you leave this page.',since:Date.now()};render();watchPlanJob();
+  }catch(e){try{await lim(persistMeta('planJob',{at:jobAt,error:'not started'}),8000)}catch(x){}pState={...pState,busy:false,msg:e&&(e.name==='AbortError'||e.code==='timeout')?'Could not reach the planner just now. Check your signal and tap Plan again.':foodErr(e)};render()}}
+function watchPlanJob(){clearTimeout(planTimer);const t0=Date.now();const tick=async()=>{let st='wait';try{st=await Promise.race([checkPlanJob(),new Promise(r=>setTimeout(()=>r('wait'),15000))])}catch(e){}
+  if(st==='wait'&&Date.now()-t0>7*60000){pState={...pState,busy:false,msg:'That took too long. Tap Plan to try again.'};render();return}
+  if(st==='wait')planTimer=setTimeout(tick,6000)};planTimer=setTimeout(tick,6000)}
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}

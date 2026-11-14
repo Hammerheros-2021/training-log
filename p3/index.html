@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Keel · Prototype 3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@600&family=JetBrains+Mono:wght@400&family=Sora:wght@600&family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Archivo:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@300;400;600&family=JetBrains+Mono:wght@400&family=Sora:wght@600&family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Archivo:wght@400;500;600&display=swap">
 <style>
 html{height:100%}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -1436,6 +1436,61 @@ html[data-look] .kwm stop:nth-child(3){stop-color:var(--logo-c)!important}
 .p3lk b{font:500 14px/18px var(--font-body)}.p3lk small{font-size:11px;line-height:15px;color:var(--text-muted)}
 .p3sw{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);margin-bottom:4px}
 .p3sw-bone{background:linear-gradient(135deg,#F4F1EB 50%,#24412F 50%)}.p3sw-forest{background:linear-gradient(135deg,#0A100D 50%,#B7EBCF 50%)}.p3sw-auto{background:linear-gradient(90deg,#F4F1EB 50%,#0A100D 50%)}
+
+/* ================= P3 drop 1b ================= */
+html[data-look="midnight"]{
+  --bg:#0A0D12; --surface:#11161D; --line:#1F2731; --text:#E9EEF4; --text-body:#C6CFDA; --text-muted:#8590A0; --on-text:#0A0D12; --on-tint:#0A0D12;
+  --fade-magenta:#1D3550; --fade-blue:#4F7FA8; --fade-green:#BFDDF5;
+  --status-good:#8EC7B0; --status-caution:#D6B98A; --status-alert:#D9928A;
+  --k-blue:#9DB8D6; --k-pink:#C9A7C0; --k-green:#8EC7B0; --k-amber:#D6B98A; --k-violet:#ADA8D6; --k-sky:#9CCBE0; --k-clay:#C9AE92;
+  --logo-a:#1D3550; --logo-b:#4F7FA8; --logo-c:#BFDDF5; --scrim:rgba(4,6,10,.72); color-scheme:dark;
+}
+html[data-look="dusk"]{
+  --bg:#0F0E10; --surface:#18161A; --line:#2A262C; --text:#F2ECEA; --text-body:#D3CBCB; --text-muted:#958C95; --on-text:#0F0E10; --on-tint:#0F0E10;
+  --fade-magenta:#3B1F3A; --fade-blue:#B0566A; --fade-green:#F5B48E;
+  --status-good:#9CC7A8; --status-caution:#E3B98A; --status-alert:#E08F86;
+  --k-blue:#A9B2D6; --k-pink:#E0A3AE; --k-green:#9CC7A8; --k-amber:#E3B98A; --k-violet:#C1A6D0; --k-sky:#A8C6D6; --k-clay:#D9B08C;
+  --font-display:"Inter Tight",Inter,system-ui,sans-serif;
+  --logo-a:#5A2C55; --logo-b:#B0566A; --logo-c:#F5B48E; --scrim:rgba(8,6,9,.72); color-scheme:dark;
+}
+html[data-look="keel"]{
+  --bg:#000000; --surface:#0E0E10; --line:#1E1E22; --text:#F5F5F7; --text-body:#D2D2D7; --text-muted:#8E8E93; --on-text:#000000; --on-tint:#000000;
+  --fade-magenta:#B8327F; --fade-blue:#4D5BD6; --fade-green:#2FBF8A;
+  --status-good:#34C88E; --status-caution:#E5B454; --status-alert:#F07070;
+  --k-blue:#8C98FF; --k-pink:#F07BC0; --k-green:#34E3A0; --k-amber:#F2B84B; --k-violet:#B9A0FF; --k-sky:#7FD3FF; --k-clay:#D9A86C;
+  --font-display:"Inter Tight",Inter,system-ui,sans-serif;
+  --logo-a:#E23D9E; --logo-b:#5B6CFF; --logo-c:#34E3A0; --scrim:rgba(0,0,0,.72); color-scheme:dark;
+}
+html[data-look="platinum"]{
+  --bg:#0E0F11; --surface:#16181B; --line:#25282D; --text:#EEF0F2; --text-body:#CDD1D6; --text-muted:#8C929A; --on-text:#0E0F11; --on-tint:#0E0F11;
+  --fade-magenta:#3A3F46; --fade-blue:#8A939D; --fade-green:#F1F4F7;
+  --status-good:#A9C4B4; --status-caution:#CDBB98; --status-alert:#CF9A92;
+  --k-blue:#AEB8C4; --k-pink:#C4B1B6; --k-green:#A9C4B4; --k-amber:#CDBB98; --k-violet:#B6B1C6; --k-sky:#A9C0C8; --k-clay:#C2B4A4;
+  --font-display:"Inter Tight",Inter,system-ui,sans-serif;
+  --logo-a:#4A5058; --logo-b:#8A939D; --logo-c:#F1F4F7; --scrim:rgba(6,7,8,.72); color-scheme:dark;
+}
+html[data-look="dusk"] h1,html[data-look="dusk"] h2,html[data-look="keel"] h1,html[data-look="keel"] h2,html[data-look="platinum"] h1,html[data-look="platinum"] h2{font-weight:300!important;letter-spacing:-0.02em!important}
+.p3lk{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.p3sw-midnight{background:linear-gradient(135deg,#0A0D12 50%,#BFDDF5 50%)}.p3sw-dusk{background:linear-gradient(135deg,#0F0E10 50%,#F5B48E 50%)}
+.p3sw-keel{background:linear-gradient(135deg,#000 50%,#5B6CFF 50%)}.p3sw-platinum{background:linear-gradient(135deg,#0E0F11 50%,#F1F4F7 50%)}
+.p3sw-auto{background:linear-gradient(90deg,#F4F1EB 50%,#0A100D 50%)}
+/* Today: tighter */
+.p3koach .p1read summary,.p3koach .p1readc{padding-top:12px!important;padding-bottom:12px!important}
+.p3koach .p1ov,.p3koach > a.card,.p3koach > section.card,.p3koach > details.card{margin-top:8px!important}
+.p3rings{margin-bottom:12px}
+.p3ring{padding:10px 2px 8px}
+.p3ring .ring{width:58px!important;height:58px!important}.p3ring .ring svg{width:58px;height:58px}
+.p3ring .ring .rl b{font-size:16px!important}
+.p3tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 var(--space-4)}
+.p1tile.p3tile{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 2px 8px!important;min-height:0!important;border-radius:var(--radius-md);text-align:center}
+.p1tile.p3tile .p1ti{width:34px;height:34px;margin:0!important}
+.p1tile.p3tile b{font:500 12px/15px var(--font-body)!important}
+.p1tile.p3tile small{font-size:10.5px!important;line-height:13px!important;color:var(--text-muted);white-space:nowrap}
+.p3myday{margin-top:var(--space-2);width:100%;text-align:left;background:transparent;border:0}
+/* Food: no quick add; supplements under vitamins; no dictate button */
+.qline{display:none!important}
+details.p3supin{background:transparent!important;margin:0 16px 12px!important;padding:0!important;border-top:1px solid var(--line)!important;border-radius:0!important}
+html[data-look] #fab{display:none!important}
 </style>
 </head>
 <body class="kloading">
@@ -1461,6 +1516,6 @@ html[data-look] .kwm stop:nth-child(3){stop-color:var(--logo-c)!important}
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p3c"></script>
+<script src="/p3/app.js?v=p3d"></script>
 </body>
 </html>

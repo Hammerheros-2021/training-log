@@ -26,11 +26,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function ask(prompt, deadline) {
   let last = '';
   for (let attempt = 0; attempt < 6; attempt++) {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
+    const left = deadline - Date.now();
+    if (left < 5000) break;
+    let r;
+    try { r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: AbortSignal.timeout(left),
       headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({ model: MODEL, max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\n\nReply with the JSON only, no other text.' }] }),
-    });
+    }); } catch (e) { last = 'Planning took too long'; break; }
     let j = {}; try { j = await r.json(); } catch (e) {}
     if (r.ok) {
       if (j.stop_reason === 'max_tokens') { last = 'The reply was cut short'; continue; }
