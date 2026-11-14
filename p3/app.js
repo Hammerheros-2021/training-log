@@ -594,13 +594,12 @@ function sessionForm(d,pl){
     <div class="field"><label class="label" for="f-ss">${esc(KEYLIFTS[1]||'Second lift')} (kg)</label><input id="f-ss" type="number" inputmode="decimal" step="1" value="${f.ss??''}" data-bind="s.ss"></div></div>`;
   if(k==='T'&&!test)spec=`<label class="toggle"><input id="f-swap" type="checkbox" ${f.swap?'checked':''} data-bind="s.swap"> Did a ${esc(TNAME.H)} instead</label>`+(f.swap?'':`<div class="field"><label class="label" for="f-pace">Average rep pace (min:sec per km)</label><input id="f-pace" type="text" inputmode="numeric" placeholder="4:35" value="${esc(f.pace||'')}" data-bind="s.pace"></div>`);
   if(test)spec=`<div class="field"><label class="label" for="f-5k">5 km time (min:sec)</label><input id="f-5k" type="text" inputmode="numeric" placeholder="21:30" value="${esc(f.fivek||'')}" data-bind="s.fivek"></div>`;
-  if(!isH&&!test&&k!=='R')spec+=`<label class="toggle"><input id="f-cls" type="checkbox" ${f.isClass?'checked':''} data-bind="s.isClass"> It was a class: snap the board</label>`;
   if(isH||f.isClass)spec+=hyroxScanHTML();
   return `<form class="form" id="logForm" autocomplete="off" style="border-top:1px solid var(--line)">
     <div style="display:flex;justify-content:space-between;align-items:baseline"><h3>Log session</h3>${has?'<span class="label" style="color:var(--ok)">Saved</span>':future?'<span class="label">Upcoming</span>':''}</div>
     <div class="field"><span class="label">How did it go?</span>${seg('s','status',['done','partial','missed'],f.status,['Done','Partial','Missed'],'status')}</div>
-    <div class="field" style="max-width:50%"><label class="label" for="f-dur">Duration (min)</label><input id="f-dur" type="number" inputmode="numeric" value="${f.dur??''}" data-bind="s.dur"></div>
-    <div class="field"><span class="label">Effort (1 to 10)</span>${seg('s','rpe',[1,2,3,4,5,6,7,8,9,10],f.rpe,null,'small')}</div>
+    <div class="field"><span class="label">How long</span><div class="p3dur">${[20,30,45,60,75,90].map(m=>`<button type="button" data-p3dur="${m}" aria-pressed="${+f.dur===m}">${m}</button>`).join('')}<input id="f-dur" type="number" inputmode="numeric" aria-label="Minutes" value="${f.dur??''}" data-bind="s.dur" placeholder="min"></div></div>
+    <div class="field p3eff"><div class="p3effh"><span class="label" style="margin:0">How hard</span><b id="f-rpeW">${f.rpe?f.rpe+'/10':'–'}</b></div><input type="range" id="f-rpe" min="1" max="10" step="1" value="${f.rpe||6}" data-bind="s.rpe" aria-label="How hard, 1 to 10"><div class="p3rpel"><small>Easy</small><small>Flat out</small></div></div>
     ${spec}
     <div class="field"><label class="label" for="f-notes">Notes</label><textarea id="f-notes" placeholder="How it felt, what you changed" data-bind="s.notes">${esc(f.notes||'')}</textarea></div>
     <div class="actions"><button class="primary" type="submit">${has?'Update log':'Save log'}</button>
@@ -3000,7 +2999,7 @@ function p2HabEdit(){const hs=myHabits();p1Sheet(`<div class="kshead"><div><h2>Y
   <div class="p2hpick">${P2HABITS.map(h=>`<button type="button" data-p2hpick="${h[0]}" aria-pressed="${hs.includes(h[0])}">${ico(h[2])}<span>${esc(h[1])}${h[3]?'<small>ticks itself</small>':''}</span></button>`).join('')}</div>
   <p class="ds" style="font-size:12px;margin:0">Streaks forgive one missed day a week, so one bad day doesn't undo the good ones.</p>`)}
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
-  if(x=c('[data-p2hab]')){if(x.dataset.auto&&!x.classList.contains('on')){toast('This one ticks itself when you log it');}const k=iso(todayDate());const d=D()[k]||{};const l=(d.hab||[]).slice();const id=x.dataset.p2hab;const i=l.indexOf(id);if(i>=0)l.splice(i,1);else if(!x.dataset.auto)l.push(id);days[k]={...(days[k]||{date:k}),hab:l};render();persistDay(k,{hab:l});return}
+  if((x=c('[data-p2hab]'))&&!x.classList.contains('p3hb')){if(x.dataset.auto&&!x.classList.contains('on')){toast('This one ticks itself when you log it');}const k=iso(todayDate());const d=D()[k]||{};const l=(d.hab||[]).slice();const id=x.dataset.p2hab;const i=l.indexOf(id);if(i>=0)l.splice(i,1);else if(!x.dataset.auto)l.push(id);days[k]={...(days[k]||{date:k}),hab:l};render();persistDay(k,{hab:l});return}
   if(c('[data-p2habedit]')){p2HabEdit();return}
   if(x=c('[data-p2habadd]')){const l=myHabits().concat([x.dataset.p2habadd]).slice(0,5);await persistMeta('habits',{list:l});render();return}
   if(x=c('[data-p2hpick]')){let l=myHabits();const id=x.dataset.p2hpick;if(l.includes(id))l=l.filter(y=>y!==id);else{if(l.length>=5){toast('Five is plenty. Untick one first.');return}l=l.concat([id])}meta.habits={list:l};p2HabEdit();render();persistMeta('habits',{list:l});return}},true);
@@ -3875,11 +3874,116 @@ mypSession=(function(old){return function(a,d,k,t){const h=old(a,d,k,t);const lg
   return h.replace(/<button type="button" class="primary" data-myplog="([^"]+)" data-k="([^"]+)">Log this session<\/button>/,(m,aid,kk)=>`<button type="button" class="primary p3wgo" data-p3wstart="${aid}" data-k="${kk}">${ico('play')} ${prog?'Carry on':'Start session'}</button><button type="button" class="linkbtn" data-myplog="${aid}" data-k="${kk}">Already done it? Just log it</button>`)}})(mypSession);
 // S&C on Today: one compact line with Start, below the rings (full details stay on Plan)
 mypCard=(function(old){return function(where){if(where==='today')return '';return old(where)}})(mypCard);
-function p3SCToday(){if(sampleMode||typeof MYP==='undefined'||!MYP.list||!MYP.list.length)return '';const k=iso(todayDate());
+function p3SCToday(){if(sampleMode||typeof MYP==='undefined')return '';if(MYP.list==null){setTimeout(mypLoad,0);return ''}if(!MYP.list.length)return '';const k=iso(todayDate());
   return MYP.list.map(a=>{const t=mypAt(a,k);if(!t.started||t.finished||!t.days.length)return '';const d=t.days[0];const lg=mypLogged(a,t.wk,t.dow);let prog=null;try{prog=JSON.parse(localStorage.getItem(p3WKey(a.assignment,k))||'null')}catch(e){}
     const n=(d.items||[]).length;return `<section class="card p3sc"><div class="p3sct"><small>${esc(a.team||'Your team')} · S&amp;C</small><b>${esc(d.title||'Session')}</b><span>${lg?(lg.done?`Done · ${lg.dur||'?'} min · effort ${lg.rpe||'?'}/10`:'Marked as missed'):`${n} exercise${n===1?'':'s'}${d.min?' · '+d.min+' min':''}${a.load!==100?' · at '+a.load+'%':''}`}</span></div>
       ${lg?`<span class="p3scok" aria-hidden="true">✓</span>`:`<button type="button" class="primary p3wgo" data-p3wstart="${esc(a.assignment)}" data-k="${k}">${ico('play')} ${prog?'Carry on':'Start'}</button>`}</section>`}).join('')}
 p3Today=function(k,s){return p1Top()+p3Koach(k)+injuryBanner()+p3Rings(k,s)+p3SCToday()+p3Tiles()+p2Habits(k)};
+// ================= P3 drop 7: meal plans get a second route, a slicker S&C player, team example and messages =================
+// Meal plan: if the server route fails or is slow, plan on this phone instead (each day shows as it lands)
+let P3LASTP=null,P3FB=false;
+serverPlan=(function(old){return async function(prompts,req){P3LASTP={prompts,req,at:Date.now()};P3FB=false;return old(prompts,req)}})(serverPlan);
+async function p3ClientPlan(){if(P3FB||!P3LASTP)return;P3FB=true;const {prompts,req}=P3LASTP;clearTimeout(planTimer);
+  pState={...pState,busy:true,msg:'Still working on it, trying a quicker route…'};render();const acc={days:[],shopping:[]};let got=0;
+  await Promise.all(prompts.map(p=>sample.json(p,{maxTokens:12000}).then(async o=>{if(!o||!Array.isArray(o.days)||!o.days.length)return;
+    acc.days.push(...o.days);acc.days.sort((x,y)=>String(x.date).localeCompare(String(y.date)));(o.shopping||[]).forEach(s=>{if(s&&s.name&&!acc.shopping.some(x=>String(x.name).toLowerCase()===String(s.name).toLowerCase()))acc.shopping.push(s)});got++;
+    await finishPlan({days:acc.days.slice(),shopping:acc.shopping.slice()},req);if(got<prompts.length){pState={...pState,busy:true,msg:`${got} of ${prompts.length} days ready, the rest are coming…`}}render()}).catch(()=>{})));
+  pState={...pState,busy:false,msg:got?`Planned ${got} day${got===1?'':'s'}.`:'Planning isn\'t working just now. Try again in a few minutes.'};render()}
+watchPlanJob=function(){clearTimeout(planTimer);const t0=Date.now();const tick=async()=>{let st='wait';try{st=await Promise.race([checkPlanJob(),new Promise(r=>setTimeout(()=>r('wait'),15000))])}catch(e){}
+  if(st==='failed'){p3ClientPlan();return}
+  if(st==='wait'&&!P3PART&&Date.now()-t0>100000){p3ClientPlan();return}
+  if(st==='wait'&&Date.now()-t0>7*60000){pState={...pState,busy:false,msg:'That took too long. Tap Re-plan to try again.'};render();return}
+  if(st==='wait')planTimer=setTimeout(tick,5000)};planTimer=setTimeout(tick,5000)};
+// Heart rate card: smaller
+p3HRCard=(function(old){return function(){return old().replace('width="92" height="84"','width="52" height="48"')}})(p3HRCard);
+// ---------- S&C player v2 ----------
+function p3WKind(it,e){const r=String(it.reps||'')+' '+String(it.load||'');const nm=(e&&e.name||'')+' '+(e&&e.equipment||'');
+  if(/(\d+)\s*(s|sec|secs|seconds)\b|(\d+)\s*min\b|hold/i.test(r)||/plank|hold|wall sit|hang\b/i.test(nm))return 'time';
+  if(/kg|%|rpe|rm\b/i.test(String(it.load||''))||/squat|deadlift|bench|press|row|curl|lunge|thrust|pull.?up|chin|clean|snatch|split squat|step.?up|carry/i.test(nm))return 'weight';
+  return 'tick'}
+function p3WSecs(it){const r=String(it.reps||'')+' '+String(it.load||'');const m=r.match(/(\d+)\s*(s|sec|secs|seconds)\b/i);if(m)return +m[1];const n=r.match(/(\d+(?:\.\d+)?)\s*min\b/i);return n?Math.round(+n[1]*60):30}
+let P3AC=null;function p3Beep(n){try{P3AC=P3AC||new (window.AudioContext||window.webkitAudioContext)();const t=P3AC.currentTime;for(let i=0;i<(n||3);i++){const o=P3AC.createOscillator(),g=P3AC.createGain();o.frequency.value=i===(n||3)-1?1320:880;g.gain.setValueAtTime(.0001,t+i*.35);g.gain.exponentialRampToValueAtTime(.4,t+i*.35+.02);g.gain.exponentialRampToValueAtTime(.0001,t+i*.35+.25);o.connect(g).connect(P3AC.destination);o.start(t+i*.35);o.stop(t+i*.35+.3)}}catch(e){}try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}}
+let P3WL=null;async function p3Wake(on){try{if(on&&!P3WL&&navigator.wakeLock){P3WL=await navigator.wakeLock.request('screen');P3WL.addEventListener('release',()=>{P3WL=null})}else if(!on&&P3WL){await P3WL.release();P3WL=null}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&P3W.on)p3Wake(true)});
+const P3T={end:0,kind:'',t:null,total:0};
+function p3TimerStart(secs,kind){P3T.end=Date.now()+secs*1000;P3T.total=secs;P3T.kind=kind;clearInterval(P3T.t);try{P3AC=P3AC||new (window.AudioContext||window.webkitAudioContext)();P3AC.resume&&P3AC.resume()}catch(e){}
+  P3T.t=setInterval(()=>{const left=Math.max(0,Math.ceil((P3T.end-Date.now())/1000));const el=document.getElementById('p3tT');const ring=document.getElementById('p3tR');
+    if(el)el.textContent=`${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}`;if(ring){const c=2*Math.PI*44;ring.setAttribute('stroke-dasharray',`${(c*left/Math.max(1,P3T.total)).toFixed(1)} ${c.toFixed(1)}`)}
+    if(left<=0){clearInterval(P3T.t);P3T.end=0;p3Beep(3);if(P3T.kind==='hold'&&P3W.on){const s=P3W.sets[P3W.i].find(z=>!z.done);if(s){s.done=true;p3WSave();const it=P3W.items[P3W.i];if(P3W.sets[P3W.i].some(z=>!z.done))p3TimerStart(p3WRestSecs(it.rest),'rest')}}p3WDraw()}},250);p3WDraw()}
+function p3TimerHTML(){const left=Math.max(0,Math.ceil((P3T.end-Date.now())/1000));if(!left)return '';const c=2*Math.PI*44;
+  return `<div class="p3tmr ${P3T.kind}" role="timer"><svg viewBox="0 0 100 100" width="104" height="104" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="var(--line)" stroke-width="6"/><circle id="p3tR" cx="50" cy="50" r="44" fill="none" style="stroke:var(--fade-blue)" stroke-width="6" stroke-linecap="round" transform="rotate(-90 50 50)" stroke-dasharray="${(c*left/Math.max(1,P3T.total)).toFixed(1)} ${c.toFixed(1)}"/></svg>
+    <div class="p3tmrt"><small>${P3T.kind==='hold'?'Hold':'Rest'}</small><b id="p3tT">${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}</b><button type="button" class="linkbtn" id="p3tSkip">${P3T.kind==='hold'?'Stop':'Skip rest'}</button></div></div>`}
+p3WDraw=function(){if(!P3W.on)return;const {a,d,items,sets}=P3W;const ex=id=>(a.exercises||[]).find(e=>e.id===id)||{name:'Exercise'};const n=items.length;const doneSets=sets.flat().filter(s=>s.done).length,allSets=sets.flat().length;let body;
+  if(P3W.fin){const vol=sets.reduce((t,ss)=>t+ss.filter(s=>s.done).reduce((u,s)=>u+(+s.kg||0)*(+s.reps||0),0),0);const mins=Math.max(1,Math.round((Date.now()-P3W.t0)/60000));const W=['','Very easy','Easy','Easy','Steady','Steady','Hard','Hard','Very hard','Very hard','Flat out'];
+    body=`<section class="p3wfin"><h3>Well done${userName()?', '+esc(userName().split(/\s+/)[0]):''}</h3><div class="p3wstats"><div><b>${doneSets}/${allSets}</b><small>sets</small></div>${vol?`<div><b>${Math.round(vol).toLocaleString('en-IE')}</b><small>kg lifted</small></div>`:''}<div><b>${mins}</b><small>minutes</small></div></div>
+      <div class="p3eff"><div class="p3effh"><span>How hard was it?</span><b id="p3effW">${P3W.rpe}/10 · ${W[P3W.rpe]}</b></div><input type="range" min="1" max="10" step="1" value="${P3W.rpe}" id="p3wRpe" aria-label="How hard, 1 to 10"><div class="p3rpel"><small>Easy</small><small>Flat out</small></div></div>
+      <div class="field"><label class="label" for="p3wNote">Note for your coach (optional)</label><input id="p3wNote" type="text" maxlength="300" value="${esc(P3W.note)}" placeholder="e.g. Left knee niggly on the split squats"></div>
+      <button type="button" class="primary" id="p3wSave" style="width:100%">Save and send to my coach</button><button type="button" class="linkbtn" id="p3wBackEx">Back to the exercises</button></section>`}
+  else{const it=items[P3W.i],e=ex(it.ex),ss=sets[P3W.i];const kind=p3WKind(it,e);const last=p3WLast(it.ex);const cur=ss.findIndex(s=>!s.done);const tmr=p3TimerHTML();
+    const tgt=[it.sets?mypSets(it.sets,a.load)+' sets':'',it.reps?it.reps+(kind==='time'?'':' reps'):'',kind==='weight'?it.load:'',it.rest?'rest '+it.rest:''].filter(Boolean).join(' · ');
+    let setsH;
+    if(kind==='weight'){const s=cur>=0?ss[cur]:null;const tr=p3WReps(it.reps);const opts=[...new Set([tr-2,tr-1,tr,tr+1,tr+2].filter(v=>v>0))];
+      setsH=`<div class="p3wdots">${ss.map((x,j)=>`<span class="${x.done?'on':j===cur?'cur':''}">${x.done?`${x.kg}×${x.reps}`:j+1}</span>`).join('')}</div>
+        ${s?`<div class="p3wedit"><div class="p3wkg"><b id="p3kgV">${s.kg}</b><small>kg</small></div><input type="range" id="p3kg" min="0" max="${Math.max(200,Math.ceil((+s.kg+40)/10)*10)}" step="2.5" value="${s.kg}" aria-label="Weight in kg">
+          <div class="p3wreps"><span>Reps</span>${opts.map(v=>`<button type="button" data-p3wrep="${v}" aria-pressed="${+s.reps===v}">${v}</button>`).join('')}</div>
+          <button type="button" class="primary p3wdo" data-p3wdone="${cur}">Set ${cur+1} done</button>${p3PlateSVG(+s.kg)}</div>`:`<div class="p3wall">All ${ss.length} sets done</div>`}`}
+    else if(kind==='time'){const secs=p3WSecs(it);setsH=`<div class="p3wdots">${ss.map((x,j)=>`<span class="${x.done?'on':j===cur?'cur':''}">${x.done?'✓':j+1}</span>`).join('')}</div>
+        ${cur>=0?(P3T.end&&P3T.kind==='hold'?'':`<button type="button" class="primary p3wdo" data-p3whold="${secs}">${ico('play')} Start ${secs>=60?Math.round(secs/60*10)/10+' min':secs+' s'}</button><small class="p3whint">It beeps when time's up, so you don't need to watch the screen.</small>`):`<div class="p3wall">All ${ss.length} done</div>`}`}
+    else{setsH=`<div class="p3wticks">${ss.map((x,j)=>`<button type="button" class="p3wtk${x.done?' on':''}" data-p3wdone="${j}" aria-pressed="${x.done}" aria-label="Set ${j+1}"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><small>${j+1}</small></button>`).join('')}</div>`}
+    body=`<section class="p3wex"><div class="p3wexh"><div><small>Exercise ${P3W.i+1} of ${n}</small><h3>${esc(e.name)}</h3></div>${e.video?`<button type="button" class="p3wvid" data-mypvid="${esc(e.id)}" data-mypa="${esc(a.assignment)}" aria-label="Watch ${esc(e.name)}">${ico('play')}<span>Watch</span></button>`:''}</div>
+      <div class="p3wtgt">${esc(tgt)}</div>${a.load!==100&&kind==='weight'?`<div class="p3wnote">${esc(mypLoadNote(a.load))}</div>`:''}${it.note||e.cues?`<div class="p3wcue">${esc(it.note||e.cues)}</div>`:''}${last&&kind==='weight'?`<div class="p3wlast">Last time: ${last.kg} kg × ${last.reps}</div>`:''}
+      ${tmr}${setsH}</section>`}
+  p1Sheet(`<div class="kshead"><div><h2>${esc(d.title||'S&C session')}</h2><small class="ds">${esc(a.programme.name)}${a.team?' · '+esc(a.team):''}</small></div><button type="button" class="x" id="p3wClose" aria-label="Close">${ico('x')}</button></div>
+    <div class="p3wbar"><i style="width:${Math.round(doneSets/Math.max(1,allSets)*100)}%"></i></div>${body}
+    ${P3W.fin?'':`<div class="p3wnav"><button type="button" class="ghost" id="p3wPrev" ${P3W.i===0?'disabled':''}>Back</button><button type="button" class="primary" id="p3wNext">${P3W.i===n-1?'Finish':'Next exercise'}</button></div>`}`);p3Wake(true)};
+p3WOpen=(function(old){return function(aid,k){old(aid,k);p3Wake(true)}})(p3WOpen);
+document.addEventListener('input',e=>{if(e.target.id==='p3kg'&&P3W.on){const s=P3W.sets[P3W.i].find(z=>!z.done);if(s){s.kg=+e.target.value;const v=document.getElementById('p3kgV');if(v)v.textContent=s.kg;const pl=document.querySelector('.p3plates');if(pl){pl.outerHTML=p3PlateSVG(s.kg)||'<div class="p3plates" hidden></div>'}}}
+  if(e.target.id==='p3wRpe'&&P3W.on){P3W.rpe=+e.target.value;const W=['','Very easy','Easy','Easy','Steady','Steady','Hard','Hard','Very hard','Very hard','Flat out'];const w=document.getElementById('p3effW');if(w)w.textContent=`${P3W.rpe}/10 · ${W[P3W.rpe]}`}});
+document.addEventListener('change',e=>{if(e.target.id==='p3kg'&&P3W.on){const ss=P3W.sets[P3W.i];const j=ss.findIndex(z=>!z.done);ss.forEach((o,ix)=>{if(ix>j&&!o.done)o.kg=ss[j].kg});p3WSave()}});
+window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;if(!P3W.on)return;
+  if(x=c('[data-p3wrep]')){e.stopImmediatePropagation();const s=P3W.sets[P3W.i].find(z=>!z.done);if(s){s.reps=+x.dataset.p3wrep;p3WSave();p3WDraw()}return}
+  if(x=c('[data-p3whold]')){e.stopImmediatePropagation();p3TimerStart(+x.dataset.p3whold,'hold');return}
+  if(c('#p3tSkip')){e.stopImmediatePropagation();clearInterval(P3T.t);P3T.end=0;p3WDraw();return}
+  if(x=c('[data-p3wdone]')){e.stopImmediatePropagation();const j=+x.dataset.p3wdone;const s=P3W.sets[P3W.i][j];s.done=!s.done;const it=P3W.items[P3W.i];if(s.done){if(p3WKind(it,(P3W.a.exercises||[]).find(z=>z.id===it.ex))==='weight')p3WSetLast(it.ex,{kg:s.kg,reps:s.reps});if(P3W.sets[P3W.i].some(z=>!z.done)&&it.rest)p3TimerStart(p3WRestSecs(it.rest),'rest')}p3WSave();p3WDraw();return}
+  if(c('#p3wClose')){p3Wake(false);clearInterval(P3T.t);P3T.end=0}
+  if(c('#p3wSave')){p3Wake(false)}},true);
+// ---------- Team example: see how team sessions and messages look without a team ----------
+const P3TD={on:(()=>{try{return localStorage.getItem('p3teamdemo')==='1'}catch(e){return false}})()};
+function p3TeamSample(){const mon=iso(addD(todayDate(),-((todayDate().getDay()+6)%7)));
+  return [{assignment:'demo',team_id:null,team:'Example team',start:mon,load:90,note:'Go 10% lighter this week, big game Sunday.',demo:true,
+    programme:{name:'In-season strength (example)',plan:{weeks:[0,1,2,3].map(()=>({days:[{dow:2,title:'Lower body strength',min:45,rpe:7,items:[{ex:'x1',sets:3,reps:'4 × 20 m',note:'Build to 90% speed'},{ex:'x2',sets:3,reps:'5',load:'70 kg',rest:'2-3 min'},{ex:'x3',sets:3,reps:'10',rest:'60 s'},{ex:'x4',sets:2,reps:'30 s / side',rest:'45 s'}]},{dow:4,title:'Upper body and power',min:40,rpe:6,items:[{ex:'x5',sets:4,reps:'6',load:'50 kg',rest:'2 min'},{ex:'x6',sets:3,reps:'8',rest:'90 s'},{ex:'x3',sets:3,reps:'10',rest:'60 s'}]}]}))}},
+    exercises:[{id:'x1',name:'Accelerations'},{id:'x2',name:'Trap bar deadlift',cues:'Push the floor away, chest tall.'},{id:'x3',name:'Pogo hops',cues:'Quick, stiff ankles, quiet landings.'},{id:'x4',name:'Copenhagen plank',cues:'Hips high, body in a straight line.'},{id:'x5',name:'Bench press',cues:'Shoulders back, bar to lower chest.'},{id:'x6',name:'Pull-ups',cues:'Full hang to chin over bar.'}],logs:[]}]}
+mypLoad=(function(old){return async function(){await old();if(P3TD.on&&(!MYP.list||!MYP.list.length)){MYP.list=p3TeamSample();render()}}})(mypLoad);
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3teamdemo]');if(!x)return;P3TD.on=!P3TD.on;try{localStorage.setItem('p3teamdemo',P3TD.on?'1':'0')}catch(z){}
+  if(P3TD.on){if(MYP.list&&!MYP.list.length)MYP.list=p3TeamSample();else if(MYP.list==null)mypLoad()}else if(MYP.list&&MYP.list.some(a=>a.demo))MYP.list=[];render()});
+// saving a demo session stays on the phone
+window.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('#p3wSave'))||!P3W.on||!P3W.a.demo)return;e.stopImmediatePropagation();const {a,t,k}=P3W;const Lg=(a.logs||[]).filter(l=>!(l.week===t.wk&&l.dow===t.dow));Lg.push({week:t.wk,dow:t.dow,day:k,done:true,dur:Math.round((Date.now()-P3W.t0)/60000),rpe:P3W.rpe});a.logs=Lg;try{localStorage.removeItem(p3WKey(P3W.aid,k))}catch(z){}P3W.on=false;p3Wake(false);p1Sheet(null);toast('Example saved on this phone only.');render()},true);
+// ---------- Messages ----------
+function p3Msgs(){const out=[];const k=iso(todayDate());
+  (MYP.list||[]).forEach(a=>{if(a.note)out.push({who:a.team||'Your team',what:'S&C',txt:a.note,when:a.start});const t=mypAt(a,k);if(t.started&&!t.finished&&t.days.length)out.push({who:a.team||'Your team',what:'S&C',txt:`Today: ${t.days[0].title||'session'}${a.load!==100?`, at ${a.load}%`:''}. Tap Start on Today when you're ready.`,when:k})});
+  try{(MYR&&MYR.list||[]).forEach(r=>{if(r.note)out.push({who:r.by||'Physio',what:'Rehab',txt:r.note,when:r.updated||''})})}catch(e){}
+  try{if(MYN&&MYN.d&&MYN.d.targets&&MYN.d.targets.note)out.push({who:MYN.d.targets.by||'Nutrition',what:'Food',txt:MYN.d.targets.note,when:''})}catch(e){}
+  if(P3TD.on&&(MYP.list||[]).some(a=>a.demo)){out.push({who:'Example team · Manager',what:'Training',txt:'Thursday moved to 7:30 pm, pitch 2. Still a hard one, so get dinner in by 5.',when:k},{who:'Example team · Nutrition',what:'Food',txt:'Match Sunday: start loading carbs Friday night. Rice or pasta with dinner.',when:k})}
+  return out}
+function p3RealTeam(){try{return typeof MYT!=='undefined'&&MYT.d&&MYT.d.teams&&MYT.d.teams.length>0}catch(e){return false}}
+function p3MsgOpen(){if(p3RealTeam()){MYT.open=null;mytMsgSheet();return}const m=p3Msgs();p1Sheet(`<div class="kshead"><div><h2>Messages</h2><small class="ds">From your team and Koach</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  ${m.length?`<div class="p3msgs">${m.map(x=>`<div class="p3msg"><span class="p3mav" aria-hidden="true">${esc((x.who||'?')[0])}</span><div><div class="p3mh"><b>${esc(x.who)}</b><small>${esc(x.what)}</small></div><p>${esc(x.txt)}</p></div></div>`).join('')}</div>`:`<p class="ds">Nothing yet. When your coach, physio or nutritionist sends you something, it shows here.</p>`}
+  <button type="button" class="linkbtn" data-p3teamdemo>${P3TD.on?'Hide the example team':'Show an example team'}</button>`)}
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#p3MsgBtn')){p3MsgOpen()}});
+function p3MsgBtnSync(){const bar=document.querySelector('.kbar .kacts,.kbar .khr,.kbar');if(!bar)return;let b=document.getElementById('p3MsgBtn');let n=0;try{n=p3RealTeam()?(+mytUnread()||0):p3Msgs().length}catch(e){}
+  if(!b){b=document.createElement('button');b.type='button';b.id='p3MsgBtn';b.className='p3msgbtn';b.setAttribute('aria-label','Messages');const av=bar.querySelector('#kAvatar,.kav,[href="#profile"]');if(av&&av.parentNode)av.parentNode.insertBefore(b,av);else bar.appendChild(b)}
+  b.innerHTML=`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>${n?`<i>${n}</i>`:''}`}
+const _p3FT4=p3FoodTidy;p3FoodTidy=function(){_p3FT4();try{p3MsgBtnSync()}catch(e){}};
+// Week: team sessions show on the strip and in the next few days
+viewPlan=(function(old){return function(){let h=old();if(!(MYP.list||[]).length)return h;const now=todayDate();const mon=addD(now,-((now.getDay()+6)%7));
+  for(let i=0;i<7;i++){const k=iso(addD(mon,i));const has=MYP.list.some(a=>{const t=mypAt(a,k);return t.started&&!t.finished&&t.days.length});if(has)h=h.replace(new RegExp(`(class="p3wk1[^"]*" data-goto="${k}"[^>]*>)`),'$1<span class="p3wteam">S&amp;C</span>')}
+  return h}})(viewPlan);
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3dur]');if(!b)return;const i=document.getElementById('f-dur');if(!i)return;i.value=b.dataset.p3dur;i.dispatchEvent(new Event('input',{bubbles:true}));document.querySelectorAll('[data-p3dur]').forEach(x=>x.setAttribute('aria-pressed',x===b))});
+document.addEventListener('input',e=>{if(e.target.id==='f-rpe'){const w=document.getElementById('f-rpeW');if(w)w.textContent=e.target.value+'/10'}});
+// Plan > Day: when the team has a session that day, your own plan's session folds away
+function p3DayFold(){if(tab()!=='training'||tView!=='today'||!(MYP.list||[]).length)return;const k=iso(sel);const has=MYP.list.some(a=>{const t=mypAt(a,k);return t.started&&!t.finished&&t.days.length});if(!has)return;
+  const f=document.querySelector('#app #logForm');const card=f&&f.closest('article,section.card,.card');if(!card||card.closest('.p3own'))return;const d=document.createElement('details');d.className='card p3own';d.innerHTML='<summary><b>Your own plan for today</b><small>Your team session comes first</small></summary>';card.replaceWith(d);d.appendChild(card)}
+const _p3FT5=p3FoodTidy;p3FoodTidy=function(){_p3FT5();try{p3DayFold()}catch(e){}};
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -4989,7 +5093,7 @@ function mypSession(a,d,k,t){const ex=id=>(a.exercises||[]).find(e=>e.id===id)||
      <div style="flex:1;min-width:0"><b style="font-size:15px">${esc(e.name)}</b><div class="ds">${esc([it.sets?mypSets(it.sets,a.load)+' × '+(it.reps||''):it.reps,it.load,it.rest?'rest '+it.rest:''].filter(Boolean).join(' · '))}</div>${it.note?`<div class="ds" style="font-style:italic">${esc(it.note)}</div>`:''}${e.cues&&!it.note?`<div class="ds">${esc(e.cues)}</div>`:''}</div></div>`}).join('')}</div>
    ${lg?`<div class="ds">${lg.done?`Logged: ${lg.dur||'?'} min, effort ${lg.rpe||'?'}/10.`:'Marked as missed.'} <button type="button" class="linkbtn" data-myplog="${esc(a.assignment)}" data-k="${k}">Change</button></div>`
      :k===iso(todayDate())||k<iso(todayDate())?`<button type="button" class="primary" data-myplog="${esc(a.assignment)}" data-k="${k}">Log this session</button>`:''}</div>`}
-function mypCard(where){if(sampleMode)return '';if(MYP.list==null){setTimeout(mypLoad,0);return ''}if(!MYP.list.length)return '';const k=iso(todayDate());
+function mypCard(where){if(sampleMode)return '';if(MYP.list==null){setTimeout(mypLoad,0);return ''}if(!MYP.list.length)return '';const k=where==='plan'&&typeof sel!=='undefined'?iso(sel):iso(todayDate());
   return MYP.list.map(a=>{const t=mypAt(a,k);if(t.finished)return '';const nx=mypNext(a,k);
     let body;if(!t.started)body=`<div class="ds">Starts ${esc(fmtD(parse(a.start),{weekday:'long',day:'numeric',month:'short'}))}.</div>`;
     else if(t.days.length)body=t.days.map(d=>mypSession(a,d,k,t)).join('');

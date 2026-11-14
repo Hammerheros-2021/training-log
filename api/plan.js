@@ -35,11 +35,11 @@ async function ask(prompt, deadline) {
       method: 'POST',
       signal: AbortSignal.timeout(left),
       headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model, max_tokens: 8000, messages: [{ role: 'user', content: prompt + '\n\nReply with the JSON only, no other text.' }] }),
+      body: JSON.stringify({ model, max_tokens: 16000, messages: [{ role: 'user', content: prompt + '\n\nReply with the JSON only, no other text.' }] }),
     }); } catch (e) { last = 'Planning took too long'; break; }
     let j = {}; try { j = await r.json(); } catch (e) {}
     if (r.ok) {
-      if (j.stop_reason === 'max_tokens') { last = 'The reply was cut short'; continue; }
+      if (j.stop_reason === 'max_tokens') { last = 'The reply was cut short'; if (model !== FALLBACK) model = FALLBACK; continue; }
       try { return looseJSON((j.content || []).filter(b => b.type === 'text').map(b => b.text).join('')); } catch (e) { last = e.message; continue; }
     }
     last = (j.error && j.error.message) || `Claude request failed (${r.status})`;
