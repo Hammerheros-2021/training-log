@@ -1401,9 +1401,12 @@ html[data-look] .donebig .tick,html[data-look] .signed .tick,html[data-look] .st
 html[data-look] .donebig .tick{background:color-mix(in srgb,var(--on-tint) 25%,transparent)}
 html[data-look] .chip{background:color-mix(in srgb,var(--text) 12%,transparent)}
 html[data-look] .shead{background:var(--surface)!important}
-html[data-look="bone"] .kwm path:not(.kl){fill:var(--text)}
-html[data-look="bone"] .kwm .kl{stroke:var(--fade-blue)}
-html[data-look="forest"] .kwm .kl{stroke:var(--fade-green)}
+html[data-look] .kwm path:not(.kl){fill:var(--text)}
+html[data-look="bone"]{--logo-a:#A9C1AE;--logo-b:#5F8A6C;--logo-c:#24412F}
+html[data-look="forest"]{--logo-a:#1F4A37;--logo-b:#4A9672;--logo-c:#B7EBCF}
+html[data-look] .kwm stop:nth-child(1){stop-color:var(--logo-a)!important}
+html[data-look] .kwm stop:nth-child(2){stop-color:var(--logo-b)!important}
+html[data-look] .kwm stop:nth-child(3){stop-color:var(--logo-c)!important}
 /* Today */
 .p3koach{margin-bottom:var(--space-4)}
 .p3koach .p1read{margin-bottom:0!important}
@@ -1458,6 +1461,6 @@ html[data-look="forest"] .kwm .kl{stroke:var(--fade-green)}
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p3b"></script>
+<script src="/p3/app.js?v=p3c"></script>
 </body>
 </html>
