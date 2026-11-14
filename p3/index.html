@@ -1540,6 +1540,44 @@ details.p3pday,details.p3shop,details.p3all{padding:0!important;overflow:hidden}
 .p3cmp small{font-size:12px;color:var(--text-muted)}.p3cmp b{font:300 24px/28px var(--font-display)}.p3cmp span{font-size:12px;color:var(--text-muted)}
 .p3cmp span.up{color:var(--status-good)}.p3cmp span.down{color:var(--status-caution)}
 .p3bp{margin:0;padding:0 16px 16px;font-size:15px;line-height:22px}
+
+/* ================= P3 drop 3 ================= */
+.p3pagebtn{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:0 16px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:500 15px var(--font-body);text-align:left}
+.p3pagebtn span:nth-child(2){flex:1}.p3pagebtn svg{width:18px;height:18px;color:var(--text-muted)}
+.p3mimg{flex:none;display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:color-mix(in srgb,var(--fade-blue) 18%,var(--surface));margin-right:10px;overflow:hidden}
+details.pm>summary.p3hp{align-items:center}
+.p3iimg{background:color-mix(in srgb,var(--fade-blue) 18%,var(--surface))}
+.schip:not(.on){opacity:.85}
+/* Your food folds */
+.p3kd{margin:0 16px 10px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.p3kd>summary{display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:pointer;list-style:none}.p3kd>summary::-webkit-details-marker{display:none}
+.p3kd>summary::after{content:"";width:8px;height:8px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);transform:rotate(45deg);margin:-4px 4px 0 auto;transition:transform .2s;flex:none}
+.p3kd[open]>summary::after{transform:rotate(225deg);margin-top:4px}
+.p3kpics{display:flex;flex:none}.p3kpics svg{margin-right:-8px;border-radius:50%;background:var(--bg)}
+.p3kt{flex:1;min-width:0;display:flex;flex-direction:column;margin-left:8px}.p3kt b{font:500 14px/18px var(--font-body)}.p3kt small{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p3kd .kchips{padding:0 12px 12px}
+.p3kit .kwrap{padding-top:4px}
+/* Drinks, compact */
+#p1Host .p1wbig{margin:0!important}#p1Host .p1wbig b{font-size:28px!important;line-height:32px!important}
+#p1Host .p1wbtns{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important}
+#p1Host .p1wbtns button{padding:8px 2px!important;min-height:44px;font-size:12px!important}#p1Host .p1wbtns button svg{width:16px;height:16px}
+.p3us{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.p3us button{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 12px;border-radius:14px;border:1px solid var(--line);background:transparent;color:var(--text);font:500 14px var(--font-body);text-align:left}
+.p3us svg{flex:none;border-radius:50%}
+.p3more{border-top:1px solid var(--line);padding-top:8px}.p3more>summary{cursor:pointer;color:var(--text-muted);font-size:14px;list-style:none;padding:6px 0}.p3more>summary::-webkit-details-marker{display:none}.p3more>summary::after{content:" ▾"}.p3more[open]>summary::after{content:" ▴"}
+.p3alc{border-top:0;padding-top:0}.p3alc>summary{color:var(--text);font:600 16px/20px var(--font-body);display:flex;align-items:center;gap:8px}.p3alc>summary svg{width:18px;height:18px}
+#p1Host .ksheet:has(.p3more){min-height:88vh}
+/* Recover folds */
+details.rcat.p3rf{background:var(--surface);border-radius:var(--radius-md);margin:0 0 10px;overflow:hidden}
+details.rcat.p3rf>summary{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;list-style:none}details.rcat.p3rf>summary::-webkit-details-marker{display:none}
+details.rcat.p3rf>summary h3{margin:0!important;flex:1}details.rcat.p3rf>summary small{font-size:12px;color:var(--text-muted)}
+details.rcat.p3rf>summary::after{content:"";width:8px;height:8px;border-right:1.5px solid var(--text-muted);border-bottom:1.5px solid var(--text-muted);transform:rotate(45deg);margin:-4px 4px 0 6px;transition:transform .2s}
+details.rcat.p3rf[open]>summary::after{transform:rotate(225deg);margin-top:4px}
+details.rcat.p3rf .rprogs{padding:0 12px 12px}
+/* Habits: five for today */
+.p3hab{display:flex;flex-direction:column;gap:10px}
+.p3hh{display:flex;align-items:flex-start;gap:10px}.p3hh>div{flex:1;display:flex;flex-direction:column;gap:2px}.p3hh b{font:400 18px/24px var(--font-display)}.p3hh small{font-size:12px;color:var(--text-muted)}
+.p3hab .p2h span{display:flex;flex-direction:column;align-items:flex-start}.p3hab .p2h small{font-size:10.5px;line-height:13px;color:var(--text-muted)}
 </style>
 </head>
 <body class="kloading">
@@ -1565,6 +1603,6 @@ details.p3pday,details.p3shop,details.p3all{padding:0!important;overflow:hidden}
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p3f"></script>
+<script src="/p3/app.js?v=p3h"></script>
 </body>
 </html>
