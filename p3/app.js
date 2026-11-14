@@ -3556,6 +3556,50 @@ p2Habits=function(k){if(sampleMode)return '';const {ids,why}=p3Five(k);const don
 p3Rings=function(k,s){const d=D()[k]||{};const dt=dayTypeFor(k),ft=foodTotals(d),kt=nutTarget('kcal',dt).t||1;const sh=sleepHours(d),need=sleepNeed(k);const {ids}=p3Five(k);const hd=ids.filter(id=>{try{return habDone(id,k)}catch(e){return false}}).length;
   const R=(id,val,max,txt,lab)=>`<button type="button" class="p3ring" data-p3ring="${id}">${ring(val,max,72,4,'fade',txt,'')}<span>${lab}</span></button>`;
   return `<section class="p3rings" aria-label="Your day">${R('balance',s,100,s!=null?Math.round(s):'–','Balance')}${R('food',Math.round(ft.kcal),kt,(ft.kcal?Math.round(ft.kcal/kt*100):0)+'%','Food')}${R('sleep',sh,need,sh!=null?sh+'h':'–','Sleep')}${R('ticks',hd,5,`${hd}/5`,'Habits')}</section>`};
+// ================= P3 drop 4: faster meal plans shown day by day, Today without double-ups, heart rate and less text in Progress, Learn folds, quieter Say =================
+let P3RAW=null,P3PART=false;try{P3RAW=localStorage.getItem('p3rawSeen')}catch(e){}
+async function checkPlanJob(){
+  if(!sb||!UID)return 'idle';
+  const {data,error}=await sb.from('entries').select('key,data').eq('user_id',UID).eq('kind','meta').in('key',['planRaw','planJob','plan']);
+  if(error)return 'wait';const m={};(data||[]).forEach(r=>m[r.key]=r.data);
+  const job=m.planJob,raw=m.planRaw,plan=m.plan;if(plan)meta.plan=plan;
+  const mine=raw&&job&&raw.jobAt===job.at;const fresh=job&&Date.now()-new Date(job.at)<7*60000;
+  if(mine&&raw.createdAt!==P3RAW&&(!plan||plan.createdAt<raw.createdAt||P3PART)){
+    P3RAW=raw.createdAt;try{localStorage.setItem('p3rawSeen',P3RAW)}catch(e){}meta.planRaw=raw;await finishPlan(raw.out,raw.req);
+    if(raw.partial&&fresh){P3PART=true;pState={...pState,busy:true,msg:'Your first day is ready. The other days are on their way.'};render();return 'wait'}
+    P3PART=false;render();return 'done'}
+  if(mine&&raw.partial&&fresh){if(!pState.busy){pState={...pState,busy:true,msg:'The other days are on their way.'};render()}return 'wait'}
+  if(job&&job.error){if(!job.seen){await persistMeta('planJob',Object.assign({},job,{seen:true}));pState={...pState,busy:false,msg:/rate|limit|overload|busy|529|429/i.test(job.error)?'The AI was too busy just then. Wait a minute, then tap Re-plan.':'The plan could not be made. Tap Re-plan to try again.'};render()}return 'failed'}
+  if(job&&!mine&&!(plan&&plan.createdAt>job.at)&&fresh){if(!pState.busy){pState={...pState,busy:true,msg:'Still planning. It carries on even if you close the app.'};render()}return 'wait'}
+  if(pState.busy&&!fresh){pState={...pState,busy:false,msg:P3PART?'Only part of the plan came back. Tap Re-plan to fill the rest.':'Planning took too long. Tap Re-plan to try again.'};P3PART=false;render()}
+  return 'idle'}
+// Today: four rings that are also the buttons (Balance, Sleep, Food, Drinks), then Check in, Session, Recover. Habits stay in their own card.
+p3Rings=function(k,s){const d=D()[k]||{};const dt=dayTypeFor(k),ft=foodTotals(d),kt=nutTarget('kcal',dt).t||1;const sh=sleepHours(d),need=sleepNeed(k);const w=+d.water||0;let lo=2.5;try{lo=p1WaterTarget().lo}catch(e){}
+  const R=(id,val,max,txt,lab,plus)=>`<button type="button" class="p3ring" data-p3ring="${id}">${ring(val,max,72,4,'fade',txt,'')}<span>${lab}${plus?' <i class="p3plus">+</i>':''}</span></button>`;
+  return `<section class="p3rings" aria-label="Your day">${R('balance',s,100,s!=null?Math.round(s):'–','Balance')}${R('sleep',sh,need,sh!=null?sh+'h':'–','Sleep')}${R('food',Math.round(ft.kcal),kt,(ft.kcal?Math.round(ft.kcal/kt*100):0)+'%','Food',1)}${R('drinks',w,lo,w?(Math.round(w*10)/10)+'L':'0L','Drinks',1)}</section>`};
+p3Tiles=function(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);
+  const t=(id,icon,name,done,sub)=>`<button type="button" class="p1tile p3tile${done?' done':''}" data-p1tile="${id}"><span class="p1ti">${ico(done?'check':icon)}</span><span class="p3tt"><b>${name}</b>${sub?`<small>${sub}</small>`:''}</span></button>`;
+  return `<section class="p3tiles p3t3" aria-label="Add">${t('ci','sun','Check in',ci,ci?'Done':'')}${t('move','footprints','Session',false,'')}${t('rec','wind','Recover',false,'')}</section>`};
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3ring]');if(!b)return;const id=b.dataset.p3ring;
+  if(id==='food'){e.stopImmediatePropagation();fView='today';sel=todayDate();location.hash='food';return}
+  if(id==='drinks'){e.stopImmediatePropagation();p1WaterOpen();return}},true);
+// Progress: a heart rate card with a heart, shorter labels, no chart explanations
+function p3HRv(k){const d=D()[k];if(!d)return null;if(d.hr&&isNum(d.hr.bpm)){let off=0;try{off=hrOffset(d.hr.type||'wake',k)||0}catch(e){}return Math.round(+d.hr.bpm-off)}return isNum(d.rhr)?+d.rhr:null}
+function p3HRCard(){const now=todayDate();const vals=[];for(let i=13;i>=0;i--)vals.push(p3HRv(iso(addD(now,-i))));const have=vals.filter(v=>v!=null);
+  const last=[...vals].reverse().find(v=>v!=null);const usual=have.length>=4?have.slice(0,-1).sort((a,b)=>a-b)[Math.floor((have.length-1)/2)]:null;
+  const W=150,H=40,mn=Math.min(...have,999)-2,mx=Math.max(...have,0)+2;const pts=vals.map((v,i)=>v==null?null:`${(i/13*W).toFixed(1)},${(H-(v-mn)/(mx-mn||1)*H).toFixed(1)}`).filter(Boolean).join(' ');
+  const diff=last!=null&&usual!=null?last-usual:null;const word=diff==null?'Log it a few mornings to see your usual':diff<=-2?`${-diff} below your usual · well rested`:diff>=4?`${diff} above your usual · go easy`:diff>=2?`${diff} above your usual`:'Right on your usual';
+  return `<section class="card p3hr"><div class="p3hri" aria-hidden="true"><svg width="54" height="50" viewBox="0 0 24 22"><defs><linearGradient id="p3hg" x1="0" y1="0" x2="24" y2="22" gradientUnits="userSpaceOnUse"><stop offset="0" style="stop-color:var(--fade-green)"/><stop offset="1" style="stop-color:var(--fade-blue)"/></linearGradient></defs><path d="M12 21s-8.5-5.3-10.4-10.6C.4 6.9 2.6 3 6.4 3c2.3 0 4 1.3 5.6 3.4C13.6 4.3 15.3 3 17.6 3c3.8 0 6 3.9 4.8 7.4C20.5 15.7 12 21 12 21z" fill="url(#p3hg)"/></svg></div>
+    <div class="p3hrt"><small>Resting heart rate</small><b>${last!=null?last:'–'}<span> bpm</span></b><small>${esc(word)}</small></div>
+    ${have.length>=2?`<svg class="p3hrs" width="${W}" height="${H}" viewBox="-2 -2 ${W+4} ${H+4}" aria-hidden="true"><polyline points="${pts}" fill="none" style="stroke:var(--fade-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`:''}</section>`}
+// Patterns: best days as a small comparison, not a sentence
+p3PatCards=(function(old){return function(){const h=old();return h.replace(/<article class="card p3best">[\s\S]*?<\/article>/,()=>{const DD=D(),now=todayDate();const all=[];for(let i=0;i<56;i++){const d=DD[iso(addD(now,-i))];if(d&&readiness(d)!=null)all.push(d)}
+  if(all.length<10)return '';const s=[...all].sort((a,b)=>readiness(b)-readiness(a));const q=Math.max(3,Math.floor(s.length/4));const top=s.slice(0,q),bot=s.slice(-q);
+  const mean=(arr,f)=>{const v=arr.map(x=>{try{return f(x)}catch(e){return null}}).filter(v=>v!=null&&!isNaN(v));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
+  const rows=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h'],['In bed by',d=>bedMin(d.bed),v=>fmtT(Math.round(v)%1440)],['Water',d=>+d.water||null,v=>v.toFixed(1)+' L']].map(([n,f,fm])=>{const a=mean(top,f),b=mean(bot,f);return a==null||b==null?'':`<div class="p3bd"><small>${n}</small><b>${fm(a)}</b><span>${fm(b)}</span></div>`}).join('');
+  return rows?`<article class="card p3best"><div class="chead"><div style="flex:1"><h2>Your best days</h2></div></div><div class="p3bdh"><small></small><small>Best days</small><small>Worst days</small></div>${rows}</article>`:''})}})(p3PatCards);
+// Learn and Recover: groups fold
+p3RecFold=(function(old){return function(){const t=tab();if(t==='reports'&&typeof pView!=='undefined'&&pView==='learn'){const save=location.hash;document.querySelectorAll('#app .rcat:not(.p3rf)').forEach(r=>{const h=r.querySelector('h3'),l=r.querySelector('.rprogs');if(!h||!l)return;const name=h.textContent.trim();const n=l.children.length;const d=document.createElement('details');d.className='rcat p3rf';d.style.cssText=r.style.cssText;if(P3RO.has('L'+name))d.open=true;d.addEventListener('toggle',()=>{if(d.open)P3RO.add('L'+name);else P3RO.delete('L'+name)});d.innerHTML=`<summary><h3>${esc(name)}</h3><small>${n} to read</small></summary>`;d.appendChild(l);r.replaceWith(d)});return}return old()}})(p3RecFold);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
@@ -3746,10 +3790,10 @@ function viewReports(){
   const wkNow=Math.max(1,Math.min(16,Math.floor((now-START)/DAY/7)+1));
   const r7=[],r14=[],sl7=[];for(let i=0;i<14;i++){const d=DD[iso(addD(now,-i))];const r=readiness(d);if(r!=null)(i<7?r7:r14).push(r);if(i<7){const s=sleepHours(d);if(s!=null)sl7.push(s)}}
   const rNow=avg(r7),rPrev=avg(r14),debt=sleepDebt(iso(now));
-  const tiles=`<div class="tiles">
-    <div class="tile"><div class="big num" style="color:${rColor(rNow)}">${rNow!=null?Math.round(rNow):'-'}</div><div class="cap">Balance, 7-day average${rNow!=null&&rPrev!=null?` (${rNow>=rPrev?'+':''}${Math.round(rNow-rPrev)} vs prior week)`:''}</div></div>
-    <div class="tile"><div class="big num">${comp}<small>%</small></div><div class="cap">Plan completed (${done} of ${planned.length})</div></div>
-    <div class="tile"><div class="big num">${sl7.length?avg(sl7).toFixed(1):'-'}<small>h</small></div><div class="cap">In bed per night, 7 days${debt>0.2?` · ${debt} h sleep debt`:''}</div></div>
+  const tiles=p3HRCard()+`<div class="tiles">
+    <div class="tile"><div class="big num" style="color:${rColor(rNow)}">${rNow!=null?Math.round(rNow):'-'}</div><div class="cap">Balance · 7 days${rNow!=null&&rPrev!=null?` · ${rNow>=rPrev?'+':''}${Math.round(rNow-rPrev)}`:''}</div></div>
+    <div class="tile"><div class="big num">${comp}<small>%</small></div><div class="cap">Plan done</div></div>
+    <div class="tile"><div class="big num">${sl7.length?avg(sl7).toFixed(1):'-'}<small>h</small></div><div class="cap">Sleep a night${debt>0.2?` · ${debt} h short`:''}</div></div>
     <div class="tile"><div class="big num">${(()=>{let s=0;const mon=addD(START,(wkNow-1)*7);for(let i=0;i<7;i++)s+=dayLoad(iso(addD(mon,i)));return (s/1000).toFixed(1)})()}<small>k</small></div><div class="cap">Training load this week (wk ${wkNow})</div></div></div>`;
   const byType={S:[0,0],E:[0,0],H:[0,0],T:[0,0],X:[0,0]};planned.forEach(x=>{const k=x.p.type;byType[k][1]++;const l=LL[iso(x.d)];if(l&&l.status!=='missed')byType[k][0]+=l.status==='done'?1:.5});
   const swaps=entries.filter(e=>e.slot==='T'&&e.type==='H'&&e.status!=='missed').length;

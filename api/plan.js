@@ -3,7 +3,8 @@
 // written to the person's own data in Supabase when Claude finishes, and the app picks it up.
 import { waitUntil } from '@vercel/functions';
 
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
+// Meal plans use the fast model by default (PLAN_MODEL can override); everything else keeps ANTHROPIC_MODEL.
+const MODEL = process.env.PLAN_MODEL || 'claude-haiku-5-5';
 const SB = () => (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 
 async function signedInUser(token) {
@@ -72,7 +73,15 @@ export default async function handler(req, res) {
       // Days start a few seconds apart (not all at once) to stay inside per-minute limits, retry when busy,
       // and stop retrying in time to save a clear error before the 5-minute cap.
       const deadline = Date.now() + 240000;
-      const outs = await Promise.all(prompts.map((p, i) => sleep(i * 8000).then(() => ask(p, deadline)).catch(e => ({ __err: String(e.message || e) }))));
+      // The first day that comes back is saved straight away (partial: true) so the app can show it while the rest finish.
+      let firstSaved = false;
+      const outs = await Promise.all(prompts.map((p, i) => sleep(i * 3000).then(() => ask(p, deadline)).then(async o => {
+        if (!firstSaved && prompts.length > 1 && o && Array.isArray(o.days) && o.days.length) {
+          firstSaved = true;
+          try { await save(token, user.id, 'planRaw', { out: { days: o.days, shopping: Array.isArray(o.shopping) ? o.shopping : [] }, req: String(request).slice(0, 800), jobAt, partial: true, createdAt: new Date().toISOString() }); } catch (e) {}
+        }
+        return o;
+      }).catch(e => ({ __err: String(e.message || e) }))));
       const ok = outs.filter(o => o && !o.__err);
       if (!ok.length) { await save(token, user.id, 'planJob', { at: jobAt, error: outs[0].__err }); return; }
       const seen = new Set();
