@@ -622,7 +622,7 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
   if(c('#dPrev')){S.k=addK(S.k,-1);render();return}
   if(c('#dNext')){if(S.k<todayK()){S.k=addK(S.k,1);render()}return}
   if(c('#reload')){if(TEAM)await selectTeam(TEAM.team_id);return}
-  if(c('#signOut')){await sb.auth.signOut();location.hash='';location.reload();return}
+  if(c('#signOut')){if(!sb){location.href='/coach/';return}await sb.auth.signOut();location.hash='';location.reload();return}
   if(x=c('[data-copy]')){try{await navigator.clipboard.writeText(x.dataset.copy);toast('Copied')}catch(err){toast(x.dataset.copy)}return}
   if(c('#tCreate')){const nm=($('#tName').value||'').trim();if(!nm){toast('Give the team a name');return}SETUP.busy=true;render();
     const {data,error}=await sb.rpc('keel_create_team',{team_name:nm,my_name:null});SETUP.busy=false;if(error){toast(error.message,5000);render();return}
@@ -1448,8 +1448,8 @@ document.addEventListener('drop',async e=>{const z=e.target.closest&&e.target.cl
 
 // ================= start =================
 (async()=>{
-  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
-  catch(e){if(/[?&]preview\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());Object.assign(RH,buildDemoRehab());Object.assign(HUB,buildDemoHub());SQUAD.forEach(p=>p._di={});render();return}
+  try{if(/[?&]demo\b/.test(location.search))throw 0;const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
+  catch(e){if(/[?&](preview|demo)\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());Object.assign(RH,buildDemoRehab());Object.assign(HUB,buildDemoHub());SQUAD.forEach(p=>p._di={});render();return}
     $('#root').innerHTML='<div class="gate"><div class="gcard"><h1>Not set up yet</h1><p class="muted">The dashboard can\'t reach the database settings.</p></div></div>';return}
   const {data:{session}}=await sb.auth.getSession();SESSION=session;if(!session){render();return}
   await joinPending();
