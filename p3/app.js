@@ -4099,6 +4099,61 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(x=c('[data-p3mv]')){p3MoveBy(+x.dataset.p3mv);return}
   if(c('#p3mvGo')){const v=($('#p3mvDate')||{}).value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v||''))return;p3MoveBy(Math.round((parse(v)-START)/864e5))}});
 viewPlan=(function(old){return function(){return old().replace('<div class="p3wh"><h2>This week</h2>','<div class="p3wh"><h2>This week</h2><button type="button" class="linkbtn" data-p3move>Move plan</button>')}})(viewPlan);
+// ================= P3: move the first session to any day, rearrange days in one tap, fit your plan around the team =================
+function p3Mon(d){return addD(d,-((d.getDay()+6)%7))}
+function p3StartApply(){const o=meta.planStart;if(!o||!o.start||sampleMode)return;if(iso(START)===o.start&&iso(FIRST)===o.first)return;START=parse(o.start);FIRST=parse(o.first);END=addD(START,16*7-1)}
+const _p3RS=render;render=function(){try{p3StartApply()}catch(e){}return _p3RS.apply(this,arguments)};
+async function p3FirstDay(k){const T=parse(k);if(isNaN(T))return;const firstType=(planFor(FIRST)||{}).base||'T';
+  await persistMeta('planStart',{start:iso(p3Mon(T)),first:k,at:new Date().toISOString()});p3StartApply();
+  const wk=[0,1,2,3,4,5,6].map(i=>addD(p3Mon(T),i)).filter(d=>d>=T);const pT=planFor(T);
+  if(pT&&pT.base!==firstType){const d2=wk.find(d=>{const p=planFor(d);return p&&p.base===firstType&&iso(d)!==k});if(d2)await moveSession(k,iso(d2))}
+  p1Sheet(null);toast(`Your plan now starts ${fmtD(T,{weekday:'long',day:'numeric',month:'short'})} with ${esc(TNAME[firstType]||'your first session')}.`,4500);sel=T;render()}
+p3MoveOpen=function(){const st=FIRST;const nextMon=p3Mon(addD(todayDate(),7));const opts=[todayDate(),addD(todayDate(),1),nextMon,addD(nextMon,7)].filter((d,i,a)=>a.findIndex(x=>iso(x)===iso(d))===i);
+  p1Sheet(`<div class="kshead"><div><h2>Move your plan</h2><small class="ds">First session: ${esc(TNAME[(planFor(FIRST)||{}).base]||'')} on ${fmtD(st,{weekday:'short',day:'numeric',month:'short'})}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  <p class="ds" style="margin:0 0 12px">Pick the day you want to start. Your first session goes on that day and the rest of the plan follows. Anything you've logged stays put.</p>
+  <div class="p3mv">${opts.map(d=>`<button type="button" data-p3first="${iso(d)}"><b>${iso(d)===iso(todayDate())?'Today':iso(d)===iso(addD(todayDate(),1))?'Tomorrow':fmtD(d,{weekday:'long'})}</b><small>${fmtD(d,{day:'numeric',month:'short'})}</small></button>`).join('')}</div>
+  <div class="field" style="margin-top:12px"><label class="label" for="p3mvDate">Or pick a date</label><input id="p3mvDate" type="date" value="${iso(nextMon)}"></div>
+  <button type="button" class="primary" id="p3mvGo2" style="width:100%;margin-top:10px">Start on this date</button>`)};
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p3first]')){e.stopImmediatePropagation();p3FirstDay(x.dataset.p3first);return}
+  if(c('#p3mvGo2')){e.stopImmediatePropagation();const v=($('#p3mvDate')||{}).value;if(/^\d{4}-\d{2}-\d{2}$/.test(v||''))p3FirstDay(v);return}},true);
+// Rearrange: tap a day, then tap where it should go
+const P3RA={on:false,from:null};
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(c('[data-p3ra-toggle]')){e.stopImmediatePropagation();P3RA.on=!P3RA.on;P3RA.from=null;render();return}
+  if(P3RA.on&&(x=c('.p3wk1[data-goto]'))){e.stopImmediatePropagation();e.preventDefault();const k=x.dataset.goto;
+    if(k<iso(todayDate())||L()[k]){toast('That day is done or past, pick a day from today on');return}
+    if(!P3RA.from){P3RA.from=k;render();return}if(P3RA.from===k){P3RA.from=null;render();return}
+    const a=P3RA.from;P3RA.from=null;P3RA.on=false;await moveSession(a,k);render()}},true);
+// Team fit: ease or cancel your own sessions around team sessions, and watch the week's load
+const P3TM={S:50,E:40,H:60,T:50,X:70,O:45,R:0},P3TR={S:7,E:4,H:8,T:8,X:7,O:5,R:0};
+function p3TeamDay(k){const out=[];
+  try{(MYP.list||[]).forEach(a=>{const t=mypAt(a,k);if(t.started&&!t.finished&&t.days.length){const d=t.days[0];out.push({kind:'gym',title:d.title||'S&C',rpe:+d.rpe||6,min:+d.min||45})}})}catch(e){}
+  try{((MYT.d&&MYT.d.events)||[]).filter(e=>e.day===k&&['training','match','gym'].includes(e.kind)).forEach(e=>{const mn=e.start_time&&e.end_time?Math.max(30,tmin(String(e.end_time).slice(0,5))-tmin(String(e.start_time).slice(0,5))):e.kind==='match'?75:75;out.push({kind:e.kind,title:e.title,rpe:e.kind==='match'?9:(+e.intensity||3)*2,min:mn})})}catch(e){}
+  return out}
+function p3Fit(){const t0=todayDate();const sug=[];let team=0,mine=0,base=0;
+  for(let i=0;i<7;i++){const d=addD(t0,i),k=iso(d);const p=planFor(d);const tm=p3TeamDay(k);const tmL=tm.reduce((a,x)=>a+x.rpe*x.min,0);team+=tmL;
+    if(!p||p.pre){continue}const own=p.type;base+=(P3TR[p.base]||0)*(P3TM[p.base]||0);
+    const nxt=p3TeamDay(iso(addD(d,1))),prv=p3TeamDay(iso(addD(d,-1)));const matchNext=nxt.some(x=>x.kind==='match'),matchPrev=prv.some(x=>x.kind==='match');
+    let to=null,why='';
+    if(!L()[k]&&!(p.adj&&p.adj.src==='team-keep')&&HARDC.includes(own)){
+      if(tm.length){const hard=tm.some(x=>x.rpe>=7||x.kind==='match');to=hard||own==='S'&&tm.some(x=>x.kind==='gym')?'R':'E';why=`team ${tm.map(x=>x.kind==='gym'?'S&C':x.kind).join(' and ')} that day`}
+      else if(matchNext){to='E';why='match the next day'}else if(matchPrev){to='E';why='match the day before'}}
+    const fin=to||own;mine+=(P3TR[fin]||0)*(P3TM[fin]||0);if(to&&to!==own)sug.push({k,from:own,to,why})}
+  return {sug,team,mine,base}}
+function p3FitCard(){if(sampleMode)return '';const hasTeam=(MYP.list||[]).length||((MYT.d&&MYT.d.events)||[]).length;if(!hasTeam)return '';const f=p3Fit();const total=f.team+f.mine;const pct=f.base?Math.round(total/f.base*100):null;
+  const bar=pct!=null?`<div class="p3load"><div class="p3lh"><span>Next 7 days' load</span><b>${pct}% of your plan</b></div><div class="p3lb"><i style="width:${Math.min(100,f.team/Math.max(total,f.base)*100)}%" class="t"></i><i style="width:${Math.min(100,f.mine/Math.max(total,f.base)*100)}%" class="m"></i></div><div class="p3ll"><small><i class="t"></i>Team</small><small><i class="m"></i>Yours</small>${pct>110?'<small class="hi">Above your plan</small>':''}</div></div>`:'';
+  return `<section class="card p3fit"><div class="p3wh"><h2>Fitted around your team</h2></div>${bar}
+    ${f.sug.length?`<div class="p3fl">${f.sug.map(s=>`<div class="p3fr"><div><b>${fmtD(parse(s.k),{weekday:'short',day:'numeric'})}: ${esc(TNAME[s.from])} → ${s.to==='R'?'Rest':esc(TNAME[s.to])}</b><small>${esc(s.why)}</small></div><button type="button" class="linkbtn" data-p3keep="${s.k}">Keep mine</button></div>`).join('')}</div>
+    <button type="button" class="primary" id="p3FitGo" style="width:100%">Apply ${f.sug.length} change${f.sug.length===1?'':'s'}</button>`:`<p class="ds" style="margin:0">Your week already fits around the team.</p>`}</section>`}
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(c('#p3FitGo')){const f=p3Fit();const cur=Object.assign({},ADJ());const now=new Date().toISOString();f.sug.forEach(s=>{const p=planFor(parse(s.k));cur[s.k]={type:s.to,was:p.type,src:'team',note:`${s.to==='R'?'Cancelled':'Made easy'}: ${s.why}`,at:now,prev:cur[s.k]||null}});await persistMeta('adjust',{days:cur});toast(`${f.sug.length} change${f.sug.length===1?'':'s'} made. Undo any day from its page.`,4000);render();return}
+  if(x=c('[data-p3keep]')){const k=x.dataset.p3keep;const cur=Object.assign({},ADJ());const p=planFor(parse(k));cur[k]={type:p.type,was:p.type,src:'team-keep',note:'Kept alongside the team session',at:new Date().toISOString(),prev:cur[k]||null};await persistMeta('adjust',{days:cur});render()}});
+viewPlan=(function(old){return function(){let h=old();
+  h=h.replace('<button type="button" class="linkbtn" data-p3move>Move plan</button>',`<button type="button" class="linkbtn" data-p3ra-toggle>${P3RA.on?'Done':'Rearrange'}</button><button type="button" class="linkbtn" data-p3move>Move start</button>`);
+  if(P3RA.on)h=h.replace('<div class="p3wstrip">',`<div class="p3rahint">${P3RA.from?`Now tap the day to swap ${fmtD(parse(P3RA.from),{weekday:'long'})} with`:'Tap the session you want to move'}</div><div class="p3wstrip p3ra">`);
+  if(P3RA.from)h=h.replace(`class="p3wk1`,'class="p3wk1').replace(new RegExp(`class="p3wk1([^"]*)" data-goto="${P3RA.from}"`),`class="p3wk1$1 p3pick" data-goto="${P3RA.from}"`);
+  const fit=p3FitCard();return h.replace('<details class="card p3all">',fit+'<details class="card p3all">')}})(viewPlan);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
