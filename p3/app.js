@@ -3799,7 +3799,7 @@ viewPlan=(function(){return function(){const now=todayDate(),td=iso(now),LL=L(),
   const t=info(now);const tt=t.ty==='R'?'Rest day':esc(TNAME[t.ty]);const lg=LL[td];
   const todayCard=`<a class="p3wtoday" href="#training" data-goto="${td}" style="--c:var(${TVAR[t.ty]||'--line'})"><small>Today</small><b>${tt}</b><span>${t.ty==='R'?'Recover, walk, stretch':lg?(lg.status==='done'?'Done':lg.status==='partial'?'Partly done':'Missed'):esc(trainTimeFor(td))}</span><i aria-hidden="true">›</i></a>`;
   const ahead=[1,2,3].map(i=>{const d=addD(now,i),f=info(d);return `<button type="button" class="p3wa" data-goto="${f.k}"><span>${fmtD(d,{weekday:'short'})}</span><b>${f.ty==='R'?'Rest':esc(TNAME[f.ty])}</b><i style="--c:var(${TVAR[f.ty]||'--line'})"></i></button>`}).join('');
-  return `<section class="card p3week2"><div class="p3wh"><h2>This week</h2><small>${pl0&&!pl0.pre?`Week ${pl0.wk} of 16 · ${esc(PHN[pl0.p]||'')}`:''}</small></div><div class="p3wstrip">${strip}</div>${todayCard}<div class="p3wah">Next few days</div><div class="p3was">${ahead}</div></section>
+  return `<section class="card p3week2"><div class="p3wh"><h2>This week</h2><small>${pl0&&!pl0.pre?`Week ${pl0.wk} of 16 · ${esc(PHN[pl0.p]||'')}`:now<FIRST?`Plan starts ${fmtD(FIRST,{weekday:'short',day:'numeric',month:'short'})}`:''}</small></div><div class="p3wstrip">${strip}</div>${todayCard}<div class="p3wah">Next few days</div><div class="p3was">${ahead}</div></section>
     <details class="card p3all"><summary><b>All 16 weeks</b><small>The whole plan at a glance</small></summary>${_p3VP()}</details>`}})();
 // Heart rate: pictures for where you are, and a bigger heart in Progress
 function p3HrPic(v){const P={wake:'<path d="M4 34h48M6 34V22M50 34v-8a4 4 0 0 0-4-4H24v12"/><circle cx="15" cy="20" r="5"/><path d="M42 8a6 6 0 1 0 7 7 5 5 0 0 1-7-7z"/>',lie:'<path d="M4 36h48"/><circle cx="12" cy="27" r="5"/><path d="M18 30h26l6 2"/><path d="M18 27c6-3 14-3 22 0"/>',sit:'<path d="M14 40V24h22"/><path d="M14 30h24v10"/><circle cx="30" cy="9" r="5"/><path d="M30 14v12h10l2 12M30 20l8 2"/>'}[v]||'';
@@ -4083,6 +4083,22 @@ window.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('
   if(i>=0)l.splice(i,1);else if(habDone(id,k)){toast('Already done from what you logged');return}else l.push(id);
   const on=l.includes(id);x.classList.toggle('on',on);x.setAttribute('aria-pressed',on);try{navigator.vibrate&&navigator.vibrate(12)}catch(z){}
   days[k]={...(days[k]||{date:k}),hab:l};persistDay(k,{hab:l});setTimeout(render,120)},true);
+// ================= P3: move the plan's start date =================
+function p3MoveOpen(){const can=!!(PROFILE&&PROFILE.plan&&PROFILE.plan.start);const st=START;
+  p1Sheet(`<div class="kshead"><div><h2>Move your plan</h2><small class="ds">${can?`Week 1 starts ${fmtD(st,{weekday:'short',day:'numeric',month:'short'})}`:'This plan can\'t be moved here'}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  ${can?`<p class="ds" style="margin:0 0 12px">The whole 16 weeks shift together. What you've already logged stays where it is.</p>
+  <div class="p3mv">${[[-7,'1 week earlier'],[7,'1 week later'],[14,'2 weeks later'],[21,'3 weeks later']].map(([d,l])=>`<button type="button" data-p3mv="${d}"><b>${l}</b><small>Starts ${fmtD(addD(st,d),{weekday:'short',day:'numeric',month:'short'})}</small></button>`).join('')}</div>
+  <div class="field" style="margin-top:12px"><label class="label" for="p3mvDate">Or pick the start date</label><input id="p3mvDate" type="date" value="${iso(st)}"></div>
+  <button type="button" class="primary" id="p3mvGo" style="width:100%;margin-top:10px">Move to this date</button>`:`<p class="ds">Your plan was set up before plans could be moved. Use the goals button at the top, then "Your day", to set a new start date.</p>`}`)}
+async function p3MoveBy(days){if(!PROFILE||!PROFILE.plan)return;const pl=PROFILE.plan;const m=d=>addD(d,-((d.getDay()+6)%7));
+  const ns=m(addD(parse(pl.start),days));const delta=Math.round((ns-parse(pl.start))/864e5);if(!delta){p1Sheet(null);return}
+  pl.start=iso(ns);pl.firstDay=iso(addD(parse(pl.firstDay||pl.start),delta));if(PROFILE.answers&&PROFILE.answers.start)PROFILE.answers.start=pl.start;
+  const ok=await saveProfile(PROFILE);if(ok===false)return;applyProfile(PROFILE);p1Sheet(null);toast(`Plan moved. Week 1 now starts ${fmtD(ns,{weekday:'short',day:'numeric',month:'short'})}.`,4000);render()}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(c('[data-p3move]')){e.preventDefault();p3MoveOpen();return}
+  if(x=c('[data-p3mv]')){p3MoveBy(+x.dataset.p3mv);return}
+  if(c('#p3mvGo')){const v=($('#p3mvDate')||{}).value;if(!/^\d{4}-\d{2}-\d{2}$/.test(v||''))return;p3MoveBy(Math.round((parse(v)-START)/864e5))}});
+viewPlan=(function(old){return function(){return old().replace('<div class="p3wh"><h2>This week</h2>','<div class="p3wh"><h2>This week</h2><button type="button" class="linkbtn" data-p3move>Move plan</button>')}})(viewPlan);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
