@@ -3984,6 +3984,105 @@ document.addEventListener('input',e=>{if(e.target.id==='f-rpe'){const w=document
 function p3DayFold(){if(tab()!=='training'||tView!=='today'||!(MYP.list||[]).length)return;const k=iso(sel);const has=MYP.list.some(a=>{const t=mypAt(a,k);return t.started&&!t.finished&&t.days.length});if(!has)return;
   const f=document.querySelector('#app #logForm');const card=f&&f.closest('article,section.card,.card');if(!card||card.closest('.p3own'))return;const d=document.createElement('details');d.className='card p3own';d.innerHTML='<summary><b>Your own plan for today</b><small>Your team session comes first</small></summary>';card.replaceWith(d);d.appendChild(card)}
 const _p3FT5=p3FoodTidy;p3FoodTidy=function(){_p3FT5();try{p3DayFold()}catch(e){}};
+// ================= P3: instant meal plans (built on the phone from a meal library, no waiting on AI) =================
+// [name, slots (b breakfast, l lunch, d dinner, s snack), kcal, protein, fat, net carbs, fibre, ingredients, method (| between steps), prep min, tags]
+const P3LIB=[
+['Scrambled eggs, spinach and sourdough','b',520,30,28,34,5,'3 eggs, 80 g spinach, 1 slice sourdough, 10 g butter, 50 g cherry tomatoes','Wilt the spinach in the butter.|Whisk the eggs and scramble on a low heat.|Toast the sourdough and serve with the tomatoes.',10,'veg'],
+['Greek yogurt, berries and oats','b',480,32,14,52,8,'250 g Greek yogurt, 100 g frozen berries, 40 g oats, 10 g honey, 10 g chia','Spoon the yogurt into a bowl.|Top with oats, berries, chia and honey.',3,'veg'],
+['Porridge with banana and peanut butter','b',560,22,18,74,9,'70 g oats, 250 ml milk, 1 banana, 20 g peanut butter','Simmer the oats and milk for 4 minutes, stirring.|Slice the banana on top and add the peanut butter.',6,'veg'],
+['Protein porridge with blueberries','b',540,40,12,66,8,'60 g oats, 250 ml milk, 1 scoop whey, 80 g blueberries','Cook the oats in the milk.|Take off the heat and stir in the whey.|Top with blueberries.',6,'veg'],
+['Mushroom and cheddar omelette','b',470,32,35,5,2,'3 eggs, 100 g mushrooms, 30 g cheddar, 10 g butter, 40 g rocket','Fry the mushrooms in butter until golden.|Pour in the beaten eggs, add cheese and fold.|Serve with rocket.',10,'veg keto'],
+['Smoked salmon and eggs on rye','b',540,38,28,30,5,'2 eggs, 80 g smoked salmon, 1 slice rye bread, 1/2 avocado','Poach or scramble the eggs.|Toast the rye, layer avocado, salmon and eggs.',10,'fish'],
+['Bacon, eggs and grilled tomato','b',560,36,42,6,2,'3 back rashers, 2 eggs, 1 tomato, 60 g mushrooms','Grill the rashers and halved tomato.|Fry the eggs and mushrooms in the bacon fat.',12,'keto'],
+['Overnight oats with apple and cinnamon','b',500,24,14,64,9,'60 g oats, 150 g Greek yogurt, 150 ml milk, 1 apple, cinnamon','Mix oats, yogurt, milk and cinnamon the night before.|Grate the apple on top in the morning.',5,'veg'],
+['Chicken, avocado and salad wrap','l',590,42,24,46,9,'150 g cooked chicken, 1 large wrap, 1/2 avocado, lettuce, 1 tomato, 20 g light mayo','Slice the chicken and avocado.|Fill the wrap with everything and roll tightly.',8,''],
+['Tuna, bean and sweetcorn salad','l',520,40,16,44,12,'1 tin tuna, 120 g mixed beans, 80 g sweetcorn, 1/2 red onion, 10 g olive oil, salad leaves','Drain the tuna, beans and sweetcorn.|Mix with chopped onion, leaves and oil, season well.',8,'fish'],
+['Chicken and rice bowl with greens','l',640,45,14,72,6,'150 g chicken breast, 75 g rice (dry), 100 g broccoli, 1 tbsp soy sauce, 1 tsp honey','Cook the rice.|Fry the sliced chicken until cooked through, add soy and honey.|Steam the broccoli and serve in a bowl.',20,''],
+['Halloumi, chickpea and roast veg salad','l',620,28,34,40,12,'80 g halloumi, 120 g chickpeas, 1 red pepper, 1 courgette, 10 g olive oil, rocket','Roast the chopped veg and chickpeas at 200°C for 20 minutes.|Fry the halloumi slices until golden.|Toss with rocket.',25,'veg'],
+['Egg and avocado salad','l',520,26,40,8,9,'3 boiled eggs, 1 avocado, salad leaves, 1/2 cucumber, 10 g olive oil','Boil the eggs for 8 minutes, cool and halve.|Toss leaves, cucumber and avocado with oil, add the eggs.',12,'veg keto'],
+['Leftover chilli with rice','l',650,38,18,78,12,'1 portion beef chilli, 60 g rice (dry)','Reheat the chilli until piping hot.|Serve with freshly cooked rice.',15,''],
+['Turkey and hummus sandwich','l',540,38,16,58,8,'2 slices wholemeal bread, 100 g turkey slices, 40 g hummus, spinach, 1 tomato','Spread the bread with hummus.|Layer turkey, spinach and tomato.',5,''],
+['Lentil and vegetable soup with bread','l',520,24,12,72,16,'100 g red lentils, 1 carrot, 1 onion, 1 celery stick, 600 ml stock, 1 slice brown bread','Soften the chopped veg in a little oil.|Add lentils and stock and simmer 20 minutes.|Blend if you like and serve with bread.',30,'veg'],
+['Salmon, sweet potato and broccoli','d',680,42,30,52,10,'160 g salmon fillet, 200 g sweet potato, 120 g broccoli, 10 g olive oil, lemon','Roast the sweet potato wedges at 200°C for 25 minutes.|Add the salmon for the last 12 minutes.|Steam the broccoli, squeeze over lemon.',30,'fish'],
+['Beef and sweet potato chilli','d',690,45,22,64,14,'150 g lean beef mince, 150 g sweet potato, 1 tin tomatoes, 100 g kidney beans, 1 onion, chilli powder','Brown the mince with the onion.|Add spices, diced sweet potato, tomatoes and beans.|Simmer 25 minutes until thick.',35,''],
+['Chicken stir-fry with noodles','d',650,46,16,72,6,'150 g chicken breast, 80 g egg noodles (dry), 1 pepper, 100 g broccoli, 1 tbsp soy, 1 tsp ginger','Cook the noodles.|Stir-fry the chicken until golden, add veg for 3 minutes.|Toss in noodles, soy and ginger.',20,''],
+['Steak, potatoes and green beans','d',720,50,32,48,7,'200 g sirloin steak, 250 g baby potatoes, 120 g green beans, 10 g butter','Boil the potatoes for 15 minutes.|Fry the steak 3 minutes each side and rest.|Boil the beans for 4 minutes, toss everything in butter.',25,''],
+['Spaghetti bolognese','d',720,44,20,86,9,'130 g lean beef mince, 90 g spaghetti (dry), 1 tin tomatoes, 1 onion, 1 carrot, 20 g parmesan','Brown the mince with chopped onion and carrot.|Add tomatoes and simmer 20 minutes.|Cook the spaghetti and serve with parmesan.',30,''],
+['Chicken curry with rice','d',700,46,18,82,6,'150 g chicken thigh, 75 g rice (dry), 1 onion, 2 tbsp curry paste, 100 ml light coconut milk, 80 g spinach','Fry the onion and chicken with the curry paste.|Add coconut milk and simmer 15 minutes, stir in spinach.|Serve with rice.',30,''],
+['Tofu and veg stir-fry with rice','d',620,28,22,72,8,'200 g firm tofu, 70 g rice (dry), 1 pepper, 100 g pak choi, 1 tbsp soy, 1 tsp sesame oil','Press and cube the tofu, fry until crisp.|Stir-fry the veg, add soy and sesame oil.|Serve on the rice.',25,'veg'],
+['Baked cod with lentils and tomatoes','d',560,46,12,52,14,'180 g cod fillet, 120 g cooked lentils, 150 g cherry tomatoes, 1 garlic clove, 10 g olive oil','Roast the tomatoes and garlic for 10 minutes.|Add the cod on top and bake 12 more minutes.|Serve over warmed lentils.',25,'fish'],
+['Pork chops, mash and cabbage','d',700,46,28,58,9,'2 pork loin chops, 250 g potatoes, 150 g cabbage, 15 g butter, splash of milk','Boil and mash the potatoes with butter and milk.|Grill the chops for 5 minutes each side.|Boil the shredded cabbage for 4 minutes.',30,''],
+['Chicken fajitas','d',680,46,20,72,10,'150 g chicken breast, 2 wraps, 1 pepper, 1 onion, fajita spice, 30 g Greek yogurt, salsa','Fry the sliced chicken, pepper and onion with the spice.|Warm the wraps and fill with yogurt and salsa.',20,''],
+['Salmon and courgette traybake (low carb)','d',560,40,38,10,5,'160 g salmon fillet, 1 courgette, 1 red pepper, 10 g olive oil, 30 g feta','Roast the chopped veg at 200°C for 15 minutes.|Add salmon and crumble on feta, roast 12 more minutes.',30,'fish keto'],
+['Chicken thighs, cauliflower mash and greens','d',620,44,40,14,8,'2 chicken thighs, 300 g cauliflower, 15 g butter, 100 g green beans','Roast the thighs at 200°C for 30 minutes.|Boil and mash the cauliflower with butter.|Boil the beans.',35,'keto'],
+['Veggie chilli with rice','d',620,24,12,92,20,'1 tin mixed beans, 1 tin tomatoes, 1 pepper, 1 onion, 70 g rice (dry), chilli spice','Soften the onion and pepper with the spice.|Add beans and tomatoes and simmer 20 minutes.|Serve with rice.',30,'veg'],
+['Banana and peanut butter on toast','s',360,12,14,46,5,'1 slice wholemeal toast, 1 banana, 15 g peanut butter','Toast the bread, spread peanut butter, slice banana on top.',3,'veg'],
+['Greek yogurt and honey','s',240,20,6,24,0,'200 g Greek yogurt, 10 g honey','Spoon into a bowl and drizzle honey.',1,'veg'],
+['Apple and cheddar','s',230,9,13,18,4,'1 apple, 35 g cheddar','Slice and eat.',1,'veg'],
+['Protein shake and banana','s',290,26,3,38,3,'1 scoop whey, 300 ml water or milk, 1 banana','Shake the whey with milk or water, have the banana with it.',2,'veg'],
+['Hummus, carrots and oatcakes','s',280,9,13,30,8,'60 g hummus, 2 carrots, 2 oatcakes','Cut the carrots into sticks and dip.',3,'veg'],
+['Boiled eggs and cherry tomatoes','s',190,13,12,4,1,'2 boiled eggs, 100 g cherry tomatoes','Boil the eggs for 8 minutes and cool.',10,'veg keto'],
+['Mixed nuts and a pear','s',300,8,20,22,6,'30 g mixed nuts, 1 pear','Ready to eat.',0,'veg'],
+['Cottage cheese and berries','s',210,22,5,18,3,'200 g cottage cheese, 80 g berries','Top the cottage cheese with berries.',1,'veg']];
+const P3SLOT={b:['Breakfast','08:00'],l:['Lunch','13:00'],s:['Snack','16:00'],d:['Dinner','19:00']};
+function p3Items(str){return String(str).split(',').map(x=>x.trim()).filter(Boolean).map(x=>{const m=x.match(/^((?:\d+(?:\.\d+)?|\d\/\d)\s*(?:g|kg|ml|l|tbsp|tsp|scoop|slices?|large|small|tin|portion|cloves?)?\b)\s*(.*)$/i);return m&&m[2]?{qty:m[1].trim(),name:m[2].trim()}:{qty:'',name:x}})}
+function p3Excl(){const txt=[String((meta.settings||{}).eatNote||''),String(pState.req||''),String(typeof APPROACH!=='undefined'?APPROACH:''),String(typeof ABOUT!=='undefined'?ABOUT:'')].join(' ').toLowerCase();const out=[];
+  (txt.match(/(?:no|not|without|don'?t (?:like|eat)|allergic to|hate)\s+([a-z]+)/g)||[]).forEach(m=>{const w=m.split(/\s+/).pop();if(w.length>2)out.push(w.replace(/s$/,''))});
+  return {words:out,veg:/vegetarian|vegan|no meat/.test(txt),keto:/keto|low.?carb/.test(txt),fish:/pescatarian/.test(txt)}}
+function p3Lib(){const ex=p3Excl();let L=P3LIB.map(r=>({name:r[0],slots:r[1],kcal:r[2],protein:r[3],fat:r[4],carbs:r[5],fibre:r[6],items:r[7],method:r[8].split('|'),prep:r[9],tags:r[10]}));
+  try{(typeof LIB!=='undefined'?LIB:[]).forEach(x=>{if(!x||!x[0])return;const sl=/post|break/i.test(x[1])?'b':/snack/i.test(x[1])?'s':'ld';L.push({name:x[0],slots:sl,kcal:+x[2],protein:+x[3],fat:+x[4],carbs:+x[5],fibre:+x[6],items:x[7]||'',method:[],prep:15,tags:'guide'})})}catch(e){}
+  return L.filter(m=>{const t=(m.name+' '+m.items).toLowerCase();if(ex.words.some(w=>t.includes(w)))return false;if(ex.veg&&!/veg/.test(m.tags))return false;if(ex.fish&&!/veg|fish/.test(m.tags))return false;return true}).map(m=>({...m,keto:/keto|guide/.test(m.tags)}))}
+function p3HaveScore(m,kit){const its=p3Items(m.items).map(i=>i.name.toLowerCase());if(!kit.length)return 0;return its.filter(n=>kit.some(k=>n.includes(k)||k.includes(n.split(' ')[0]))).length/Math.max(1,its.length)}
+function p3LocalPlan(dlist){const L=p3Lib();const kit=kitchen().map(x=>String(x.name).toLowerCase());const recent=new Set();for(let i=1;i<=7;i++){const d=D()[iso(addD(todayDate(),-i))];(d&&d.food||[]).forEach(x=>recent.add(String(x.name).toLowerCase()))}
+  const nm=+((meta.settings||{}).meals)||3;const ex=p3Excl();const used=new Map();const days=[];let seed=Date.now()%1e6;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+  dlist.forEach(dl=>{const T=dl.targets;const slots=nm<=2?['b','d']:nm>=4?['b','l','s','d']:['b','l','d','s'];const pick={};let best=null;
+    for(let tries=0;tries<400;tries++){const combo=slots.map(s=>{const pool=L.filter(m=>m.slots.includes(s)||(s==='l'&&m.slots.includes('d'))||(s==='d'&&m.slots.includes('l')));return pool[Math.floor(rnd()*pool.length)]});if(combo.some(x=>!x))continue;
+      const names=combo.map(c=>c.name);if(new Set(names).size<names.length)continue;const tot=combo.reduce((a,c)=>({kcal:a.kcal+c.kcal,protein:a.protein+c.protein,carbs:a.carbs+c.carbs}),{kcal:0,protein:0,carbs:0});
+      const scale=Math.max(.75,Math.min(1.35,T.kcal/tot.kcal));const p=tot.protein*scale,c=tot.carbs*scale;
+      let sc=Math.abs(p-T.protein_g)/T.protein_g*2+(c>T.net_carbs_max_g?(c-T.net_carbs_max_g)/T.net_carbs_max_g*(ex.keto?4:1.5):0)+Math.abs(scale-1)*.6;
+      combo.forEach(m=>{sc+=(used.get(m.name)||0)*.8+(recent.has(m.name.toLowerCase())?.3:0)-p3HaveScore(m,kit)*.5-(ex.keto&&m.keto?.2:0)});
+      if(!best||sc<best.sc)best={sc,combo,scale}}
+    const sess=dl.session&&!/^rest$/i.test(dl.session);const tt=(meta.settings&&meta.settings.trainTime)||'18:30';const tm=tmin(tt);
+    const meals=best.combo.map((m,ix)=>{used.set(m.name,(used.get(m.name)||0)+1);const s=slots[ix];let [slot,time]=P3SLOT[s];
+      if(sess&&s==='s'&&tm!=null&&tm>=600){slot='Pre-training snack';time=fmtT(Math.max(0,tm-120))}
+      if(sess&&s==='b'&&tm!=null&&tm<600){slot='Post-training breakfast';time=fmtT(tm+75)}
+      const k=best.scale;const r=v=>Math.round(v*k);
+      return {slot,time,where:'Home',name:m.name,items:p3Items(m.items).map(i=>({name:i.name,qty:k>1.12||k<.88?(i.qty?i.qty+(k>1?' (a bit more)':' (a bit less)'):''):i.qty})),prep:m.prep,servings:1,method:m.method,kcal:r(m.kcal),protein:r(m.protein),carbs:r(m.carbs),fat:r(m.fat),fibre:r(m.fibre),plants:[]}}).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+    days.push({date:dl.date,dayType:dl.dayType,session:sess?dl.session:'Rest',note:sess?`Training day: the ${meals.find(m=>/pre-training|lunch/i.test(m.slot))?.slot.toLowerCase()||'meal before'} fuels the session.`:'Rest day: a little lighter on carbs.',meals})});
+  const need=new Map();const STAPLE=/oil|salt|pepper$|spice|powder|soy|honey|cinnamon|stock|water|ginger|garlic|lemon|chilli|curry paste|mayo|salsa|butter/;days.forEach(d=>d.meals.forEach(m=>m.items.forEach(i=>{const n=i.name.toLowerCase();if(STAPLE.test(n))return;if(!kit.length||!kit.some(k=>n.includes(k)||k.includes(n.split(' ')[0])))need.set(n,{name:i.name,qty:'',why:m.name})})));
+  return {days,shopping:[...need.values()].slice(0,15)}}
+buildPlan=async function(reqArg){const req=(typeof reqArg==='string'?reqArg:($('#p-req')&&$('#p-req').value||'')).trim();pState.req=req;if(typeof reqArg!=='string'){try{await saveEatNote()}catch(e){}}
+  clearTimeout(planTimer);const now=new Date(),t=todayDate();const start=now.getHours()>=12||(days[iso(t)]&&(days[iso(t)].food||[]).length)?addD(t,1):t;
+  const dlist=[0,1,2].map(i=>{const d=addD(start,i),k=iso(d),pl=planFor(d),dt=dayTypeFor(k);const T=DAYT[dt];return {date:k,dayType:dt,session:pl&&pl.type!=='R'&&dt!=='rest'?`${TNAME[pl.type]} at ${trainTimeFor(k)}`:(dt==='match'?'Match day':'Rest'),targets:{kcal:T.kcal,protein_g:T.protein,net_carbs_max_g:T.carbs,fat_g:T.fat}}});
+  pState={busy:true,req,msg:'Planning…'};render();
+  try{const out=p3LocalPlan(dlist);await finishPlan(out,req);pState={busy:false,req:'',msg:`Planned ${out.days.length} days${out.shopping.length?` with ${out.shopping.length} things to buy`:''}. Tap a meal to see the recipe, or swap it.`}}
+  catch(e){pState={busy:false,req,msg:'Could not plan just now: '+String(e&&e.message||e).slice(0,100)}}render();p3Enrich()};
+// Micronutrients for the planned meals are filled in quietly afterwards so vitamins add up once you tick "Ate"
+async function p3Enrich(){try{if(!sample||!meta.plan)return;const p=meta.plan;const names=[...new Set(p.days.flatMap(d=>d.meals.map(m=>m.name)))].slice(0,14);
+  const out=await sample.json(`For each meal give the approximate micronutrients for one portion as JSON {"meals":[{"name":"...","fibre":0,"sodium":0,"potassium":0,"magnesium":0,"calcium":0,"iron":0,"zinc":0,"vitC":0,"vitD":0,"b12":0,"folate":0,"omega3":0,"plants":["..."]}]} (mg, µg for vitD/b12/folate, g for fibre/omega3). Meals:\n${p.days.flatMap(d=>d.meals.map(m=>`${m.name}: ${m.items.map(i=>(i.qty?i.qty+' ':'')+i.name).join(', ')}`)).filter((v,i,a)=>a.indexOf(v)===i).slice(0,14).join('\n')}`,{maxTokens:3000});
+  const by={};(out&&out.meals||[]).forEach(m=>{if(m&&m.name)by[String(m.name).toLowerCase()]=m});const cur=meta.plan;if(!cur||cur.createdAt!==p.createdAt)return;
+  cur.days.forEach(d=>d.meals.forEach(m=>{const e=by[m.name.toLowerCase()];if(!e)return;Object.keys(e).forEach(k=>{if(k!=='name'&&k!=='plants'&&isNum(e[k]))m[k]=+e[k]});if(Array.isArray(e.plants))m.plants=e.plants.map(x=>String(x).toLowerCase()).slice(0,12)}));
+  await persistMeta('plan',cur);if(tab()==='food')render()}catch(e){}}
+// Swap a planned meal for another that fits the same slot
+document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-p3swap]');if(!b)return;e.preventDefault();e.stopPropagation();const [k,ix]=b.dataset.p3swap.split(':');const p=meta.plan;if(!p)return;const d=p.days.find(x=>x.date===k);if(!d)return;const m=d.meals[+ix];if(!m)return;
+  const s=/break/i.test(m.slot)?'b':/lunch/i.test(m.slot)?'l':/snack/i.test(m.slot)?'s':'d';const taken=new Set(d.meals.map(x=>x.name));const L=p3Lib().filter(x=>(x.slots.includes(s)||(s!=='b'&&s!=='s'&&/[ld]/.test(x.slots)))&&!taken.has(x.name));if(!L.length)return;
+  const pick=L[Math.floor(Math.random()*L.length)];const k2=m.kcal&&pick.kcal?m.kcal/pick.kcal:1;const r=v=>Math.round(v*k2);
+  d.meals[+ix]={...m,name:pick.name,items:p3Items(pick.items),method:pick.method,prep:pick.prep,kcal:r(pick.kcal),protein:r(pick.protein),carbs:r(pick.carbs),fat:r(pick.fat),fibre:r(pick.fibre),plants:[]};
+  await persistMeta('plan',p);render();toast('Swapped for '+pick.name);p3Enrich()},true);
+const _p3PicsSwap=p3PicsPhotos;p3PicsPhotos=function(){_p3PicsSwap();document.querySelectorAll('details.pm:not(.minor) .pmbody:not(.p3sw)').forEach(b=>{b.classList.add('p3sw');const pm=b.closest('details.pm');const ate=pm.querySelector('[data-ate]');const key=(ate&&ate.dataset.ate)||'';const ms=(pm.dataset.ms||'').replace(/^p/,'');const k=ms.split(':')[0],ix=ms.split(':')[1];if(!k)return;
+  const a=b.querySelector('.pma')||Object.assign(document.createElement('div'),{className:'pma'});if(!a.parentNode)b.appendChild(a);a.insertAdjacentHTML('beforeend',`<button type="button" class="ghost" data-p3swap="${k}:${ix}">Swap</button>`)})};
+
+// P3: meal plans are instant now, so the old server polling is switched off here
+checkPlanJob=async function(){if(pState.busy&&!P3FB){pState={...pState,busy:false}}return 'idle'};watchPlanJob=function(){clearTimeout(planTimer)};
+// Habits: unmistakable on/off squares with the habit's icon, and the change shows the moment you tap
+p2Habits=(function(old){return function(k){if(sampleMode)return '';const {ids,why}=p3Five(k);const done=ids.filter(id=>habDone(id,k)).length;
+  return `<section class="card p2hab p3hab2"><div class="p3hstar">${p3StarRow(done,5,320)}</div><div class="p3hh2"><b>${done>=5?'All five done':`${done} of 5 today`}</b><button type="button" class="linkbtn" data-p2habedit>Edit</button></div>
+    <div class="p3hrow">${ids.map(id=>{const h=P2HABITS.find(x=>x[0]===id);const dn=habDone(id,k);return `<button type="button" class="p2h p3hb${dn?' on':''}" data-p2hab="${id}" aria-pressed="${dn}" aria-label="${esc(h[1])}${why[id]?', '+esc(why[id]):''}"><span class="p3hq"><span class="p3hi">${ico(h[2])}</span><span class="p3hk"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="p3hl">${esc(P3HS[id]||h[1])}</span></button>`}).join('')}</div></section>`}})(p2Habits);
+window.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('.p3hb[data-p2hab]');if(!x)return;e.stopImmediatePropagation();e.preventDefault();
+  const k=iso(todayDate());const d=D()[k]||{};const l=(d.hab||[]).slice();const id=x.dataset.p2hab;const i=l.indexOf(id);
+  if(i>=0)l.splice(i,1);else if(habDone(id,k)){toast('Already done from what you logged');return}else l.push(id);
+  const on=l.includes(id);x.classList.toggle('on',on);x.setAttribute('aria-pressed',on);try{navigator.vibrate&&navigator.vibrate(12)}catch(z){}
+  days[k]={...(days[k]||{date:k}),hab:l};persistDay(k,{hab:l});setTimeout(render,120)},true);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}

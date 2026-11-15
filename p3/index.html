@@ -1732,6 +1732,16 @@ html[data-look] #tdOpen{display:none!important}
 details.p3own{padding:0!important;overflow:hidden}details.p3own>summary{display:flex;flex-direction:column;padding:14px 16px;cursor:pointer;list-style:none}details.p3own>summary::-webkit-details-marker{display:none}details.p3own>summary small{font-size:12px;color:var(--text-muted)}
 details.p3own>.card,details.p3own>article{margin:0!important;box-shadow:none!important}
 #p1Host .ksheet:has(.p3wbar){min-height:92vh}
+
+/* habits: on/off squares */
+.p3hrow{gap:8px!important}
+.p2h.p3hb{gap:6px!important}
+.p3hq{position:relative;display:grid;place-items:center;width:100%;max-width:58px;aspect-ratio:1;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);color:var(--text-muted);transition:background .15s,border-color .15s}
+.p3hi svg{width:22px;height:22px}.p3hk{display:none;color:var(--bg)}
+.p3hb.pick .p3hq{border-color:var(--fade-blue)}
+.p3hb.on .p3hq{background:var(--text);border-color:var(--text)}.p3hb.on .p3hi{display:none}.p3hb.on .p3hk{display:grid}
+.p3hb .p3hc{display:none!important}
+.p3hb:active .p3hq{transform:scale(.94)}
 </style>
 </head>
 <body class="kloading">
@@ -1757,6 +1767,6 @@ details.p3own>.card,details.p3own>article{margin:0!important;box-shadow:none!imp
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p3o"></script>
+<script src="/p3/app.js?v=p3p"></script>
 </body>
 </html>
