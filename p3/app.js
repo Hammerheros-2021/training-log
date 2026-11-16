@@ -4165,7 +4165,7 @@ window.addEventListener('input',e=>{const el=e.target;if(!p3IsTime(el))return;co
 window.addEventListener('focusout',e=>{const el=e.target;if(!p3IsTime(el))return;const v=p3TimeFix(el.value,true);if(v!==el.value){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}))}},true);
 new MutationObserver(()=>{document.querySelectorAll('input[inputmode="numeric"]').forEach(el=>{if(p3IsTime(el))el.setAttribute('inputmode','decimal')})}).observe(document.documentElement,{childList:true,subtree:true});
 // ================= P3: the meal you pick is the meal it goes to; no When row =================
-foodActionsHTML=function(dIso){let h=_p1foodActions(dIso);if(!h)return h;const m=h.match(/<div class="mealpick">[\s\S]*?<\/div>/);if(!m)return h;h=h.replace(m[0],'');const i=h.indexOf('>')+1;return h.slice(0,i)+m[0].replace('class="mealpick"','class="mealpick p3mfirst"')+h.slice(i)};
+foodActionsHTML=function(dIso){let h=_p1foodActions(dIso);if(!h)return h;const m=h.match(/<div class="mealpick"><div[^>]*>[\s\S]*?<\/div><\/div>/);if(!m)return h;h=h.replace(m[0],'');const i=h.indexOf('>')+1;return h.slice(0,i)+m[0].replace('class="mealpick"','class="mealpick p3mfirst"')+h.slice(i)};
 let P3MP=false,P3VM=null;
 window.addEventListener('click',e=>{const s=e.target.closest&&e.target.closest('[data-form="f"][data-v]');if(s&&MEALS.includes(s.dataset.v)){P3MP=true;fState.at=null}},true);
 function p3ShownMeal(){return fState.meal||(iso(sel)===iso(todayDate())?guessMeal():'Dinner')}
@@ -4214,7 +4214,7 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(c('#p3askGo')){p3AskGo();return}
   if(c('#p3askClr')){p3AskSave([]);p3AskDraw()}},true);
 document.addEventListener('input',e=>{if(e.target.id==='p3askT')P3ASK.q=e.target.value});
-p3Koach=(function(old){return function(k){return old(k)+`<button type="button" class="p3askbar" data-p3ask="">${ico('sparkles')}<span>Ask Koach anything</span>${MIC}</button>`}})(p3Koach);
+p3Koach=(function(old){return function(k){const bar=`<button type="button" class="p3askbar" data-p3ask="">${ico('sparkles')}<span class="p3askt">Ask Koach anything</span>${MIC}</button>`;const h=old(k);return /<\/div>$/.test(h)?h.replace(/<\/div>$/,bar+'</div>'):h+bar}})(p3Koach);
 microsHTML=(function(old){return function(t,dt,k){const h=old(t,dt,k);if(!h||!t||!t.n)return h;return h.replace(/<\/details>\s*$/,`<button type="button" class="linkbtn p3askv" data-p3ask="Am I over on any vitamins or minerals, and is there any risk from that?">Ask Koach about these ›</button></details>`)}})(microsHTML);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
