@@ -634,8 +634,8 @@ If the photo is not a workout, reply {"summary":"Not a workout board","runM":0,"
 async function saveLog(pl){
   readAll();const f=sDraft;
   if(!f.status){toast('Pick Done, Partial or Missed');return}
-  if(f.pace&&!toSec(f.pace)){toast('Pace format is min:sec, e.g. 4:35');return}
-  if(f.fivek&&!toSec(f.fivek)){toast('5 km time format is min:sec, e.g. 21:30');return}
+  if(f.pace&&!toSec(f.pace)){toast('Type pace like 4.35 or 4:35');return}
+  if(f.fivek&&!toSec(f.fivek)){toast('Type it like 21.30 or 21:30');return}
   const isH=pl.type==='H'||(pl.type==='T'&&f.swap);
   const doc={...f,wk:pl.wk,slot:pl.type,type:pl.type==='T'&&f.swap?'H':pl.type,savedAt:new Date().toISOString()};
   if(!isH)doc.hyrox=null;
@@ -4154,6 +4154,12 @@ viewPlan=(function(old){return function(){let h=old();
   if(P3RA.on)h=h.replace('<div class="p3wstrip">',`<div class="p3rahint">${P3RA.from?`Now tap the day to swap ${fmtD(parse(P3RA.from),{weekday:'long'})} with`:'Tap the session you want to move'}</div><div class="p3wstrip p3ra">`);
   if(P3RA.from)h=h.replace(`class="p3wk1`,'class="p3wk1').replace(new RegExp(`class="p3wk1([^"]*)" data-goto="${P3RA.from}"`),`class="p3wk1$1 p3pick" data-goto="${P3RA.from}"`);
   const fit=p3FitCard();return h.replace('<details class="card p3all">',fit+'<details class="card p3all">')}})(viewPlan);
+// ================= P3: time boxes (5 km, pace) accept 20.55, 20,55, 20 55 or 2055 =================
+function p3IsTime(el){return el&&el.tagName==='INPUT'&&/^\d{1,2}:\d{2}/.test(el.getAttribute('placeholder')||'')}
+function p3TimeFix(v,final){v=String(v||'').replace(/[.,;\s]/g,':').replace(/:+/g,':');if(final&&/^\d{3,4}$/.test(v))v=v.slice(0,-2)+':'+v.slice(-2);return v}
+window.addEventListener('input',e=>{const el=e.target;if(!p3IsTime(el))return;const v=p3TimeFix(el.value,false);if(v!==el.value)el.value=v},true);
+window.addEventListener('focusout',e=>{const el=e.target;if(!p3IsTime(el))return;const v=p3TimeFix(el.value,true);if(v!==el.value){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}))}},true);
+new MutationObserver(()=>{document.querySelectorAll('input[inputmode="numeric"]').forEach(el=>{if(p3IsTime(el))el.setAttribute('inputmode','decimal')})}).observe(document.documentElement,{childList:true,subtree:true});
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
