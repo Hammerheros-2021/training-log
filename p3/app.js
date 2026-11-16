@@ -4227,6 +4227,28 @@ p1NutInfo=(function(old){return function(k){old(k);const host=document.querySele
   const head=host.querySelector('.kshead');if(head)head.insertAdjacentHTML('afterend',p3SrcHTML(k));
   const v=t[k]||0;const f=x=>x>=10?Math.round(x):Math.round(x*10)/10;
   host.querySelectorAll('.p1blk h3').forEach(h=>{if(h.textContent==='Foods that have it'){h.textContent=tg.lo&&v<tg.lo?`Short by ${f(tg.lo-v)} ${n.u}. Top up with`:tg.hi&&v>tg.hi&&!tg.lo?'Over today. It mostly comes from':'Where else to get it';const s=h.parentElement;const w=host.querySelector('.p3srcS');if(w&&s!==w.nextElementSibling)w.insertAdjacentElement('afterend',s)}})}})(p1NutInfo);
+// ================= P3: safe upper limits: a note when too much of something could be a risk =================
+const P3UL={vitA:{ul:3000,risk:'Too much vitamin A over time can harm the liver and bones. The limit is for retinol (liver, fish oils, supplements); vitamin A from carrots and other veg is not a worry.'},
+ vitD:{ul:100,risk:'Very high vitamin D over weeks can raise calcium in the blood. This nearly always comes from high-dose supplements, not food.'},
+ vitC:{ul:2000,risk:'Above this, vitamin C can upset your stomach. Your body passes out what it doesn’t need, so it’s not a lasting risk.'},
+ iron:{ul:45,risk:'Too much iron can cause stomach upset and, taken high for long, build up in the body. Don’t take an iron supplement unless a GP has told you to.'},
+ zinc:{ul:25,risk:'Too much zinc over time blocks copper and can cause stomach upset. Usually from supplements stacked on top of meat and shellfish.'},
+ selenium:{ul:255,risk:'Too much selenium over time can cause hair and nail problems. Brazil nuts are very high: 1 or 2 a day is plenty.'},
+ iodine:{ul:600,risk:'Too much iodine over time can upset the thyroid. Usually from seaweed or kelp supplements.'},
+ calcium:{ul:2500,risk:'Too much calcium, mostly from supplements, can raise the risk of kidney stones.'},
+ choline:{ul:3500,risk:'Very high choline can cause a fishy body smell and low blood pressure.'},
+ omega3:{ul:5,risk:'Above about 5 g a day of fish oil can thin the blood. Food alone won’t get you there.'},
+ magnesium:{ul:250,supp:1,risk:'From supplements, more than 250 mg a day can cause loose stools. Magnesium from food has no limit.'},
+ folate:{ul:1000,supp:1,risk:'More than 1000 µg a day of folic acid from supplements or fortified foods can hide a B12 shortage.'}};
+function p3ULval(k,d){const u=P3UL[k];if(!u)return null;if(!u.supp)return foodTotals(d)[k]||0;let s=0;try{suppItems(d).forEach(i=>s+=(+i[k]||0))}catch(e){}return s}
+p1NutInfo=(function(old){return function(k){old(k);const u=P3UL[k];const n=NUTS.find(x=>x.k===k);const host=document.querySelector('#p1Host .p1sheet');if(!host||!n)return;const d=D()[iso(sel)]||{};
+  const v=p3ULval(k,d),tot=foodTotals(d)[k]||0,tg=nutTarget(k,dayTypeFor(iso(sel)))||{};const f=x=>x>=10?Math.round(x):Math.round(x*10)/10;let h='';
+  if(!u){if(tg.lo&&tot>tg.lo*1.5&&!tg.hi)h=`<section class="p1blk p3ul ok"><h3>Is too much a risk?</h3><p style="margin:0">No safe upper limit has been set for ${esc(n.l)}, because no harm has been seen from high amounts in food. Being over target is fine.</p></section>`}
+  else if(v>u.ul)h=`<section class="p1blk p3ul hi"><h3>Above the safe limit</h3><p style="margin:0"><b>${f(v)} ${n.u}${u.supp?' from supplements':''}</b> today, over the ${u.ul} ${n.u} a day that's safe long term. ${esc(u.risk)} One day over isn't a worry; if it happens most days, check your supplements or ask your GP or pharmacist.</p></section>`;
+  else if(v>u.ul*0.8)h=`<section class="p1blk p3ul mid"><h3>Close to the safe limit</h3><p style="margin:0">${f(v)} ${n.u}${u.supp?' from supplements':''} today, near the ${u.ul} ${n.u} safe daily limit. ${esc(u.risk)}</p></section>`;
+  else if(tg.lo&&tot>tg.lo)h=`<section class="p1blk p3ul ok"><h3>Is too much a risk?</h3><p style="margin:0">No. You're over target but well under the safe limit of ${u.ul} ${n.u} a day${u.supp?' from supplements':''}.</p></section>`;
+  if(!h)return;const a=host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',h)}})(p1NutInfo);
+nutBar=(function(old){return function(n,val,tg){const h=old(n,val,tg);const u=P3UL[n.k];if(!u||u.supp||!(val>u.ul))return h;return h.replace(`<span>${n.l} <i`,`<span>${n.l} <span class="p3ulb">Over safe limit</span> <i`)}})(nutBar);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
