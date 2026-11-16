@@ -4192,7 +4192,8 @@ Food today: ${foods||'nothing logged yet'}.
 Supplements taken today: ${su.join(', ')||'none'}.
 Nutrients (today vs target, with 7-day average over ${L7.length} logged days):
 ${NUTS.map(line).join('\n')}
-Sleep last nights: ${sl.join(', ')||'not logged'}.`}
+Sleep last nights: ${sl.join(', ')||'not logged'}.
+Days over the safe upper limit (last 14 logged days): ${(()=>{try{return Object.keys(P3UL).map(k=>{const r=p3ULfreq(k);return r.o14?`${k} ${r.o14}/${r.n14}`:''}).filter(Boolean).join(', ')||'none'}catch(e){return 'unknown'}})()}.`}
 function p3AskHTML(){const h=p3AskHist();
   return `<div class="p3ask"><div class="p3askin"><textarea id="p3askT" rows="2" placeholder="Ask anything, e.g. I'm over on some vitamins, is that a risk?">${esc(P3ASK.q||'')}</textarea></div>
   <div class="p3askb">${typeof speakBtn==='function'?speakBtn('p3askT'):''}<button type="button" class="primary" id="p3askGo" ${P3ASK.busy?'disabled':''}>${P3ASK.busy?'Thinking…':'Ask'}</button></div>
@@ -4249,6 +4250,15 @@ p1NutInfo=(function(old){return function(k){old(k);const u=P3UL[k];const n=NUTS.
   else if(tg.lo&&tot>tg.lo)h=`<section class="p1blk p3ul ok"><h3>Is too much a risk?</h3><p style="margin:0">No. You're over target but well under the safe limit of ${u.ul} ${n.u} a day${u.supp?' from supplements':''}.</p></section>`;
   if(!h)return;const a=host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',h)}})(p1NutInfo);
 nutBar=(function(old){return function(n,val,tg){const h=old(n,val,tg);const u=P3UL[n.k];if(!u||u.supp||!(val>u.ul))return h;return h.replace(`<span>${n.l} <i`,`<span>${n.l} <span class="p3ulb">Over safe limit</span> <i`)}})(nutBar);
+// ================= P3: Koach watches how often you go over a safe limit =================
+function p3ULfreq(k){const t0=todayDate();let n7=0,o7=0,n14=0,o14=0;for(let i=0;i<14;i++){const d=D()[iso(addD(t0,-i))];if(!d||!((d.food||[]).length||(()=>{try{return suppItems(d).length}catch(e){return 0}})()))continue;const over=p3ULval(k,d)>P3UL[k].ul;n14++;if(over)o14++;if(i<7){n7++;if(over)o7++}}return {n7,o7,n14,o14}}
+function p3ULrisks(){return Object.keys(P3UL).map(k=>({k,...p3ULfreq(k)})).filter(r=>r.o7>=3||r.o14>=5).sort((a,b)=>b.o14-a.o14)}
+p3Koach=(function(old){return function(k){const h=old(k);let rs=[];try{rs=p3ULrisks().slice(0,2)}catch(e){}if(!rs.length)return h;
+  const al=rs.map(r=>{const n=NUTS.find(x=>x.k===r.k);return `<button type="button" class="p3ulal" data-nutinfo="${r.k}"><span class="p3ulic">!</span><span><b>${esc(n.l)} over the safe limit ${r.o7>=3?`${r.o7} of the last ${r.n7} days`:`${r.o14} of the last ${r.n14} days`}</b><small>${P3UL[r.k].supp?'From supplements. ':''}Tap to see where it's coming from</small></span><i aria-hidden="true">›</i></button>`}).join('');
+  return h.includes('class="p3askbar"')?h.replace('<button type="button" class="p3askbar"',al+'<button type="button" class="p3askbar"'):h+al}})(p3Koach);
+p1NutInfo=(function(old){return function(k){old(k);if(!P3UL[k])return;const host=document.querySelector('#p1Host .p1sheet');if(!host)return;const r=p3ULfreq(k);if(!r.n14)return;
+  const msg=r.o14===0?`Under the safe limit every day you've logged in the last 2 weeks.`:(r.o7>=3||r.o14>=5)?`Over the safe limit on <b>${r.o14} of the last ${r.n14} days</b> you logged. That's often enough to be worth changing: look at where it comes from above, and check supplements first.`:`Over the safe limit on ${r.o14} of the last ${r.n14} days you logged. Now and then is fine; Koach will tell you on Today if it becomes a habit.`;
+  const s=host.querySelector('.p3ul');const blk=`<p class="p3ulf">${msg}</p>`;if(s)s.insertAdjacentHTML('beforeend',blk);else{const a=host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',`<section class="p1blk p3ul ${r.o14?'mid':'ok'}"><h3>Last 2 weeks</h3>${blk}</section>`)}}})(p1NutInfo);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
