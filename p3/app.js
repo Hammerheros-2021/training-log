@@ -4204,10 +4204,17 @@ function p3AskDraw(){const h=$('#p3askHost');if(h)h.innerHTML=p3AskHTML()}
 async function p3AskGo(){const t=$('#p3askT');const q=(t&&t.value||'').trim();if(!q){toast('Type or say your question first');return}try{stopListen()}catch(e){}
   P3ASK={busy:true,q};p3AskDraw();const hist=p3AskHist().slice(-4).map(x=>`Q: ${x.q}\nA: ${x.a}`).join('\n\n');
   try{const out=await sample.json(`You are Koach, a friendly, plain-spoken coach in a training and food app. Answer ${userName()||'the user'}'s question using their own numbers below. Speak to them directly by first name now and then.
-Rules: plain words for a non-expert; short (under 120 words unless they ask for detail); be specific to their numbers; say clearly when something is fine and when it's worth acting on. For supplements or vitamins over target, separate the ones that matter (e.g. vitamin A, D, iron, zinc, selenium, B6 at high doses over time, especially from supplements) from ones that don't (water-soluble ones like vitamin C or B12 from food). Never diagnose; if something could be a medical issue, say to check with their GP or pharmacist. If the data isn't there to answer, say what to log.
+How to answer, like a good coach who has looked at their numbers:
+1. Start with a one-line verdict (e.g. "You're over on zinc and magnesium, and it's your supplements doing it.").
+2. Then a clear recommendation they can act on today, naming the actual supplement and amounts: drop it, take it every other day, halve it, or keep it. Show the sum: "Vitals Plus gives you 15 mg zinc, food gives about 12 mg, so you're at 27 against a 25 mg safe limit. Drop to every second day and you average 19 mg."
+3. Say what changing it would leave them short on, using their food averages, and the 1-2 foods that would cover it.
+4. Judge how steady the data is: if fewer than 5 days are logged, or the food numbers swing a lot day to day, say so and give the call anyway with how long to keep watching (e.g. "log another week before changing, but lean towards dropping it").
+5. Separate what matters (vitamin A as retinol, vitamin D, iron, zinc, selenium, iodine, magnesium and folic acid from supplements) from what doesn't (vitamin C, B12, potassium and most things from food).
+Be direct and specific. Do not tell them to "look at it" or "talk to your GP" as a way of not answering. Only mention a GP or pharmacist for real warning signs, a medicine they take, or a diagnosed condition, and still give your view. Never diagnose. If a supplement's contents are only estimated, say so in one short phrase and suggest snapping the label in Food > Supplements > What's in them.
+Plain words, no jargon; under 170 words unless they ask for more.
 ${p3AskCtx()}
 ${hist?'Earlier in this chat:\n'+hist+'\n':''}Question: ${q}
-Reply as JSON: {"answer":"..."}`,{maxTokens:1500});
+Reply as JSON: {"answer":"..."}`,{maxTokens:2500});
     const a=String(out&&out.answer||'').trim()||'Sorry, I could not answer that. Try asking another way.';const h=p3AskHist();const n=new Date();h.push({q,a,at:fmtD(n,{day:'numeric',month:'short'})+' '+fmtT(n.getHours()*60+n.getMinutes())});p3AskSave(h);P3ASK={busy:false,q:''}}
   catch(e){P3ASK={busy:false,q};toast(foodErr(e),5000)}p3AskDraw()}
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
@@ -4241,11 +4248,13 @@ const P3UL={vitA:{ul:3000,risk:'Too much vitamin A over time can harm the liver 
  omega3:{ul:5,risk:'Above about 5 g a day of fish oil can thin the blood. Food alone won’t get you there.'},
  magnesium:{ul:250,supp:1,risk:'From supplements, more than 250 mg a day can cause loose stools. Magnesium from food has no limit.'},
  folate:{ul:1000,supp:1,risk:'More than 1000 µg a day of folic acid from supplements or fortified foods can hide a B12 shortage.'}};
+function p3ULadvice(k,d){let sp=[];try{sp=suppItems(d).filter(i=>+i[k]>0)}catch(e){}if(!sp.length)return ' It\u2019s coming from food today, so no change needed unless it happens most days.';const u=P3UL[k],n=NUTS.find(x=>x.k===k);const tot=foodTotals(d)[k]||0,s=sp.reduce((a,i)=>a+(+i[k]||0),0),fo=tot-s;const f=x=>x>=10?Math.round(x):Math.round(x*10)/10;const big=sp.sort((a,b)=>b[k]-a[k])[0];
+  const lim=u.supp?s:tot;const without=u.supp?s-(+big[k]):tot-(+big[k]);return ` <b>${esc(big.name)} gives ${f(+big[k])} ${n.u}</b>${u.supp?'':`, food ${f(fo)} ${n.u}`}. Without it you'd be at ${f(without)} ${n.u}${without<=u.ul?', under the limit':''}. If this keeps happening, drop it or take it every second day.`}
 function p3ULval(k,d){const u=P3UL[k];if(!u)return null;if(!u.supp)return foodTotals(d)[k]||0;let s=0;try{suppItems(d).forEach(i=>s+=(+i[k]||0))}catch(e){}return s}
 p1NutInfo=(function(old){return function(k){old(k);const u=P3UL[k];const n=NUTS.find(x=>x.k===k);const host=document.querySelector('#p1Host .p1sheet');if(!host||!n)return;const d=D()[iso(sel)]||{};
   const v=p3ULval(k,d),tot=foodTotals(d)[k]||0,tg=nutTarget(k,dayTypeFor(iso(sel)))||{};const f=x=>x>=10?Math.round(x):Math.round(x*10)/10;let h='';
   if(!u){if(tg.lo&&tot>tg.lo*1.5&&!tg.hi)h=`<section class="p1blk p3ul ok"><h3>Is too much a risk?</h3><p style="margin:0">No safe upper limit has been set for ${esc(n.l)}, because no harm has been seen from high amounts in food. Being over target is fine.</p></section>`}
-  else if(v>u.ul)h=`<section class="p1blk p3ul hi"><h3>Above the safe limit</h3><p style="margin:0"><b>${f(v)} ${n.u}${u.supp?' from supplements':''}</b> today, over the ${u.ul} ${n.u} a day that's safe long term. ${esc(u.risk)} One day over isn't a worry; if it happens most days, check your supplements or ask your GP or pharmacist.</p></section>`;
+  else if(v>u.ul)h=`<section class="p1blk p3ul hi"><h3>Above the safe limit</h3><p style="margin:0"><b>${f(v)} ${n.u}${u.supp?' from supplements':''}</b> today, over the ${u.ul} ${n.u} a day that's safe long term. ${esc(u.risk)} One day over isn't a worry.${p3ULadvice(k,d)}</p></section>`;
   else if(v>u.ul*0.8)h=`<section class="p1blk p3ul mid"><h3>Close to the safe limit</h3><p style="margin:0">${f(v)} ${n.u}${u.supp?' from supplements':''} today, near the ${u.ul} ${n.u} safe daily limit. ${esc(u.risk)}</p></section>`;
   else if(tg.lo&&tot>tg.lo)h=`<section class="p1blk p3ul ok"><h3>Is too much a risk?</h3><p style="margin:0">No. You're over target but well under the safe limit of ${u.ul} ${n.u} a day${u.supp?' from supplements':''}.</p></section>`;
   if(!h)return;const a=host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',h)}})(p1NutInfo);
@@ -4259,6 +4268,40 @@ p3Koach=(function(old){return function(k){const h=old(k);let rs=[];try{rs=p3ULri
 p1NutInfo=(function(old){return function(k){old(k);if(!P3UL[k])return;const host=document.querySelector('#p1Host .p1sheet');if(!host)return;const r=p3ULfreq(k);if(!r.n14)return;
   const msg=r.o14===0?`Under the safe limit every day you've logged in the last 2 weeks.`:(r.o7>=3||r.o14>=5)?`Over the safe limit on <b>${r.o14} of the last ${r.n14} days</b> you logged. That's often enough to be worth changing: look at where it comes from above, and check supplements first.`:`Over the safe limit on ${r.o14} of the last ${r.n14} days you logged. Now and then is fine; Koach will tell you on Today if it becomes a habit.`;
   const s=host.querySelector('.p3ul');const blk=`<p class="p3ulf">${msg}</p>`;if(s)s.insertAdjacentHTML('beforeend',blk);else{const a=host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',`<section class="p1blk p3ul ${r.o14?'mid':'ok'}"><h3>Last 2 weeks</h3>${blk}</section>`)}}})(p1NutInfo);
+// ================= P3: see and fix exactly what's in each supplement; Koach gives a straight answer =================
+const P3SK=()=>MICRO.filter(x=>x!=='caffeine');
+function p3NU(k){const n=NUTS.find(x=>x.k===k);return n?n.u:''}
+function p3NL(k){const n=NUTS.find(x=>x.k===k);return n?n.l:k}
+function p3SuppCard(s){const ks=P3SK().filter(k=>+((s.nut||{})[k])>0);const rest=P3SK().filter(k=>!ks.includes(k));
+  return `<section class="p1blk p3sc" data-sid="${esc(String(s.id))}"><div class="p3sch"><div><b>${esc(s.name)}</b><small>${s.src==='label'?'From the label':s.src==='you'?'Entered by you':'Estimated from the name. Snap the label to make it exact.'}</small></div></div>
+  <div class="field"><label class="label">Daily dose</label><input type="text" value="${esc(s.dose||'')}" data-p3sd="${esc(String(s.id))}" placeholder="e.g. 2 tablets"></div>
+  <div class="p3sg">${ks.map(k=>`<label class="p3sn"><span>${esc(p3NL(k))}</span><input type="number" inputmode="decimal" min="0" step="any" value="${+s.nut[k]}" data-p3sn="${esc(String(s.id))}|${k}"><i>${p3NU(k)}</i></label>`).join('')||'<p class="ds" style="margin:0">No vitamins or minerals listed.</p>'}</div>
+  <div class="p3sa"><select data-p3sadd="${esc(String(s.id))}"><option value="">+ Add a nutrient</option>${rest.map(k=>`<option value="${k}">${esc(p3NL(k))}</option>`).join('')}</select>
+  <label class="linkbtn p3slab">Read the label<input type="file" accept="image/*" capture="environment" data-p3slab="${esc(String(s.id))}" hidden></label>
+  <button type="button" class="linkbtn" data-p3srm="${esc(String(s.id))}">Remove</button></div></section>`}
+function p3SuppOpen(){const l=supps();p1Sheet(`<div class="kshead"><div><h2>What's in your supplements</h2><small class="ds">Per daily dose. Changes save as you type.</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div><div id="p3sHost">${l.length?l.map(p3SuppCard).join(''):'<p class="ds">No supplements added yet.</p>'}</div>`)}
+async function p3SuppSave(fn,redraw){const l=clone(supps());fn(l);await persistMeta('supps',{list:l});if(redraw){const h=$('#p3sHost');if(h)h.innerHTML=l.map(p3SuppCard).join('')}}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(c('[data-p3sopen]')){e.preventDefault();p3SuppOpen();return}
+  if(x=c('[data-p3srm]')){const id=x.dataset.p3srm;const s=supps().find(z=>String(z.id)===id);if(!s)return;if(x.dataset.sure!=='1'){x.dataset.sure='1';x.textContent='Tap again to remove';return}p3SuppSave(l=>{const i=l.findIndex(z=>String(z.id)===id);if(i>=0)l.splice(i,1)},true).then(()=>toast(`Removed ${s.name}`))}});
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset)return;
+  if(t.dataset.p3sn){const [id,k]=t.dataset.p3sn.split('|');const v=+t.value;await p3SuppSave(l=>{const s=l.find(z=>String(z.id)===id);if(!s)return;s.nut=s.nut||{};if(v>0)s.nut[k]=v;else delete s.nut[k];s.src=s.src==='label'?'label':'you'},!(v>0));return}
+  if(t.dataset.p3sd!=null){const id=t.dataset.p3sd;await p3SuppSave(l=>{const s=l.find(z=>String(z.id)===id);if(s)s.dose=t.value.slice(0,40)});return}
+  if(t.dataset.p3sadd){const id=t.dataset.p3sadd,k=t.value;if(!k)return;await p3SuppSave(l=>{const s=l.find(z=>String(z.id)===id);if(s){s.nut=s.nut||{};s.nut[k]=0.0001}},true);const inp=document.querySelector(`[data-p3sn="${id}|${k}"]`);if(inp){inp.value='';inp.focus()}return}
+  if(t.dataset.p3slab&&t.files&&t.files[0]){const id=t.dataset.p3slab;const f=t.files[0];const card=t.closest('.p3sc');if(card)card.classList.add('busy');toast('Reading the label…');
+    try{const out=await sample.json(`This is a photo of a supplement label. Read the nutrients in ONE daily dose exactly as printed (if the label gives per 2 tablets and that is the daily dose, use that). Keys and units: ${P3SK().join(', ')} (sodium, potassium, magnesium, calcium, iron, zinc, choline, vitC in mg; selenium, iodine, vitA, vitD, vitK, b12, folate in µg; omega3 in g). Convert IU to µg (vitamin D: 40 IU = 1 µg; vitamin A: 3.33 IU = 1 µg). Leave out anything not on the label.
+Reply with ONLY JSON: {"name":"","dose":"","nut":{}}`,{images:f});
+      if(!out||!out.nut)throw new Error('Could not read it, try a clearer photo of the nutrition panel');
+      await p3SuppSave(l=>{const s=l.find(z=>String(z.id)===id);if(!s)return;s.nut={};Object.keys(out.nut).forEach(k=>{if(NK.includes(k)&&isNum(out.nut[k])&&+out.nut[k]>0)s.nut[k]=+out.nut[k]});if(out.dose)s.dose=String(out.dose).slice(0,40);s.src='label'},true);toast('Updated from the label')}
+    catch(err){if(card)card.classList.remove('busy');toast(foodErr(err),5000)}}});
+suppHTML=(function(old){return function(k){const h=old(k);if(!supps().length)return h;return h.replace('<div class="sbtns">','<div class="sbtns"><button type="button" class="linkbtn" data-p3sopen>What\'s in them ›</button>')}})(suppHTML);
+// Richer context for Ask Koach: each supplement's contents, food vs supplement split, how steady the diet is
+p3AskCtx=(function(old){return function(){const base=old();const t0=todayDate();const days=[];for(let i=0;i<14;i++){const d=D()[iso(addD(t0,-i))];if(d&&(d.food||[]).length)days.push(d)}
+  const sl=supps().map(s=>`- ${s.name}${s.dose?' ('+s.dose+')':''}${s.src==='label'||s.src==='you'?'':' [contents estimated from the name]'}: ${Object.keys(s.nut||{}).filter(k=>+s.nut[k]>0).map(k=>`${p3NL(k)} ${+s.nut[k]}${p3NU(k)}`).join(', ')||'no vitamins/minerals'}`).join('\n');
+  const split=P3SK().map(k=>{if(!days.length)return '';const fo=days.map(d=>{const t=foodTotals(d);let s=0;try{suppItems(d).forEach(i=>s+=(+i[k]||0))}catch(e){}return {f:t[k]-s,s}});const fa=fo.reduce((a,x)=>a+x.f,0)/fo.length,sa=fo.reduce((a,x)=>a+x.s,0)/fo.length;
+    const sd=Math.sqrt(fo.reduce((a,x)=>a+(x.f-fa)**2,0)/fo.length);const tg=nutTarget(k,'training')||{};const ul=P3UL[k];
+    return `${p3NL(k)}: food avg ${Math.round(fa*10)/10}${p3NU(k)} (day-to-day spread ±${Math.round(sd*10)/10}), supplements ${Math.round(sa*10)/10}${p3NU(k)}, target ${tg.lo||'-'}${tg.hi?'-'+tg.hi:''}${ul?`, safe limit ${ul.ul}${ul.supp?' from supplements only':''}`:''}`}).filter(Boolean).join('\n');
+  return base+`\n\nSupplements they take, per daily dose:\n${sl||'none'}\n\nLast ${days.length} logged days, food vs supplements (daily average):\n${split}`}})(p3AskCtx);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
