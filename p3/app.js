@@ -4216,6 +4216,17 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
 document.addEventListener('input',e=>{if(e.target.id==='p3askT')P3ASK.q=e.target.value});
 p3Koach=(function(old){return function(k){const bar=`<button type="button" class="p3askbar" data-p3ask="">${ico('sparkles')}<span class="p3askt">Ask Koach anything</span>${MIC}</button>`;const h=old(k);return /<\/div>$/.test(h)?h.replace(/<\/div>$/,bar+'</div>'):h+bar}})(p3Koach);
 microsHTML=(function(old){return function(t,dt,k){const h=old(t,dt,k);if(!h||!t||!t.n)return h;return h.replace(/<\/details>\s*$/,`<button type="button" class="linkbtn p3askv" data-p3ask="Am I over on any vitamins or minerals, and is there any risk from that?">Ask Koach about these ›</button></details>`)}})(microsHTML);
+// ================= P3: a nutrient's sheet shows where today's came from, and what to eat when short =================
+function p3SrcHTML(k){const n=NUTS.find(x=>x.k===k);if(!n)return '';const dk=iso(sel);const d=D()[dk]||{};const tg=nutTarget(k,dayTypeFor(dk))||{};
+  const rows=[];(d.food||[]).forEach(i=>{const v=k==='kcal'?kcalOf(i):(+i[k]||0);if(v>0)rows.push({name:i.name,v,meal:i.meal})});let su=[];try{su=suppItems(d)}catch(e){}su.forEach(i=>{const v=+i[k]||0;if(v>0)rows.push({name:i.name,v,sup:1})});
+  const tot=rows.reduce((a,r)=>a+r.v,0);rows.sort((a,b)=>b.v-a.v);const f=v=>v>=10?Math.round(v):Math.round(v*10)/10;
+  const top=rows.slice(0,5),rest=rows.slice(5).reduce((a,r)=>a+r.v,0);const u=n.u==='kcal'?' kcal':' '+n.u;
+  const row=(nm,v,tag)=>`<div class="p3srcR"><span>${esc(nm)}${tag?` <i>${tag}</i>`:''}</span><b>${f(v)}${u}</b><em style="width:${Math.max(4,Math.round(v/tot*100))}%"></em></div>`;
+  return `<section class="p1blk p3srcS"><h3>Where today's came from</h3>${rows.length?top.map(r=>row(r.name,r.v,r.sup?'supplement':r.meal)).join('')+(rest>0?row('Everything else',rest):''):`<p class="ds" style="margin:0">No ${esc(n.l)} logged today.</p>`}</section>`}
+p1NutInfo=(function(old){return function(k){old(k);const host=document.querySelector('#p1Host .p1sheet');if(!host)return;const n=NUTS.find(x=>x.k===k);const dk=iso(sel);const t=foodTotals(D()[dk]||{});const tg=nutTarget(k,dayTypeFor(dk))||{};
+  const head=host.querySelector('.kshead');if(head)head.insertAdjacentHTML('afterend',p3SrcHTML(k));
+  const v=t[k]||0;const f=x=>x>=10?Math.round(x):Math.round(x*10)/10;
+  host.querySelectorAll('.p1blk h3').forEach(h=>{if(h.textContent==='Foods that have it'){h.textContent=tg.lo&&v<tg.lo?`Short by ${f(tg.lo-v)} ${n.u}. Top up with`:tg.hi&&v>tg.hi&&!tg.lo?'Over today. It mostly comes from':'Where else to get it';const s=h.parentElement;const w=host.querySelector('.p3srcS');if(w&&s!==w.nextElementSibling)w.insertAdjacentElement('afterend',s)}})}})(p1NutInfo);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
