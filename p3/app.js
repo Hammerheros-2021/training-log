@@ -4176,6 +4176,46 @@ runVoice=(function(old){return async function(){const t=$('#v-text');const text=
   P3VM={meal,at:p3AtFor(meal),force:P3MP,words:/\b(breakfast|lunch|dinner|tea|supper|snack)\b/i.test(text)};
   try{return await old.apply(this,arguments)}finally{P3VM=null;P3MP=false}}})(runVoice);
 parseFoodPhoto=(function(old){return async function(){const meal=p3ShownMeal();P3VM={meal,at:p3AtFor(meal),force:true};try{return await old.apply(this,arguments)}finally{P3VM=null;P3MP=false}}})(parseFoodPhoto);
+// ================= P3: Ask Koach (type or talk a question; answers use your own numbers) =================
+let P3ASK={busy:false,q:''};
+function p3AskHist(){try{return JSON.parse(localStorage.getItem('p3ask_'+(UID||''))||'[]')}catch(e){return []}}
+function p3AskSave(h){try{localStorage.setItem('p3ask_'+(UID||''),JSON.stringify(h.slice(-12)))}catch(e){}}
+function p3AskCtx(){const t0=todayDate(),k=iso(t0);const dt=dayTypeFor(k);const d=D()[k]||{};const tt=foodTotals(d);const L7=[];
+  for(let i=1;i<=7;i++){const dd=D()[iso(addD(t0,-i))];if(dd&&(dd.food||[]).length)L7.push(foodTotals(dd))}
+  const line=x=>{const tg=x.macro?nutTarget(x.k,dt):{lo:x.lo,hi:x.hi};const v=Math.round(tt[x.k]||0);const av=L7.length?Math.round(L7.reduce((a,t)=>a+(+t[x.k]||0),0)/L7.length):null;
+    return `${x.l}: today ${v}${x.u}${tg&&tg.lo!=null?`, target ${tg.lo}${tg.hi?'-'+tg.hi:'+'}${x.u}`:''}${tg&&tg.hi&&v>tg.hi?' (OVER)':''}${av!=null?`, 7-day avg ${av}${x.u}`:''}`};
+  const sl=[1,2,3].map(i=>{const dd=D()[iso(addD(t0,-i+1))];const h=sleepHours(dd);return h!=null?h+'h':null}).filter(Boolean);
+  let su=[];try{su=suppItems(d).map(s=>s.name)}catch(e){}
+  const pl=planFor(t0);const foods=(d.food||[]).map(i=>`${i.meal} ${i.at||''}: ${i.name}${i.qty?' ('+i.qty+')':''}`).join('; ');
+  return `About them: ${typeof ABOUT!=='undefined'?ABOUT:''}. Eating approach: ${typeof APPROACH!=='undefined'?APPROACH:''}. Today is ${fmtD(t0,{weekday:'long',day:'numeric',month:'long'})}, a ${dt} day${pl&&!pl.pre?`, plan: ${TNAME[pl.type]}, week ${pl.wk} of 16`:''}.
+Food today: ${foods||'nothing logged yet'}.
+Supplements taken today: ${su.join(', ')||'none'}.
+Nutrients (today vs target, with 7-day average over ${L7.length} logged days):
+${NUTS.map(line).join('\n')}
+Sleep last nights: ${sl.join(', ')||'not logged'}.`}
+function p3AskHTML(){const h=p3AskHist();
+  return `<div class="p3ask"><div class="p3askin"><textarea id="p3askT" rows="2" placeholder="Ask anything, e.g. I'm over on some vitamins, is that a risk?">${esc(P3ASK.q||'')}</textarea></div>
+  <div class="p3askb">${typeof speakBtn==='function'?speakBtn('p3askT'):''}<button type="button" class="primary" id="p3askGo" ${P3ASK.busy?'disabled':''}>${P3ASK.busy?'Thinking…':'Ask'}</button></div>
+  <div class="p3askl">${h.slice().reverse().map(x=>`<div class="p3qa"><b>${esc(x.q)}</b><p>${esc(x.a).replace(/\n/g,'<br>')}</p><small>${esc(x.at||'')}</small></div>`).join('')}</div>
+  ${h.length?`<button type="button" class="linkbtn" id="p3askClr">Clear these</button>`:''}</div>`}
+function p3AskOpen(q){if(q!=null)P3ASK.q=q;p1Sheet(`<div class="kshead"><div><h2>Ask Koach</h2><small class="ds">Answers use your logged food, sleep and plan</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div><div id="p3askHost">${p3AskHTML()}</div>`);setTimeout(()=>{const t=$('#p3askT');if(t&&!q)t.focus()},80)}
+function p3AskDraw(){const h=$('#p3askHost');if(h)h.innerHTML=p3AskHTML()}
+async function p3AskGo(){const t=$('#p3askT');const q=(t&&t.value||'').trim();if(!q){toast('Type or say your question first');return}try{stopListen()}catch(e){}
+  P3ASK={busy:true,q};p3AskDraw();const hist=p3AskHist().slice(-4).map(x=>`Q: ${x.q}\nA: ${x.a}`).join('\n\n');
+  try{const out=await sample.json(`You are Koach, a friendly, plain-spoken coach in a training and food app. Answer ${userName()||'the user'}'s question using their own numbers below. Speak to them directly by first name now and then.
+Rules: plain words for a non-expert; short (under 120 words unless they ask for detail); be specific to their numbers; say clearly when something is fine and when it's worth acting on. For supplements or vitamins over target, separate the ones that matter (e.g. vitamin A, D, iron, zinc, selenium, B6 at high doses over time, especially from supplements) from ones that don't (water-soluble ones like vitamin C or B12 from food). Never diagnose; if something could be a medical issue, say to check with their GP or pharmacist. If the data isn't there to answer, say what to log.
+${p3AskCtx()}
+${hist?'Earlier in this chat:\n'+hist+'\n':''}Question: ${q}
+Reply as JSON: {"answer":"..."}`,{maxTokens:1500});
+    const a=String(out&&out.answer||'').trim()||'Sorry, I could not answer that. Try asking another way.';const h=p3AskHist();const n=new Date();h.push({q,a,at:fmtD(n,{day:'numeric',month:'short'})+' '+fmtT(n.getHours()*60+n.getMinutes())});p3AskSave(h);P3ASK={busy:false,q:''}}
+  catch(e){P3ASK={busy:false,q};toast(foodErr(e),5000)}p3AskDraw()}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p3ask]')){e.preventDefault();e.stopImmediatePropagation();p3AskOpen(x.dataset.p3ask||null);return}
+  if(c('#p3askGo')){p3AskGo();return}
+  if(c('#p3askClr')){p3AskSave([]);p3AskDraw()}},true);
+document.addEventListener('input',e=>{if(e.target.id==='p3askT')P3ASK.q=e.target.value});
+p3Koach=(function(old){return function(k){return old(k)+`<button type="button" class="p3askbar" data-p3ask="">${ico('sparkles')}<span>Ask Koach anything</span>${MIC}</button>`}})(p3Koach);
+microsHTML=(function(old){return function(t,dt,k){const h=old(t,dt,k);if(!h||!t||!t.n)return h;return h.replace(/<\/details>\s*$/,`<button type="button" class="linkbtn p3askv" data-p3ask="Am I over on any vitamins or minerals, and is there any risk from that?">Ask Koach about these ›</button></details>`)}})(microsHTML);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
