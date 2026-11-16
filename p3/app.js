@@ -2342,7 +2342,7 @@ const p1Now=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+
 const p1Ago=m=>{const n=new Date(Date.now()-m*60000);return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
 const p1Min=t=>{const m=/^(\d{1,2}):(\d{2})/.exec(t||'');return m?+m[1]*60+ +m[2]:null};
 function p1MealFor(t){const m=p1Min(t);if(m==null)return guessMeal();return m<630?'Breakfast':m<870?'Lunch':m<1050?'Snack':m<1290?'Dinner':'Snack'}
-function p1WhenHTML(name,val){const opts=[['now','Now'],['30','30 min ago'],['60','1 h ago'],['120','2 h ago']];
+function p1WhenHTML(name,val){const opts=[['now','Now'],['60','1 h ago'],['120','2 h ago'],['180','3 h ago']];
   return `<div class="p1when"><span class="label">When</span><div class="p1wopts">${opts.map(([v,l])=>`<button type="button" data-p1when="${name}" data-v="${v}" aria-pressed="${(!val&&v==='now')}">${l}</button>`).join('')}<input type="time" data-p1whent="${name}" value="${esc(val||'')}" aria-label="Pick a time"></div></div>`}
 
 // ---------- 1. no more jumping: keep scroll and open sections when the same screen redraws ----------
@@ -3684,10 +3684,14 @@ const _p3DD=p1DrinksDraw;p1DrinksDraw=function(){_p3DD();const host=document.que
     const det=document.createElement('details');det.className='p3more';if(P1C.type)det.open=true;det.innerHTML=`<summary>${us.length?'Something else':'Add a coffee or tea'}</summary>`;keep.forEach(x=>det.appendChild(x));
     const row=document.createElement('div');row.className='p3us';row.innerHTML=us.map((x,i)=>`<button type="button" data-p3us="${i}">${p3Pic(x.name,26)}<span>+ ${esc(x.name)}</span></button>`).join('');
     h3.insertAdjacentElement('afterend',det);if(us.length)h3.insertAdjacentElement('afterend',row);P3US=us}
+  if(cof){if(!cof.querySelector('.p1when')){const tmp=document.createElement('div');tmp.innerHTML=p1WhenHTML('cof',P1C.at);const det0=cof.querySelector('details.p3more');if(det0)det0.appendChild(tmp.firstElementChild)}
+    cof.querySelectorAll('.p1cafi').forEach(r=>{const sp=r.querySelector('span');const del=r.querySelector('[data-del-food]');if(sp&&del&&!r.querySelector('input')){sp.outerHTML=`<input type="time" class="p3cft" data-p3cft="${del.dataset.delFood}" value="${esc(sp.textContent)}" aria-label="Change time">`}});
+    const w=cof.querySelector('details.p3more .p1when');if(w){w.classList.add('p3cofwhen');const lb=w.querySelector('.label');if(lb)lb.textContent='Had it';(cof.querySelector('.p3us')||cof.querySelector('details.p3more')).insertAdjacentElement('beforebegin',w)}}
   if(alc&&alc.tagName!=='DETAILS'&&!alc.dataset.p3f){alc.dataset.p3f='1';const h3=alc.querySelector('h3');const det=document.createElement('details');det.className='p3more p3alc';det.innerHTML=`<summary>${h3?h3.innerHTML:'Alcohol'}</summary>`;[...alc.children].filter(x=>x!==h3).forEach(x=>det.appendChild(x));if(h3)h3.remove();alc.appendChild(det)}};
 let P3US=[];
 document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-p3us]');if(!b)return;const x=P3US[+b.dataset.p3us];if(!x)return;const n=new Date();
-  const it=clone(x);delete it.planRef;it.at=fmtT(n.getHours()*60+n.getMinutes());it.meal=guessMeal();sel=todayDate();await addFood([it],iso(todayDate()));toast('Logged '+x.name);p1DrinksDraw()});
+  const it=clone(x);delete it.planRef;it.at=P1C.at||fmtT(n.getHours()*60+n.getMinutes());it.meal=p1MealFor(it.at);sel=todayDate();await addFood([it],iso(todayDate()));toast(`Logged ${x.name} at ${it.at}`);P1C.at=null;p1DrinksDraw()});
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||t.dataset.p3cft==null||!t.value)return;const k=iso(todayDate());const food=clone((days[k]||{}).food||[]);const it=food[+t.dataset.p3cft];if(!it)return;it.at=t.value;it.meal=p1MealFor(t.value);await persistDay(k,{food});toast('Time changed to '+t.value);p1DrinksDraw()});
 // Recover: each group folds
 const P3RO=new Set();
 function p3RecFold(){if(tab()!=='recover')return;document.querySelectorAll('#app .rcat:not(.p3rf)').forEach(r=>{const h=r.querySelector('h3'),l=r.querySelector('.rprogs');if(!h||!l)return;const name=h.textContent.trim();const n=l.children.length;
