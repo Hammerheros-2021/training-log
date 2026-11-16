@@ -4160,6 +4160,18 @@ function p3TimeFix(v,final){v=String(v||'').replace(/[.,;\s]/g,':').replace(/:+/
 window.addEventListener('input',e=>{const el=e.target;if(!p3IsTime(el))return;const v=p3TimeFix(el.value,false);if(v!==el.value)el.value=v},true);
 window.addEventListener('focusout',e=>{const el=e.target;if(!p3IsTime(el))return;const v=p3TimeFix(el.value,true);if(v!==el.value){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}))}},true);
 new MutationObserver(()=>{document.querySelectorAll('input[inputmode="numeric"]').forEach(el=>{if(p3IsTime(el))el.setAttribute('inputmode','decimal')})}).observe(document.documentElement,{childList:true,subtree:true});
+// ================= P3: the meal you pick is the meal it goes to; no When row =================
+foodActionsHTML=function(dIso){let h=_p1foodActions(dIso);if(!h)return h;const m=h.match(/<div class="mealpick">[\s\S]*?<\/div>/);if(!m)return h;h=h.replace(m[0],'');const i=h.indexOf('>')+1;return h.slice(0,i)+m[0].replace('class="mealpick"','class="mealpick p3mfirst"')+h.slice(i)};
+let P3MP=false,P3VM=null;
+window.addEventListener('click',e=>{const s=e.target.closest&&e.target.closest('[data-form="f"][data-v]');if(s&&MEALS.includes(s.dataset.v)){P3MP=true;fState.at=null}},true);
+function p3ShownMeal(){return fState.meal||(iso(sel)===iso(todayDate())?guessMeal():'Dinner')}
+function p3AtFor(meal){const today=iso(sel)===iso(todayDate());if(!today)return MEAL_T[meal];const n=new Date(),nm=n.getHours()*60+n.getMinutes();if(meal===guessMeal())return fmtT(nm);const t=tmin(MEAL_T[meal]);return t!=null&&t<nm?MEAL_T[meal]:fmtT(nm)}
+cleanItems=(function(old){return function(arr,meal,est,src){const out=old(arr,meal,est,src);if(!P3VM||(src!=='voice'&&src!=='photo'))return out;
+  return out.map(i=>P3VM.force||!P3VM.words?{...i,meal:P3VM.meal,at:P3VM.at}:i)}})(cleanItems);
+runVoice=(function(old){return async function(){const t=$('#v-text');const text=(t&&t.value||'');const meal=p3ShownMeal();
+  P3VM={meal,at:p3AtFor(meal),force:P3MP,words:/\b(breakfast|lunch|dinner|tea|supper|snack)\b/i.test(text)};
+  try{return await old.apply(this,arguments)}finally{P3VM=null;P3MP=false}}})(runVoice);
+parseFoodPhoto=(function(old){return async function(){const meal=p3ShownMeal();P3VM={meal,at:p3AtFor(meal),force:true};try{return await old.apply(this,arguments)}finally{P3VM=null;P3MP=false}}})(parseFoodPhoto);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
