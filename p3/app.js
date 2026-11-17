@@ -4302,6 +4302,23 @@ p3AskCtx=(function(old){return function(){const base=old();const t0=todayDate();
     const sd=Math.sqrt(fo.reduce((a,x)=>a+(x.f-fa)**2,0)/fo.length);const tg=nutTarget(k,'training')||{};const ul=P3UL[k];
     return `${p3NL(k)}: food avg ${Math.round(fa*10)/10}${p3NU(k)} (day-to-day spread ±${Math.round(sd*10)/10}), supplements ${Math.round(sa*10)/10}${p3NU(k)}, target ${tg.lo||'-'}${tg.hi?'-'+tg.hi:''}${ul?`, safe limit ${ul.ul}${ul.supp?' from supplements only':''}`:''}`}).filter(Boolean).join('\n');
   return base+`\n\nSupplements they take, per daily dose:\n${sl||'none'}\n\nLast ${days.length} logged days, food vs supplements (daily average):\n${split}`}})(p3AskCtx);
+// ================= P3: known supplements fill themselves; flag ones with nothing counted =================
+const P3KNOWN=[[/\b(sis|science in sport)\b|go hydro/i,{name:'SiS GO Hydro tablet',dose:'1 tablet',nut:{sodium:345,calcium:102,potassium:65,magnesium:8.1,zinc:1.3,kcal:9}}]];
+function p3SuppNut(s){const has=s.nut&&Object.keys(s.nut).some(k=>+s.nut[k]>0);if(has)return s.nut;const m=P3KNOWN.find(([re])=>re.test(s.name||''));return m?m[1].nut:(s.nut||{})}
+suppItems=function(d){if(!d||!d.date)return [];return supps().filter(s=>d.date<=iso(todayDate())&&p3Took(d,s)).map(s=>Object.assign({name:s.name},p3SuppNut(s)))};
+const P3NONUT=/creatine|collagen|protein|caffeine|ashwagandha|probiotic|melatonin|beta.?alanine|glutamine|bcaa|turmeric/i;
+function p3SuppEmpty(s){return !P3NONUT.test(s.name||'')&&!Object.keys(p3SuppNut(s)).some(k=>+p3SuppNut(s)[k]>0)}
+async function p3SuppLookup(id){const s=supps().find(z=>String(z.id)===id);if(!s)return;toast('Looking up '+s.name+'…');
+  try{const out=await sample.json(`A person takes this supplement: "${String(s.name).slice(0,80)}"${s.dose?`, dose "${s.dose}"`:''}. Give the nutrients in ONE daily dose from the product's real label, using these keys and units: ${P3SK().join(', ')} (sodium, potassium, magnesium, calcium, iron, zinc, choline, vitC in mg; selenium, iodine, vitA, vitD, vitK, b12, folate in µg; omega3 in g), plus "kcal" if any. Leave out anything not in it. If you don't know the product, give the typical contents for that kind of product.
+Reply with ONLY JSON: {"dose":"","nut":{}}`,{maxTokens:800});
+    const n={};Object.keys((out&&out.nut)||{}).forEach(k=>{if(NK.includes(k)&&isNum(out.nut[k])&&+out.nut[k]>0)n[k]=+out.nut[k]});if(!Object.keys(n).length)throw new Error('Could not find it. Add a photo or screenshot of the label instead.');
+    await p3SuppSave(l=>{const z=l.find(x=>String(x.id)===id);if(z){z.nut=n;if(out.dose&&!z.dose)z.dose=String(out.dose).slice(0,40);z.src='lookup'}},true);toast('Filled in '+s.name);render()}
+  catch(e){toast(foodErr(e),5000)}}
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3slook]');if(x){e.preventDefault();p3SuppLookup(x.dataset.p3slook)}});
+p3SuppCard=(function(old){return function(s){let h=old(Object.assign({},s,{nut:p3SuppNut(s)}));if(p3SuppEmpty(s))h=h.replace('<div class="p3sg">',`<div class="p3empty"><b>Nothing is being counted from this yet.</b><span>Add a photo or screenshot of the label, or let Koach look it up.</span><button type="button" class="primary" data-p3slook="${esc(String(s.id))}">Look it up</button></div><div class="p3sg">`);
+  else if(!(s.nut&&Object.keys(s.nut).some(k=>+s.nut[k]>0)))h=h.replace(/<small>[^<]*<\/small>/,'<small>Standard label values</small>');
+  if(s.src==='lookup')h=h.replace(/<small>[^<]*<\/small>/,'<small>Looked up. Add a photo of the label to make it exact.</small>');return h}})(p3SuppCard);
+suppHTML=(function(old){return function(k){const h=old(k);const em=supps().filter(p3SuppEmpty);if(!em.length)return h;return h.replace('<div class="sbtns">',`<button type="button" class="p3swarn" data-p3sopen>${em.map(s=>esc(s.name)).join(', ')}: nothing counted yet. Tap to fill in ›</button><div class="sbtns">`)}})(suppHTML);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
