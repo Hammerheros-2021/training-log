@@ -4263,10 +4263,12 @@ nutBar=(function(old){return function(n,val,tg){const h=old(n,val,tg);const u=P3
 function p3ULfreq(k){const t0=todayDate();let n7=0,o7=0,n14=0,o14=0;for(let i=0;i<14;i++){const d=D()[iso(addD(t0,-i))];if(!d||!((d.food||[]).length||(()=>{try{return suppItems(d).length}catch(e){return 0}})()))continue;const over=p3ULval(k,d)>P3UL[k].ul;n14++;if(over)o14++;if(i<7){n7++;if(over)o7++}}return {n7,o7,n14,o14}}
 function p3ULrisks(){return Object.keys(P3UL).map(k=>({k,...p3ULfreq(k)})).filter(r=>r.o7>=3||r.o14>=5).sort((a,b)=>b.o14-a.o14)}
 p3Koach=(function(old){return function(k){const h=old(k);let rs=[];try{rs=p3ULrisks().slice(0,2)}catch(e){}if(!rs.length)return h;
-  const al=rs.map(r=>{const n=NUTS.find(x=>x.k===r.k);return `<button type="button" class="p3ulal" data-nutinfo="${r.k}"><span class="p3ulic">!</span><span><b>${esc(n.l)} over the safe limit ${r.o7>=3?`${r.o7} of the last ${r.n7} days`:`${r.o14} of the last ${r.n14} days`}</b><small>${P3UL[r.k].supp?'From supplements. ':''}Tap to see where it's coming from</small></span><i aria-hidden="true">›</i></button>`}).join('');
+  const al='<div class="p3ulrow">'+rs.map(r=>{const n=NUTS.find(x=>x.k===r.k);return `<button type="button" class="p3ulchip" data-nutinfo="${r.k}" data-p3ul14="1"><span class="p3ulic">!</span>${esc(n.l)} high · ${r.o7>=3?`${r.o7}/${r.n7}`:`${r.o14}/${r.n14}`} days</button>`}).join('')+'</div>';
+  const chips=al.replace('<div class="p3ulrow">','').replace(/<\/div>$/,'');
+  if(h.includes('<div class="p3chips">'))return h.replace('<div class="p3chips">','<div class="p3chips">'+chips);
   return h.includes('class="p3askbar"')?h.replace('<button type="button" class="p3askbar"',al+'<button type="button" class="p3askbar"'):h+al}})(p3Koach);
 p1NutInfo=(function(old){return function(k){old(k);if(!P3UL[k])return;const host=document.querySelector('#p1Host .p1sheet');if(!host)return;const r=p3ULfreq(k);if(!r.n14)return;
-  const msg=r.o14===0?`Under the safe limit every day you've logged in the last 2 weeks.`:(r.o7>=3||r.o14>=5)?`Over the safe limit on <b>${r.o14} of the last ${r.n14} days</b> you logged. That's often enough to be worth changing: look at where it comes from above, and check supplements first.`:`Over the safe limit on ${r.o14} of the last ${r.n14} days you logged. Now and then is fine; Koach will tell you on Today if it becomes a habit.`;
+  const msg=r.o14===0?`Under the safe limit every day you've logged in the last 2 weeks.`:(r.o7>=3||r.o14>=5)?`Over the safe limit on <b>${r.o14} of the last ${r.n14} days</b> you logged. That's often enough to be worth acting on. See what's behind it below.`:`Over the safe limit on ${r.o14} of the last ${r.n14} days you logged. Now and then is fine. Koach will flag it on Today if it becomes a habit.`;
   const s=host.querySelector('.p3ul');const blk=`<p class="p3ulf">${msg}</p>`;if(s)s.insertAdjacentHTML('beforeend',blk);else{const a=host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',`<section class="p1blk p3ul ${r.o14?'mid':'ok'}"><h3>Last 2 weeks</h3>${blk}</section>`)}}})(p1NutInfo);
 // ================= P3: see and fix exactly what's in each supplement; Koach gives a straight answer =================
 const P3SK=()=>MICRO.filter(x=>x!=='caffeine');
@@ -4319,6 +4321,25 @@ p3SuppCard=(function(old){return function(s){let h=old(Object.assign({},s,{nut:p
   else if(!(s.nut&&Object.keys(s.nut).some(k=>+s.nut[k]>0)))h=h.replace(/<small>[^<]*<\/small>/,'<small>Standard label values</small>');
   if(s.src==='lookup')h=h.replace(/<small>[^<]*<\/small>/,'<small>Looked up. Add a photo of the label to make it exact.</small>');return h}})(p3SuppCard);
 suppHTML=(function(old){return function(k){const h=old(k);const em=supps().filter(p3SuppEmpty);if(!em.length)return h;return h.replace('<div class="sbtns">',`<button type="button" class="p3swarn" data-p3sopen>${em.map(s=>esc(s.name)).join(', ')}: nothing counted yet. Tap to fill in ›</button><div class="sbtns">`)}})(suppHTML);
+// ================= P3: 2-week sources behind a high nutrient; clearer food wording =================
+function p3Src14(k){const t0=todayDate(),u=P3UL[k];const by={};let od=0;
+  for(let i=0;i<14;i++){const d=D()[iso(addD(t0,-i))];if(!d)continue;let su=[];try{su=suppItems(d)}catch(e){}if(!((d.food||[]).length||su.length))continue;if(!(p3ULval(k,d)>u.ul))continue;od++;
+    const seen={};const add=(nm,v,sup)=>{if(!(v>0))return;const key=(sup?'s:':'f:')+String(nm).toLowerCase().replace(/\s+/g,' ').trim();const r=by[key]||(by[key]={nm,sup,tot:0,days:0});r.tot+=v;if(!seen[key]){seen[key]=1;r.days++}};
+    su.forEach(i=>add(i.name,+i[k]||0,1));if(!u.supp)(d.food||[]).forEach(i=>add(i.name,+i[k]||0,0))}
+  return {od,rows:Object.values(by).sort((a,b)=>b.tot-a.tot)}}
+p1NutInfo=(function(old){return function(k){old(k);const host=document.querySelector('#p1Host .p1sheet');const n=NUTS.find(x=>x.k===k);if(!host||!n)return;
+  const dk=iso(sel);const v=foodTotals(D()[dk]||{})[k]||0;const tg=nutTarget(k,dayTypeFor(dk))||{};const f=x=>x>=10?Math.round(x):Math.round(x*10)/10;
+  host.querySelectorAll('.p1blk h3').forEach(h=>{const s=h.parentElement;const t=h.textContent;if(!/Top up with|Where else to get it|mostly comes from|Foods that have it/.test(t))return;
+    const highNow=(P3UL[k]&&!P3UL[k].supp&&p3ULval(k,D()[dk]||{})>P3UL[k].ul)||(tg.hi&&v>tg.hi);
+    const suppHigh=P3UL[k]&&P3UL[k].supp&&p3ULval(k,D()[dk]||{})>P3UL[k].ul;
+    if(suppHigh){h.textContent=`Better from food (no limit on ${n.l.toLowerCase()} from food)`;return}
+    if(highNow){h.textContent=`Foods high in ${n.l.toLowerCase()}`;const p=s.querySelector('p');if(p&&!p.dataset.x){p.dataset.x=1;p.insertAdjacentHTML('afterend','<p class="ds" style="margin:6px 0 0;font-size:12px">Only worth cutting back on if you\'re over most days.</p>')}}
+    else if(tg.lo&&v>=tg.lo)s.remove()});
+  if(!P3UL[k])return;const r=p3ULfreq(k);if(!r.o14)return;const x=p3Src14(k);if(!x.rows.length)return;const u=P3UL[k];
+  const top=x.rows.slice(0,5);const lead=top[0];const verdict=lead.sup&&lead.days>=Math.ceil(x.od*0.7)?`Mostly <b>${esc(lead.nm)}</b>. It was there on ${lead.days} of the ${x.od} high days, so that's the one to change, not your food.`:
+    !lead.sup&&lead.days>=Math.ceil(x.od*0.5)?`Mostly from food. <b>${esc(lead.nm)}</b> comes up on ${lead.days} of the ${x.od} high days. If you eat it most days, that's your pattern; if not, it was a run of it.`:`No single cause. It's a mix of the things below.`;
+  const html=`<section class="p1blk p3src14"><h3>What's behind it (last 2 weeks)</h3><p style="margin:0 0 8px">${verdict}</p>${top.map(z=>`<div class="p3srcR"><span>${esc(z.nm)}${z.sup?' <i>supplement</i>':''}</span><b>${z.days} of ${x.od} days · ${f(z.tot/z.days)} ${n.u}</b><em style="width:${Math.max(4,Math.round(z.tot/x.rows.reduce((a,q)=>a+q.tot,0)*100))}%"></em></div>`).join('')}<p class="ds" style="margin:6px 0 0;font-size:12px">Amounts are per day it was eaten or taken${u.supp?'. The limit for this one only counts supplements':''}.</p></section>`;
+  const a=host.querySelector('.p3ul')||host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',html)}})(p1NutInfo);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
