@@ -4040,7 +4040,7 @@ function p3HaveScore(m,kit){const its=p3Items(m.items).map(i=>i.name.toLowerCase
 function p3LocalPlan(dlist){const L=p3Lib();const kit=kitchen().map(x=>String(x.name).toLowerCase());const recent=new Set();for(let i=1;i<=7;i++){const d=D()[iso(addD(todayDate(),-i))];(d&&d.food||[]).forEach(x=>recent.add(String(x.name).toLowerCase()))}
   const nm=+((meta.settings||{}).meals)||3;const ex=p3Excl();const used=new Map();const days=[];let seed=Date.now()%1e6;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
   dlist.forEach(dl=>{const T=dl.targets;const slots=nm<=2?['b','d']:nm>=4?['b','l','s','d']:['b','l','d','s'];const pick={};let best=null;
-    for(let tries=0;tries<400;tries++){const combo=slots.map(s=>{const pool=L.filter(m=>m.slots.includes(s)||(s==='l'&&m.slots.includes('d'))||(s==='d'&&m.slots.includes('l')));return pool[Math.floor(rnd()*pool.length)]});if(combo.some(x=>!x))continue;
+    for(let tries=0;tries<400;tries++){const combo=slots.map(s=>{const pool=L.filter(m=>(m.slots.includes(s)||(s==='l'&&m.slots.includes('d'))||(s==='d'&&m.slots.includes('l')))&&p3FitsDay(m,dl));return pool[Math.floor(rnd()*pool.length)]});if(combo.some(x=>!x))continue;
       const names=combo.map(c=>c.name);if(new Set(names).size<names.length)continue;const tot=combo.reduce((a,c)=>({kcal:a.kcal+c.kcal,protein:a.protein+c.protein,carbs:a.carbs+c.carbs}),{kcal:0,protein:0,carbs:0});
       const scale=Math.max(.75,Math.min(1.35,T.kcal/tot.kcal));const p=tot.protein*scale,c=tot.carbs*scale;
       let sc=Math.abs(p-T.protein_g)/T.protein_g*2+(c>T.net_carbs_max_g?(c-T.net_carbs_max_g)/T.net_carbs_max_g*(ex.keto?4:1.5):0)+Math.abs(scale-1)*.6;
@@ -4073,7 +4073,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.c
   const pick=L[Math.floor(Math.random()*L.length)];const k2=m.kcal&&pick.kcal?m.kcal/pick.kcal:1;const r=v=>Math.round(v*k2);
   d.meals[+ix]={...m,name:pick.name,items:p3Items(pick.items),method:pick.method,prep:pick.prep,kcal:r(pick.kcal),protein:r(pick.protein),carbs:r(pick.carbs),fat:r(pick.fat),fibre:r(pick.fibre),plants:[]};
   await persistMeta('plan',p);render();toast('Swapped for '+pick.name);p3Enrich()},true);
-const _p3PicsSwap=p3PicsPhotos;p3PicsPhotos=function(){_p3PicsSwap();document.querySelectorAll('details.pm:not(.minor) .pmbody:not(.p3sw)').forEach(b=>{b.classList.add('p3sw');const pm=b.closest('details.pm');const ate=pm.querySelector('[data-ate]');const key=(ate&&ate.dataset.ate)||'';const ms=(pm.dataset.ms||'').replace(/^p/,'');const k=ms.split(':')[0],ix=ms.split(':')[1];if(!k)return;
+const _p3PicsSwap=p3PicsPhotos;p3PicsPhotos=function(){_p3PicsSwap();document.querySelectorAll('details.pm:not(.minor) .pmbody:not(.p3swd)').forEach(b=>{b.classList.add('p3swd');const pm=b.closest('details.pm');const ate=pm.querySelector('[data-ate]');const key=(ate&&ate.dataset.ate)||'';const ms=(pm.dataset.ms||'').replace(/^p/,'');const k=ms.split(':')[0],ix=ms.split(':')[1];if(!k)return;
   const a=b.querySelector('.pma')||Object.assign(document.createElement('div'),{className:'pma'});if(!a.parentNode)b.appendChild(a);a.insertAdjacentHTML('beforeend',`<button type="button" class="ghost" data-p3swap="${k}:${ix}">Swap</button>`)})};
 
 // P3: meal plans are instant now, so the old server polling is switched off here
@@ -4382,6 +4382,17 @@ p1NutInfo=(function(old){return function(k){old(k);const host=document.querySele
     if(pattern&&!P3UL[k].supp)h.textContent=`Foods high in ${n.l.toLowerCase()} (ease off these if it keeps happening)`;
     else if(pattern&&P3UL[k].supp)h.textContent=`Better from food: no limit on ${n.l.toLowerCase()} from food`;
     else if(tg.lo&&v<tg.lo)h.textContent=`Low so far today (${f(v)} of ${tg.lo} ${n.u}). Foods that have it`});}})(p1NutInfo);
+// ================= P3: meal plan follows the training plan =================
+function p3FitsDay(m,dl){const n=String(m.name||'').toLowerCase();const train=dl.session&&!/^rest$/i.test(dl.session);
+  if(/post.?(game|match)|match.?day|pre.?match/.test(n))return dl.dayType==='match';if(/post.?(training|run|session)|pre.?(training|session)/.test(n))return !!train;return true}
+function p3PlanDayFor(k){const d=parse(k),pl=planFor(d),dt=dayTypeFor(k);const T=DAYT[dt];return {date:k,dayType:dt,session:pl&&pl.type!=='R'&&dt!=='rest'?`${TNAME[pl.type]} at ${trainTimeFor(k)}`:(dt==='match'?'Match day':'Rest'),targets:{kcal:T.kcal,protein_g:T.protein,net_carbs_max_g:T.carbs,fat_g:T.fat}}}
+let P3PSYNC=0;
+async function p3PlanSync(){const p=meta.plan;if(!p||!p.days||sampleMode||P3PSYNC)return;const today=iso(todayDate());
+  const stale=p.days.filter(pd=>pd.date>today||(pd.date===today&&!(D()[today]&&(D()[today].food||[]).length))).map(pd=>{const want=p3PlanDayFor(pd.date);const sess=want.session&&!/^rest$/i.test(want.session)?want.session:'Rest';return (pd.dayType!==want.dayType||String(pd.session||'Rest')!==sess||(pd.meals||[]).some(m=>!p3FitsDay(m,want)))?want:null}).filter(Boolean);
+  if(!stale.length)return;P3PSYNC=1;let out;try{out=p3LocalPlan(stale)}catch(e){P3PSYNC=0;return}const cur=clone(p);
+  out.days.forEach(nd=>{const i=cur.days.findIndex(x=>x.date===nd.date);if(i>=0)cur.days[i]=nd});await persistMeta('plan',cur);P3PSYNC=0;
+  toast(`Meal plan updated for ${stale.map(x=>fmtD(parse(x.date),{weekday:'long'})).join(', ')} to match your training.`,4500);if(tab()==='food')render();try{p3Enrich()}catch(e){}}
+planHTML=(function(old){return function(){setTimeout(p3PlanSync,0);return old()}})(planHTML);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
