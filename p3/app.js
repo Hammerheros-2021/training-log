@@ -4209,6 +4209,7 @@ How to answer, like a good coach who has looked at their numbers:
 2. Then a clear recommendation they can act on today, naming the actual supplement and amounts: drop it, take it every other day, halve it, or keep it. Show the sum: "Vitals Plus gives you 15 mg zinc, food gives about 12 mg, so you're at 27 against a 25 mg safe limit. Drop to every second day and you average 19 mg."
 3. Say what changing it would leave them short on, using their food averages, and the 1-2 foods that would cover it.
 4. Judge how steady the data is: if fewer than 5 days are logged, or the food numbers swing a lot day to day, say so and give the call anyway with how long to keep watching (e.g. "log another week before changing, but lean towards dropping it").
+4b. When a supplement with lots of things in it is the cause (a multivitamin like Vitals Plus), go through what else it gives them. Using their food averages, name which nutrients would drop below target if they stopped it, by how much, and which would still be fine. Then make the call: drop it, every second day, or swap to a single-nutrient product for the one they actually need.
 5. Separate what matters (vitamin A as retinol, vitamin D, iron, zinc, selenium, iodine, magnesium and folic acid from supplements) from what doesn't (vitamin C, B12, potassium and most things from food).
 Be direct and specific. Do not tell them to "look at it" or "talk to your GP" as a way of not answering. Only mention a GP or pharmacist for real warning signs, a medicine they take, or a diagnosed condition, and still give your view. Never diagnose. If a supplement's contents are only estimated, say so in one short phrase and suggest snapping the label in Food > Supplements > What's in them.
 Plain words, no jargon; under 170 words unless they ask for more.
@@ -4340,6 +4341,47 @@ p1NutInfo=(function(old){return function(k){old(k);const host=document.querySele
     !lead.sup&&lead.days>=Math.ceil(x.od*0.5)?`Mostly from food. <b>${esc(lead.nm)}</b> comes up on ${lead.days} of the ${x.od} high days. If you eat it most days, that's your pattern; if not, it was a run of it.`:`No single cause. It's a mix of the things below.`;
   const html=`<section class="p1blk p3src14"><h3>What's behind it (last 2 weeks)</h3><p style="margin:0 0 8px">${verdict}</p>${top.map(z=>`<div class="p3srcR"><span>${esc(z.nm)}${z.sup?' <i>supplement</i>':''}</span><b>${z.days} of ${x.od} days · ${f(z.tot/z.days)} ${n.u}</b><em style="width:${Math.max(4,Math.round(z.tot/x.rows.reduce((a,q)=>a+q.tot,0)*100))}%"></em></div>`).join('')}<p class="ds" style="margin:6px 0 0;font-size:12px">Amounts are per day it was eaten or taken${u.supp?'. The limit for this one only counts supplements':''}.</p></section>`;
   const a=host.querySelector('.p3ul')||host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',html)}})(p1NutInfo);
+// ================= P3: Today reorganised; 5 stars = 5 things you log =================
+function p3Log5(k){const d=D()[k]||{};const meals=new Set((d.food||[]).map(i=>i.meal).filter(m=>m&&m!=='Snack'));const w=+d.water||0;let wt=2;try{wt=p1WaterTarget().lo||2}catch(e){}
+  return [{id:'ci',l:'Check in',ic:'sun',done:!!(d.sleepQ||d.energy||d.bed),a:'data-p1tile="ci"'},
+   {id:'food',l:meals.size>=2?'Meals':'2+ meals',ic:'utensils',done:meals.size>=2,a:'data-p3ring="food"'},
+   {id:'water',l:'Water',ic:'droplet',done:w>=wt,a:'data-p3ring="drinks"'},
+   {id:'move',l:'Session',ic:'footprints',done:!!(L()[k]||(d.recovery||[]).length||(d.extras||[]).length),a:'data-p1tile="move"'},
+   {id:'phone',l:'Phone away',ic:'moon',done:habDone('phone',k),a:'data-p3phone'}]}
+p2Habits=function(k){if(sampleMode)return '';const it=p3Log5(k);const n=it.filter(x=>x.done).length;
+  return `<section class="card p3l5"><div class="p3l5h"><span class="p3l5s">${p3StarRow(n,5,110)}</span><b>${n>=5?'All 5 logged':`${n} of 5 logged`}</b></div>
+  <div class="p3l5r">${it.map(x=>`<button type="button" class="p3l5b${x.done?' on':''}" ${x.a} aria-pressed="${x.done}"><span class="p3l5i">${ico(x.done?'check':x.ic)}</span><span>${esc(x.l)}</span></button>`).join('')}</div></section>`};
+window.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3phone]');if(!x)return;e.stopImmediatePropagation();const k=iso(todayDate());const d=D()[k]||{};const l=(d.hab||[]).slice();const i=l.indexOf('phone');
+  if(i>=0)l.splice(i,1);else{if(habDone('phone',k)){toast('Already counted from your bedtime log');return}l.push('phone')}try{navigator.vibrate&&navigator.vibrate(12)}catch(z){}days[k]={...(days[k]||{date:k}),hab:l};persistDay(k,{hab:l});render()},true);
+p3Today=function(k,s){const tpl=document.createElement('template');tpl.innerHTML=p3Koach(k);const ch=tpl.content.querySelector('.p3chips');const ask=tpl.content.querySelector('.p3askbar');const ul=tpl.content.querySelector('.p3ulrow');
+  const chips=[ch,ul].filter(Boolean).map(x=>x.innerHTML).join('');[ch,ask,ul].forEach(x=>x&&x.remove());const koach=tpl.innerHTML;
+  return p1Top()+koach+injuryBanner()+p3Rings(k,s)+p3Tiles()+(chips?`<div class="p3chips p3chips2">${chips}</div>`:'')+p3SCToday()+p2Habits(k)+(ask?ask.outerHTML:'')};
+// ================= P3: what dropping a supplement would really do; clearer food heading =================
+function p3DropImpact(sid){const s=supps().find(z=>String(z.id)===String(sid));if(!s)return null;const S=p3SuppNut(s);const t0=todayDate();const days=[];
+  for(let i=0;i<14&&days.length<7;i++){const d=D()[iso(addD(t0,-i))];if(d&&(d.food||[]).length)days.push(d)}if(!days.length)return {s,n:0,rows:[]};
+  const ks=Object.keys(S).filter(k=>+S[k]>0&&NUTS.find(x=>x.k===k)&&k!=='kcal');const rows=ks.map(k=>{let F=0,O=0,T=0;days.forEach(d=>{let su=[];try{su=suppItems(d)}catch(e){}const sAll=su.reduce((a,i)=>a+(+i[k]||0),0);const tk=p3Took(d,s);F+=(foodTotals(d)[k]||0)-sAll;O+=sAll-(tk?+S[k]:0);T+=tk?1:0});
+    F/=days.length;O/=days.length;const p=T/days.length;const tg=nutTarget(k,'training')||{};const u=P3UL[k];const withV=F+O+(+S[k])*p,without=F+O,alt=F+O+(+S[k])/2;
+    const lim=u?(u.supp?{w:O+(+S[k])*p,wo:O,alt:O+(+S[k])/2}:{w:withV,wo:without,alt}):null;
+    return {k,l:p3NL(k),u:p3NU(k),dose:+S[k],food:F,withV,without,alt,lo:tg.lo,ul:u?u.ul:null,over:lim&&lim.w>u.ul,overAlt:lim&&lim.alt>u.ul,overWo:lim&&lim.wo>u.ul,short:tg.lo&&without<tg.lo&&withV>=tg.lo*0.9,stillShort:tg.lo&&withV<tg.lo*0.9}});
+  return {s,n:days.length,rows}}
+function p3DropHTML(sid){const r=p3DropImpact(sid);if(!r||!r.rows.length)return '';const f=x=>x>=10?Math.round(x):Math.round(x*10)/10;const nm=esc(r.s.name);
+  if(!r.n)return `<div class="p3drop"><b>If you stop ${nm}</b><p>Log a few days of food first. Then this will show what you'd be short on without it.</p></div>`;
+  const over=r.rows.filter(x=>x.over),short=r.rows.filter(x=>x.short),keep=r.rows.filter(x=>x.stillShort);const imp=['vitD','iodine','b12','iron','folate','omega3','selenium'];
+  const altFixes=over.every(x=>!x.overAlt);const call=!over.length?`keep ${nm} as it is`:!short.length?`<b>drop ${nm}</b>`:short.some(x=>imp.includes(x.k))&&altFixes?`<b>take ${nm} every second day</b>`:`<b>drop ${nm}</b> and cover the gaps below with food`;
+  const li=a=>a.map(x=>`<li><b>${esc(x.l)}</b>: you'd average ${f(x.without)} of ${x.lo} ${x.u} (food gives ${f(x.food)} ${x.u})</li>`).join('');
+  return `<div class="p3drop"><b>If you stop ${nm}</b>
+   ${over.length?`<p>${over.map(x=>`${esc(x.l)} drops from ${f(x.withV)} to ${f(x.without)} ${x.u}, under the ${x.ul} ${x.u} limit`).join('. ')}.</p>`:''}
+   ${short.length?`<p>But going by your last ${r.n>1?r.n+' days':'day'} of food, you'd be short on:</p><ul>${li(short)}</ul>`:`<p>Going by your last ${r.n} days of food, you wouldn't be short on anything it gives you.</p>`}
+   ${keep.length?`<p class="ds">Already short even with it: ${keep.map(x=>esc(x.l)).join(', ')}.</p>`:''}
+   ${over.length&&short.length&&altFixes?`<p>Every second day instead: ${over.map(x=>`${esc(x.l)} ${f(x.alt)} ${x.u}`).join(', ')}, under the limit, and you keep half of the rest.</p>`:''}
+   <p class="p3call">Koach's call: ${call}.${r.n<5?` That's from only ${r.n} day${r.n>1?'s':''} of food, so watch another week before deciding for good.`:''}</p></div>`}
+p1NutInfo=(function(old){return function(k){old(k);const host=document.querySelector('#p1Host .p1sheet');const n=NUTS.find(x=>x.k===k);if(!host||!n)return;
+  const s14=host.querySelector('.p3src14');if(s14&&P3UL[k]){const x=p3Src14(k);const lead=x.rows[0];if(lead&&lead.sup){const sp=supps().find(z=>z.name===lead.nm);if(sp)s14.insertAdjacentHTML('beforeend',p3DropHTML(sp.id))}}
+  const r=P3UL[k]?p3ULfreq(k):{o14:0};const pattern=r.o14>0;const dk=iso(sel);const v=foodTotals(D()[dk]||{})[k]||0;const tg=nutTarget(k,dayTypeFor(dk))||{};const f=x=>x>=10?Math.round(x):Math.round(x*10)/10;
+  host.querySelectorAll('.p1blk h3').forEach(h=>{if(!/Top up with|Where else to get it|Foods that have it|Better from food|Foods high in/.test(h.textContent))return;
+    if(pattern&&!P3UL[k].supp)h.textContent=`Foods high in ${n.l.toLowerCase()} (ease off these if it keeps happening)`;
+    else if(pattern&&P3UL[k].supp)h.textContent=`Better from food: no limit on ${n.l.toLowerCase()} from food`;
+    else if(tg.lo&&v<tg.lo)h.textContent=`Low so far today (${f(v)} of ${tg.lo} ${n.u}). Foods that have it`});}})(p1NutInfo);
 // ================= analytics =================
 function sRPE(l){return l&&l.status!=='missed'&&l.dur&&l.rpe?l.dur*l.rpe:0}
 function extrasLoad(d){return (d&&d.extras||[]).reduce((a,x)=>a+((+x.dur||0)*(+x.rpe||0)),0)}
