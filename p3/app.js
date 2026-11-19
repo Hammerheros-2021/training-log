@@ -5660,6 +5660,64 @@ document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||!t.
   if(error){t.checked=!on;toast(/share_meals/.test(error.message)?'Meal sharing isn\'t switched on for this team yet.':'Could not change that. Try again.');return}
   toast(on?'Your meals are now shared with the staff':'Meals are private again. Totals are still shared.',3500);TEAM.list=null;render()});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&MYT.d&&MYT.d.teams.length){MYT.d=null;render()}});
+// ================= P3: yesterday's food log, copy meals to today, usual meals (19 Nov) =================
+// Usual meals are saved in meta 'usuals' as {list:[{name,meal,items:[...]}]}. Tapping one adds every item at once.
+const kuzSaved=()=>(meta.usuals&&Array.isArray(meta.usuals.list))?meta.usuals.list:[];
+const kuzToday=()=>iso(todayDate());
+function kuzMealItems(k,m){return ((D()[k]&&D()[k].food)||[]).filter(i=>i.meal===m&&i.src!=='plan')}
+function kuzPaste(items,meal,at){return items.map(i=>{const o=clone(i);delete o.ix;delete o.planRef;o.src='copy';if(meal)o.meal=meal;if(at)o.at=at;return o})}
+function kuzDayName(k){const t=kuzToday();return k===t?'today':k===iso(addD(todayDate(),-1))?'yesterday':fmtD(parse(k),{weekday:'long'})}
+// the same set of foods eaten for one meal on 2+ of the last 3 weeks, not already saved
+function kuzSuggest(m){const seen={};const saved=new Set(kuzSaved().map(u=>u.items.map(i=>String(i.name).toLowerCase().trim()).sort().join('|')));
+  for(let i=1;i<=21;i++){const k=iso(addD(todayDate(),-i));const its=kuzMealItems(k,m).filter(x=>!(+x.caffeine>0));if(its.length<2)continue;
+    const key=its.map(x=>String(x.name).toLowerCase().trim()).sort().join('|');if(saved.has(key))continue;(seen[key]=seen[key]||{n:0,items:its}).n++}
+  return Object.values(seen).filter(s=>s.n>=2).sort((a,b)=>b.n-a.n).slice(0,3).map(s=>({name:s.items[0].name+(s.items.length>1?` + ${s.items.length-1} more`:''),meal:m,items:s.items}))}
+function kuzGuessName(its,m){const p=its.find(i=>/porridge|oats|overnight/i.test(i.name));if(p)return 'Porridge';return m==='Breakfast'?'My breakfast':m==='Lunch'?'My lunch':m==='Dinner'?'My dinner':'My snack'}
+let KUZL=[];
+function kuzRowHTML(dIso){const m=p3ShownMeal();const yk=iso(addD(parse(dIso),-1));const ym=kuzMealItems(yk,m);
+  const saved=kuzSaved().map(u=>({...u,saved:true})).sort((a,b)=>(b.meal===m)-(a.meal===m));const sug=kuzSuggest(m);KUZL=saved.concat(sug);
+  const chips=(ym.length?`<button type="button" class="kuzcp" data-kuzsame="${yk}|${m}">${ico('repeat')}<span>Same ${esc(m.toLowerCase())} as ${esc(kuzDayName(yk))}</span></button>`:'')
+    +KUZL.map((u,i)=>`<button type="button" class="${u.saved?'kuzch':'kuzch sug'}" data-kuzadd="${i}">${esc(u.name)}<small>${u.items.length} item${u.items.length>1?'s':''}</small></button>`).join('');
+  return `<div class="kuzq"><span class="label">Usual ${esc(m.toLowerCase())}</span>${chips?`<div class="kuztags">${chips}</div>`:''}<small class="ds">${kuzSaved().length?'Tap one to add the whole meal.':'To save one, open a meal below and tap <b>Save as usual</b>.'}</small></div>`}
+foodActionsHTML=(function(old){return function(dIso){const h=old(dIso);if(!h||sampleMode)return h;const i=h.indexOf('<div class="frow">');return i<0?h+kuzRowHTML(dIso):h.slice(0,i)+kuzRowHTML(dIso)+h.slice(i)}})(foodActionsHTML);
+// day switcher at the top of the food log, plus a copy card on past days
+function kuzDayBar(dIso){const t=kuzToday();const prev=iso(addD(parse(dIso),-1)),next=iso(addD(parse(dIso),1));
+  return `<div class="kuzday"><button type="button" data-goto="${prev}">‹ ${prev===iso(addD(todayDate(),-1))?'Yesterday':'Day before'}</button><b>${dIso===t?'Today':esc(kuzDayName(dIso)===fmtD(parse(dIso),{weekday:'long'})?fmtD(parse(dIso),{weekday:'short',day:'numeric',month:'short'}):kuzDayName(dIso).replace(/^./,c=>c.toUpperCase()))}</b>${dIso<t?`<button type="button" data-goto="${next===t?t:next}">${next===t?'Today':'Next day'} ›</button>`:'<span></span>'}</div>`}
+function kuzCopyCard(dIso){if(dIso>=kuzToday())return '';const ms=MEALS.filter(m=>kuzMealItems(dIso,m).length);if(!ms.length)return '';
+  return `<article class="card kuzcopy"><div class="chead"><div style="flex:1"><h2>Copy to today</h2><div class="sub">Adds the same foods to today, at the same times</div></div></div><div class="kuztags" style="padding:0 16px 14px">${ms.map(m=>`<button type="button" class="kuzcp" data-kuzcopy="${m}">${ico('repeat')}<span>${esc(m)}</span></button>`).join('')}${ms.length>1?`<button type="button" class="kuzcp" data-kuzcopy="*">${ico('repeat')}<span>Whole day</span></button>`:''}</div></article>`}
+foodTodayHTML=(function(old){return function(dIso){const h=old(dIso);return sampleMode?h:kuzDayBar(dIso)+kuzCopyCard(dIso)+h}})(foodTodayHTML);
+// buttons at the bottom of each meal
+p1MealHTML=(function(old){return function(m,its){const h=old(m,its);if(sampleMode)return h;const k=iso(sel);
+  const bar=`<div class="kuzbar"><button type="button" data-kuzsave="${m}">${ico('star')}<span>Save as usual</span></button>${k<kuzToday()?`<button type="button" data-kuzcopy="${m}">${ico('repeat')}<span>Copy to today</span></button>`:''}</div>`;
+  const j=h.lastIndexOf('</details>');return j<0?h:h.slice(0,j)+bar+h.slice(j)}})(p1MealHTML);
+// save-as-usual sheet: name it, untick anything that isn't part of it
+let KUZS=null;
+function kuzSheetDraw(){const s=KUZS;if(!s){p1Sheet(null);return}
+  p1Sheet(`<div class="kshead"><div><h2>Save as a usual meal</h2><small class="ds">${esc(s.meal)} · tick what's in it</small></div><button type="button" class="x" id="kuzX" aria-label="Close">${ico('x')}</button></div>
+  <div class="form" style="padding:0;gap:12px"><div class="field"><label class="label" for="kuzname">Name</label><input id="kuzname" type="text" value="${esc(s.name)}" maxlength="40"></div>
+  <div class="kuzitems">${s.items.map((i,x)=>`<label class="toggle"><input type="checkbox" data-kuzit="${x}" ${s.on[x]?'checked':''}><span style="flex:1"><b>${esc(i.name)}</b>${i.qty?` · ${esc(i.qty)}`:''}<br><small class="ds">${kcalOf(i)} kcal · ${Math.round(+i.protein||0)} g protein</small></span></label>`).join('')}</div>
+  <div class="actions"><button type="button" class="ghost" id="kuzX2" style="flex:1;color:var(--fg)">Cancel</button><button type="button" class="primary" id="kuzSave" style="flex:1">Save</button></div></div>`)}
+async function kuzSaveList(list){return persistMeta('usuals',{list:list.slice(0,30),updatedAt:new Date().toISOString()})}
+window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-kuzadd]')){e.preventDefault();const u=KUZL[+x.dataset.kuzadd];if(!u)return;const m=p3ShownMeal();
+    await addFood(kuzPaste(u.items,m,p3AtFor(m)));toast(`Added ${u.name}: ${u.items.length} item${u.items.length>1?'s':''}`);render();return}
+  if(x=c('[data-kuzsame]')){e.preventDefault();const [k,m]=x.dataset.kuzsame.split('|');const src=kuzMealItems(k,m);if(!src.length)return;
+    await addFood(kuzPaste(src,m,null));toast(`Copied ${m.toLowerCase()} from ${kuzDayName(k)}`);render();return}
+  if(x=c('[data-kuzcopy]')){e.preventDefault();e.stopPropagation();const k=iso(sel),w=x.dataset.kuzcopy;const ms=w==='*'?MEALS:[w];const src=[].concat(...ms.map(m=>kuzMealItems(k,m)));if(!src.length)return;
+    await addFood(kuzPaste(src,null,null),kuzToday());toast(`Copied ${w==='*'?'the whole day':w.toLowerCase()} to today`);render();return}
+  if(x=c('[data-kuzsave]')){e.preventDefault();e.stopPropagation();const m=x.dataset.kuzsave;const its=kuzMealItems(iso(sel),m);if(!its.length)return;
+    KUZS={meal:m,items:its.map(i=>{const o=clone(i);delete o.ix;delete o.planRef;delete o.at;return o}),on:its.map(i=>!(+i.caffeine>0)),name:kuzGuessName(its,m)};kuzSheetDraw();return}
+  if(x=c('[data-kuzit]')){if(KUZS)KUZS.on[+x.dataset.kuzit]=x.checked;return}
+  if(e.target.id==='kuzX'||e.target.closest&&e.target.closest('#kuzX')||e.target.id==='kuzX2'){KUZS=null;p1Sheet(null);return}
+  if(e.target.id==='kuzSave'){const s=KUZS;if(!s)return;const name=(($('#kuzname')||{}).value||'').trim().slice(0,40)||s.name;const items=s.items.filter((_,i)=>s.on[i]);if(!items.length){toast('Tick at least one food');return}
+    const list=kuzSaved().filter(u=>u.name.toLowerCase()!==name.toLowerCase());list.unshift({name,meal:s.meal,items});KUZS=null;p1Sheet(null);
+    if(await kuzSaveList(list))toast(`Saved "${name}". It's in Usual ${s.meal.toLowerCase()} on the log.`,3500);render();return}
+  if(x=c('[data-kuzdel]')){const l=kuzSaved().slice();const u=l.splice(+x.dataset.kuzdel,1)[0];await kuzSaveList(l);toast('Removed '+(u?u.name:'usual'));render();return}
+},true);
+window.addEventListener('change',e=>{const t=e.target;if(!t||!t.dataset||t.dataset.kuzname==null)return;const l=clone(kuzSaved());const u=l[+t.dataset.kuzname];const n=String(t.value||'').trim().slice(0,40);if(!u||!n)return;u.name=n;kuzSaveList(l).then(()=>toast('Renamed'))});
+// manage them under My food
+kitchenHTML=(function(old){return function(){const l=kuzSaved();const h=old.apply(this,arguments);if(sampleMode)return h;
+  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Your usual meals</h2><div class="sub">${l.length?'Tap a name to rename it.':'None yet. On the food log, open a meal and tap Save as usual.'}</div></div></div>${l.length?`<div class="kuzlist">${l.map((u,i)=>`<div class="kuzrow"><input type="text" value="${esc(u.name)}" data-kuzname="${i}" aria-label="Name"><small class="ds">${esc(u.meal)} · ${u.items.map(x=>esc(x.name)).join(', ')} · ${Math.round(u.items.reduce((a,x)=>a+kcalOf(x),0))} kcal</small><button type="button" class="x" data-kuzdel="${i}" aria-label="Remove ${esc(u.name)}">${ico('x')}</button></div>`).join('')}</div>`:''}</article>`+h}})(kitchenHTML);
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
