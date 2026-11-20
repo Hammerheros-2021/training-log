@@ -2560,7 +2560,7 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
 const _p1planMeals=planMealsHTML;planMealsHTML=function(k,compact){return _p1planMeals(k,compact).replace(/<button type="button" class="ghost" data-recipe="([^"]+)">Recipe<\/button>/g,'<button type="button" class="ghost" data-recipe="$1">Recipe and steps</button>')};
 
 // ---------- 9. Progress: patterns and export ----------
-function progSub(){return p1Nav('data-pview',pView,[['me','trending-up','Progress','Your trends','var(--k-blue)'],['patterns','link','Patterns','What links up','var(--k-pink)'],['export','download','Export','PDF or Excel','var(--k-green)'],['learn','book-open','Learn','Short reads','var(--k-amber)']]).replace('class="p1nav"','class="p1nav p1nav4"')}
+function progSub(){return p1Nav('data-pview',pView,[['me','trending-up','Progress','Your trends','var(--k-blue)'],['patterns','link','Patterns','What links up','var(--k-pink)'],['export','download','Export','PDF or Excel','var(--k-green)'],['body','person-standing','Body map','What you miss','var(--k-violet)'],['learn','book-open','Learn','Short reads','var(--k-amber)']]).replace('class="p1nav"','class="p1nav p1nav5"')}
 function p1Series(n){const DD=D(),LL=L();const end=sampleMode?SAMPLE.now:todayDate();const out=[];
   for(let i=n-1;i>=0;i--){const k=iso(addD(end,-i)),d=DD[k]||{},l=LL[k];const nk=iso(addD(end,-i+1));const ft=foodTotals(d);const pt=nutTarget('protein',dayTypeFor(k));
     out.push({k,d,bal:readiness(d),next:readiness(DD[nk]),nextSore:isNum((DD[nk]||{}).sore)?+DD[nk].sore:null,sleep:sleepHours(d),nextSleep:sleepHours(DD[nk]),load:dayLoadAll(k),hard:p1Hard(k),
@@ -4693,6 +4693,198 @@ function buildSample(){
       days[k].sfb={feel,start:fr2<.3?'slow':fr2>.8?'sharp':'normal',flow:feel>=4?'better':feel<=2?'faded':'same',energy:feel>=4?'full':feel<=2?'low':'steady',effort:feel<=2?'harder':feel>=5?'easier':'right',trend:p.wk>=6&&p.wk<=8?'plateau':p.wk>=10?'fitter':'unsure',note:''}}}
   return {now,logs,days};
 }
+// ================= Body map (stage 1) =================
+const BM_M=[
+ ['quads','Quads','legs',2],['hams','Hamstrings','legs',2],['calves','Calves','legs',2],['shins','Shins','legs',1],['adductors','Adductors (groin)','legs',1],
+ ['glutes','Glutes','hips',2],['gmed','Side glutes (glute med)','hips',1],['hipflex','Hip flexors','hips',1],
+ ['abs','Abs','core',2],['obliques','Obliques','core',1.5],['lowback','Lower back','core',1],
+ ['lats','Lats','back',1.5],['upback','Upper back','back',2],
+ ['delts','Shoulders','shoulders',1.5],['cuff','Rotator cuff','shoulders',1],['chest','Chest','shoulders',1.5],
+ ['arms','Arms','arms',1],['grip','Forearms and grip','arms',1]];
+const BM_R=[['legs','Legs'],['hips','Hips and glutes'],['core','Core'],['back','Back'],['shoulders','Shoulders and chest'],['arms','Arms and grip']];
+const BM_G={
+ hyrox:{l:'Hyrox',t:{quads:3,glutes:3,calves:2.5,hams:2,upback:2.5,lats:2,grip:2,delts:2,abs:2,obliques:1.5,arms:1.5}},
+ gaa:{l:'GAA football',t:{hams:3,glutes:2.5,quads:2.5,calves:2.5,adductors:2,gmed:2,hipflex:1.5,obliques:1.5,shins:1.5,lowback:1.5}},
+ run:{l:'Running event',t:{calves:3,glutes:2.5,hams:2,quads:2,gmed:1.5,shins:1.5,hipflex:1.5,abs:1.5}},
+ strong:{l:'Get stronger',t:{quads:2.5,hams:2.5,glutes:2.5,upback:2.5,lats:2,chest:2,delts:2,lowback:1.5,grip:1.5}},
+ weight:{l:'Lose weight',t:{quads:2.5,glutes:2.5,hams:2,upback:2,lats:2,chest:2}}};
+const BM_WK=[1,2,3,4,6,8,10,13];
+const BM_PAT=[['squat','Squat'],['hinge','Hinge'],['single','Single leg'],['push','Push'],['pull','Pull'],['carry','Carry'],['rotate','Rotation / anti-rotation'],['lateral','Side to side'],['sprint','Sprint'],['jump','Jump']];
+// exercise library: [regex, muscles {key:weight}, patterns]
+const BM_LIB=[
+ [/row ?erg|rowing|rower|^row$|^row \d|concept ?2/i,{quads:.6,glutes:.5,hams:.4,upback:.8,lats:.7,arms:.4,grip:.3},['pull']],
+ [/ski ?erg|ski\b/i,{lats:1,upback:.6,arms:.5,abs:.6,delts:.4},['pull']],
+ [/sled push|prowler/i,{quads:1,glutes:.8,calves:.7,delts:.3,chest:.3,arms:.3},['push']],
+ [/sled pull|rope pull/i,{upback:.9,lats:.7,arms:.6,grip:.8,hams:.6,glutes:.5},['pull']],
+ [/burpee/i,{quads:.8,glutes:.7,chest:.5,delts:.4,calves:.4,abs:.3},['jump','push']],
+ [/wall ?ball|thruster/i,{quads:1,glutes:.7,delts:.7,arms:.3,abs:.3},['squat','push']],
+ [/farmer|carry|suitcase/i,{grip:1,upback:.8,obliques:.6,abs:.4,glutes:.3,calves:.3},['carry']],
+ [/trap.?bar|deadlift|rdl|romanian|good ?morning/i,{hams:.8,glutes:1,quads:.5,lowback:.7,upback:.4,grip:.5},['hinge']],
+ [/swing/i,{glutes:1,hams:.8,lowback:.5,grip:.5,abs:.3},['hinge']],
+ [/nordic|ham(string)? curl/i,{hams:1},['hinge']],
+ [/bridge|hip thrust/i,{glutes:1,hams:.4},['hinge']],
+ [/copenhagen/i,{adductors:1,obliques:.6},['lateral']],
+ [/lateral bound|skater|side lunge|lateral lunge|cossack/i,{gmed:1,adductors:.6,glutes:.6,quads:.5,calves:.4},['lateral','single','jump']],
+ [/bound/i,{glutes:.8,hams:.8,calves:.6,hipflex:.5,quads:.5},['sprint','jump','single']],
+ [/split squat|lunge|step.?up|bulgarian|pistol/i,{quads:1,glutes:.9,adductors:.4,gmed:.4,hipflex:.3},['squat','single']],
+ [/squat/i,{quads:1,glutes:.8,adductors:.4,lowback:.3,abs:.3},['squat']],
+ [/calf raise|calf/i,{calves:1},[]],
+ [/tib|toe raise/i,{shins:1},[]],
+ [/pogo|skipping|jump rope|a-skip|b-skip/i,{calves:1,shins:.3},['jump']],
+ [/hurdle hop|box jump|jump|hop/i,{quads:.8,glutes:.6,calves:.6},['jump']],
+ [/5-0-5|decel|cut|change of direction|agility|shuttle/i,{quads:.8,glutes:.6,gmed:.6,adductors:.5,calves:.4},['lateral','sprint']],
+ [/curved/i,{gmed:.7,adductors:.6,calves:.6,hams:.5},['sprint','lateral']],
+ [/sprint|acceleration|flying|build.?up|strides/i,{hams:1,glutes:.8,hipflex:.7,calves:.7,quads:.5},['sprint']],
+ [/pallof|anti.?rotation|woodchop|russian twist|landmine rot/i,{obliques:1,abs:.5},['rotate']],
+ [/side plank/i,{obliques:1,gmed:.5},['rotate']],
+ [/dead ?bug|hollow|leg raise|sit.?up|crunch|ab wheel|rollout/i,{abs:1,hipflex:.4},[]],
+ [/mountain climber/i,{abs:.7,hipflex:.6,delts:.3},[]],
+ [/plank/i,{abs:1,delts:.4,obliques:.4},['rotate']],
+ [/face pull|pull.?apart|external rotation|ytw|y-t-w|band dislocate/i,{cuff:1,upback:.6,delts:.3},['pull']],
+ [/pull.?up|chin.?up|lat pull/i,{lats:1,arms:.6,grip:.5,upback:.4},['pull']],
+ [/row/i,{upback:1,lats:.8,arms:.5,grip:.3},['pull']],
+ [/push.?up|press.?up|bench|dip/i,{chest:1,delts:.6,arms:.6,abs:.3},['push']],
+ [/overhead|shoulder press|military|push press|landmine press/i,{delts:1,arms:.6,upback:.3,abs:.3},['push']],
+ [/curl/i,{arms:1,grip:.3},['pull']],
+ [/bike|assault|echo|cycle/i,{quads:1,glutes:.4,calves:.3},[]],
+ [/run|jog/i,{calves:.6,quads:.5,hams:.4,glutes:.4,hipflex:.4,shins:.3},[]]];
+const BM_RUN={calves:1,quads:.6,hams:.5,glutes:.5,hipflex:.5,shins:.4,gmed:.3,abs:.2};
+const BM_FIELD={hams:.8,quads:.7,calves:.7,glutes:.6,adductors:.6,gmed:.5,hipflex:.5,shins:.3,obliques:.3};
+const BM_FARM={grip:.5,upback:.4,lowback:.4,obliques:.3,quads:.2};
+const BM_REG={'Quads':{quads:.8},'Hamstrings':{hams:.8},'Glutes':{glutes:.8},'Calves':{calves:.8},'Hips / groin':{adductors:.6,hipflex:.5},'Lower back':{lowback:.8},'Core':{abs:.7,obliques:.5},'Shoulders':{delts:.8},'Upper back':{upback:.8,lats:.5},'Chest':{chest:.8},'Grip / forearms':{grip:.8}};
+const BM_MOB=[[/couch|hip flexor/i,['hipflex','quads']],[/90\/90/i,['glutes','gmed','hipflex']],[/adductor/i,['adductors']],[/calf/i,['calves']],[/thoracic|open book/i,['upback']],[/deep squat/i,['adductors','glutes','calves']],[/hamstring/i,['hams']]];
+const BM_MOBALL=['hipflex','quads','glutes','gmed','adductors','calves','upback','hams'];
+let bmS={lvl:2,wi:5,sel:null};
+function bmGuess(){let t='';try{const a=(PROFILE&&PROFILE.answers)||{};t=[a.target,a.mainGoal,PROFILE&&PROFILE.plan&&PROFILE.plan.goalLine,TNAME.H].join(' ').toLowerCase()}catch(e){}
+  const g=[];if(/hyrox/.test(t))g.push('hyrox');if(/football|gaa|hurling|camogie|rugby|soccer|pitch|match/.test(t))g.push('gaa');if(/marathon|\b10 ?k|\b5 ?k|half|race|road run/.test(t))g.push('run');if(/strong/.test(t))g.push('strong');if(/weight|lose|fat|lean/.test(t))g.push('weight');return g}
+function bmGoals(){if(sampleMode)return bmS.sg||['hyrox','gaa'];const g=meta.settings&&meta.settings.bmGoals;return Array.isArray(g)?g:bmGuess()}
+function bmTag(name,regions){for(const [re,m,p] of BM_LIB)if(re.test(name))return {m,p};
+  if(Array.isArray(regions)&&regions.length){const m={};regions.forEach(r=>{const x=BM_REG[r];if(x)Object.entries(x).forEach(([k,v])=>m[k]=Math.max(m[k]||0,v))});if(Object.keys(m).length)return {m,p:[]}}
+  return null}
+function bmItems(l){const out=[];const p=Math.max(0,Math.min(3,Math.floor(((l.wk||1)-1)/4)));const t=l.type;
+  const add=(nm,regions,mult,src)=>out.push({nm,regions,mult:mult||1,src:src||nm});
+  if(t==='S')STRENGTH.forEach(e=>add(Array.isArray(e.nm)?e.nm[p]:e.nm));
+  else if(t==='E'){out.push({run:1,src:'Easy runs'});CORE.forEach(e=>add(e[0]))}
+  else if(t==='T')out.push({run:1,src:'Threshold runs'});
+  else if(t==='X'){SPEED.forEach(e=>add(e.nm));out.push({run:1.2,src:'Long runs'})}
+  else if(t==='H'){const it=(l.hyrox&&l.hyrox.items)||[];if(it.length)it.forEach(x=>add(x.name||x.category||'',x.regions,1,x.name||x.category));else out.push({mix:BM_G.hyrox.t,src:'Hyrox class (no board scanned)',f:.35})}
+  else out.push({mix:{quads:1,glutes:1,hams:1,upback:1,abs:1,chest:1},src:'Other training',f:.3});
+  return out}
+function bmCalc(){
+  const LL=L(),DD=D();const now=sampleMode?SAMPLE.now:todayDate();const wks=BM_WK[bmS.wi];const from=addD(now,-wks*7+1);
+  const hits={},mob={},src={},pat={},pre={};BM_M.forEach(([k])=>{hits[k]=0;mob[k]=0;src[k]={}});BM_PAT.forEach(([k])=>pat[k]=0);
+  let untag=[],legEx=0,legSingle=0,sessions=0;
+  const credit=(sess,m,f,s)=>Object.entries(m).forEach(([k,v])=>{if(!(k in hits))return;sess[k]=(sess[k]||0)+v*f;src[k][s]=(src[k][s]||0)+v*f});
+  const flush=sess=>Object.entries(sess).forEach(([k,v])=>hits[k]+=Math.min(v,1.5));
+  for(let d=new Date(from);d<=now;d=addD(d,1)){const k=iso(d);const l=LL[k],dd=DD[k]||{};
+    if(l&&l.status&&l.status!=='missed'){const f=l.status==='partial'?.6:1;const sess={};sessions++;
+      bmItems(l).forEach(it=>{
+        if(it.run){credit(sess,BM_RUN,f*it.run,it.src);return}
+        if(it.mix){credit(sess,it.mix,f*it.f,it.src);return}
+        const tg=bmTag(it.nm,it.regions);if(!tg){untag.push(it.nm);return}
+        credit(sess,tg.m,f*it.mult,it.src);tg.p.forEach(x=>pat[x]+=f);
+        if(['quads','hams','glutes','calves','adductors','gmed'].some(x=>tg.m[x]>=.6)){legEx+=f;if(tg.p.includes('single')||tg.p.includes('lateral'))legSingle+=f}});
+      flush(sess)}
+    (dd.extras||[]).forEach(x=>{const sess={};const f=(x.dur||60)/75;sessions++;
+      if(x.sc){const a=(MYP.list||[]).find(z=>z.assignment===x.sc);let names=[];if(a){const t=mypAt(a,k);const dd=t.days[0];if(dd)names=(dd.items||[]).map(it=>((a.exercises||[]).find(z=>z.id===it.ex)||{}).name).filter(Boolean)}
+        if(names.length){names.forEach(nm=>{const tg=bmTag(nm);if(!tg){untag.push(nm);return}credit(sess,tg.m,1,nm);tg.p.forEach(q=>pat[q]+=1);if(['quads','hams','glutes','calves','adductors','gmed'].some(q=>tg.m[q]>=.6)){legEx+=1;if(tg.p.includes('single')||tg.p.includes('lateral'))legSingle+=1}})}
+        else credit(sess,{quads:1,glutes:1,hams:1,upback:1,abs:1,chest:1},.3,'Gym programme');flush(sess);return}
+      if(x.kind==='Club training'||x.kind==='Match'){credit(sess,BM_FIELD,Math.min(f,1.3),x.kind==='Match'?'Matches':'Club training');pat.sprint+=1;pat.lateral+=1}
+      else if(x.kind==='Run')credit(sess,BM_RUN,Math.min(f,1.3),'Extra runs');
+      else if(/^Extra /.test(x.kind||''))credit(sess,BM_G.hyrox.t,.35,'Extra Hyrox classes');
+      else credit(sess,{quads:1,glutes:1,hams:1,upback:1,abs:1,chest:1},.3,x.kind==='Gym'?'Extra gym':'Other training');
+      flush(sess)});
+    if(isNum(dd.farm)&&dd.farm>=3){const sess={};credit(sess,BM_FARM,dd.farm>=4?1:.7,'Heavy farm days');flush(sess);pat.carry+=.5}
+    const h=dd.habits||[],rec=(dd.recovery||[]).map(r=>r.kind);
+    if(h.includes('Mobility / stretch')||rec.includes('Loosen-out'))MOBILITY.forEach(([nm])=>BM_MOB.forEach(([re,ms])=>{if(re.test(nm))ms.forEach(m=>mob[m]+=1/ms.length*1.5)}));
+    if(h.includes('Yoga / pilates')||rec.includes('Stretch / yoga'))BM_MOBALL.forEach(m=>mob[m]+=.5)}
+  const goals=bmGoals();
+  const rows=BM_M.map(([k,nm,rg,base])=>{let t=base,why='All-round';goals.forEach(g=>{const v=BM_G[g]&&BM_G[g].t[k];if(v&&v>t){t=v;why=BM_G[g].l}});
+    const pw=hits[k]/wks,r=pw/t;const st=r<.4?'neg':r<.8?'light':'ok';
+    const top=Object.entries(src[k]).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]);
+    return {k,nm,rg,t,why,pw,r,st,top,mob:mob[k]/wks}});
+  const regs=BM_R.map(([rk,rn])=>{const rs=rows.filter(x=>x.rg===rk);const tw=rs.reduce((a,x)=>a+x.t,0);const r=rs.reduce((a,x)=>a+Math.min(x.r,1.3)*x.t,0)/tw;
+    return {k:rk,nm:rn,r,st:r<.4?'neg':r<.8?'light':'ok',low:rs.filter(x=>x.st!=='ok').sort((a,b)=>a.r-b.r).map(x=>x.nm)}});
+  const H=k=>hits[k]/wks;
+  const bal=[
+    ['Front vs back of the thigh','Quads',H('quads'),'Hamstrings',H('hams'),'Hamstrings should be at least two-thirds of quads to protect against pulls when sprinting.'],
+    ['Push vs pull','Chest and shoulders',H('chest')+H('delts'),'Back',H('lats')+H('upback')+H('cuff'),'Aim for at least as much pulling as pushing to keep shoulders healthy.'],
+    ['Front vs back of the body','Front',H('quads')+H('hipflex')+H('abs')+H('chest'),'Back',H('hams')+H('glutes')+H('lowback')+H('upback')+H('lats'),'The back chain does the driving in running, jumping and the sled.']];
+  return {wks,rows,regs,bal,pat,untag:[...new Set(untag)],legShare:legEx?legSingle/legEx:null,sessions,goals}}
+// ---- figure ----
+const BM_SIL='M80,8 C70,8 66,16 66,26 C66,36 70,42 74,45 L74,50 C66,52 56,53 50,56 C43,59 40,66 39,76 L36,104 C35,114 33,124 32,134 L28,170 C27,180 27,188 28,194 C29,200 33,200 34,194 L37,170 C39,158 41,146 43,136 L48,104 L52,90 C53,110 55,130 56,148 C54,160 53,172 54,186 C55,210 57,232 59,252 C58,268 58,286 61,304 L62,322 C58,328 57,332 61,334 L74,334 C77,331 75,324 73,318 C73,300 74,280 74,262 C75,240 77,214 78,196 L80,192 Z';
+const BM_FRONT=[
+ ['delts','<ellipse cx="46" cy="68" rx="8" ry="12" transform="rotate(22 46 68)"/>'],
+ ['chest','<path d="M79,60 C70,57 60,58 54,64 C52,72 54,82 60,86 C68,90 76,89 79,86 Z"/>'],
+ ['abs','<rect x="71" y="92" width="8" height="17" rx="3"/><rect x="71" y="111" width="8" height="17" rx="3"/><rect x="71" y="130" width="8" height="18" rx="3"/>'],
+ ['obliques','<path d="M68,92 C62,100 58,116 59,132 C60,142 63,148 68,150 Z"/>'],
+ ['arms','<ellipse cx="43" cy="103" rx="5.5" ry="18" transform="rotate(10 43 103)"/>'],
+ ['grip','<ellipse cx="36" cy="160" rx="4.8" ry="20" transform="rotate(10 36 160)"/>'],
+ ['hipflex','<path d="M65,153 C61,160 62,168 66,175 L76,182 C75,171 72,161 69,153 Z"/>'],
+ ['quads','<path d="M57,180 C54,202 56,226 61,248 C65,252 72,252 75,247 C77,230 76,208 75,186 C69,184 62,182 57,180 Z"/>'],
+ ['adductors','<path d="M77,188 C79.5,196 80,204 79.5,214 C79,222 77,230 76,236 C75,220 76,202 77,188 Z"/>'],
+ ['shins','<ellipse cx="63.5" cy="288" rx="3.4" ry="24"/>'],
+ ['calves','<ellipse cx="70.5" cy="282" rx="3.6" ry="18"/>']];
+const BM_BACK=[
+ ['upback','<path d="M79,46 C74,48 66,52 58,56 C62,64 68,72 72,80 C75,89 78,97 79,102 Z"/>'],
+ ['delts','<ellipse cx="46" cy="68" rx="8" ry="12" transform="rotate(22 46 68)"/>'],
+ ['cuff','<ellipse cx="62" cy="73" rx="6.5" ry="7.5"/>'],
+ ['lowback','<path d="M67,126 C71,123 75,121 79,119 L79,160 C74,160 70,158 67,156 Z"/>'],
+ ['lats','<path d="M57,84 C54,96 55,110 58,124 C64,124 72,118 79,113 L79,104 C74,98 66,90 57,84 Z"/>'],
+ ['arms','<ellipse cx="43" cy="103" rx="5.5" ry="18" transform="rotate(10 43 103)"/>'],
+ ['grip','<ellipse cx="36" cy="160" rx="4.8" ry="20" transform="rotate(10 36 160)"/>'],
+ ['gmed','<ellipse cx="60" cy="166" rx="5.5" ry="7"/>'],
+ ['glutes','<path d="M79,164 C70,163 63,167 58,177 C57,187 60,196 68,198 C73,199 77,197 79,195 Z"/>'],
+ ['hams','<path d="M57,203 C55,222 57,240 61,252 C66,255 72,255 76,250 C78,234 78,216 77,203 C70,205 62,205 57,203 Z"/>'],
+ ['calves','<path d="M60,262 C57,276 58,292 62,306 C66,310 71,308 73,302 C75,288 74,274 72,262 C68,258 63,258 60,262 Z"/>']];
+function bmFig(parts,col,lbl){const sh=parts.map(([k,svg])=>`<g class="bmm${bmS.sel===k?' on':''}" data-bmm="${k}" style="--mc:${col[k]}">${svg}</g>`).join('');
+  return `<figure class="bmfig"><svg viewBox="20 0 120 340" role="img" aria-label="${lbl} of the body"><defs><linearGradient id="bmSk${lbl}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--surface)"/><stop offset="1" stop-color="var(--sunk)"/></linearGradient></defs>
+   <path d="${BM_SIL}" fill="url(#bmSk${lbl})" stroke="var(--line)"/><path d="${BM_SIL}" transform="translate(160,0) scale(-1,1)" fill="url(#bmSk${lbl})" stroke="var(--line)"/>
+   ${sh}<g transform="translate(160,0) scale(-1,1)">${sh}</g></svg><figcaption>${lbl}</figcaption></figure>`}
+const BM_C={neg:'var(--status-alert)',light:'var(--status-caution)',ok:'var(--status-good)'};
+const BM_W={neg:'Neglected',light:'Light',ok:'Covered'};
+function viewBody(){
+  const now=sampleMode?SAMPLE.now:todayDate();
+  const toggle=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">${sampleMode?`<span class="sample">Example data as of ${fmtD(now)}, not yours</span>`:'<span class="label">Your training</span>'}<button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'Show my data':'See an example'}</button></div>`;
+  if(!sampleMode&&MYP.list==null&&typeof mypLoad==='function')mypLoad();
+  const c=bmCalc();const goals=c.goals;
+  const col={};c.rows.forEach(r=>{const reg=c.regs.find(x=>x.k===r.rg);col[r.k]=BM_C[bmS.lvl===1?reg.st:r.st]});
+  const wl=c.wks===13?'3 months':c.wks===1?'1 week':c.wks+' weeks';
+  const controls=`<div class="panel bmctl">
+    <div class="subtabs" style="grid-template-columns:1fr 1fr"><button type="button" data-bmlvl="1" aria-pressed="${bmS.lvl===1}">Body areas</button><button type="button" data-bmlvl="2" aria-pressed="${bmS.lvl===2}">Muscles</button></div>
+    <div><div class="bmwin"><span class="label">Looking back</span><b id="bmWinL">${wl}</b></div><input type="range" id="bmWin" min="0" max="${BM_WK.length-1}" step="1" value="${bmS.wi}" aria-label="How far back to look"><div class="bmticks"><span>1 wk</span><span>1 month</span><span>3 months</span></div></div>
+    <div><span class="label">Judged on all-round balance plus</span><div class="bmgoals">${Object.entries(BM_G).map(([k,g])=>`<button type="button" data-bmgoal="${k}" aria-pressed="${goals.includes(k)}">${g.l}</button>`).join('')}</div></div></div>`;
+  if(!c.sessions)return toggle+controls+`<div class="panel empty"><h3>Nothing logged in this window</h3>Log a few sessions, or look back further, and the map fills in.</div>`;
+  const n=s=>c.rows.filter(r=>r.st===s).length;
+  const items=bmS.lvl===1?c.regs:c.rows;
+  const sorted=items.slice().sort((a,b)=>a.r-b.r);
+  const selR=bmS.sel&&c.rows.find(r=>r.k===bmS.sel);
+  const fmt=v=>v>=10?Math.round(v):v.toFixed(1);
+  const list=sorted.map(r=>{const isSel=bmS.lvl===2&&bmS.sel===r.k;
+    const det=bmS.lvl===1?(r.low.length?`Low: ${r.low.join(', ')}`:'All muscles here are covered'):`${fmt(r.pw)} a week, needs ${fmt(r.t)}${r.why!=='All-round'?` for ${r.why}`:''}`;
+    const more=isSel?`<div class="bmmore">${r.top.length?`<div><span class="label">Worked mostly by</span> ${r.top.map(esc).join(', ')}</div>`:'<div>Nothing in your logs works this yet.</div>'}${r.mob>0?`<div><span class="label">Mobility</span> about ${fmt(r.mob)} times a week</div>`:''}</div>`:'';
+    return `<button type="button" class="bmrow${isSel?' on':''}" ${bmS.lvl===2?`data-bmm="${r.k}"`:`data-bmlvl="2"`}><i style="background:${BM_C[r.st]}"></i><span><b>${esc(r.nm)}</b><small>${det}</small>${more}</span><em style="color:${BM_C[r.st]}">${BM_W[r.st]}</em></button>`}).join('');
+  const bal=c.bal.map(([t,a,av,b,bv,tip])=>{const tot=av+bv||1;const pa=Math.round(av/tot*100);const ok=t.startsWith('Front vs back of the thigh')?bv>=av*.66:t.startsWith('Push')?bv>=av*.95:bv>=av*.9;
+    return `<div class="bmbal"><div class="bmbalh"><b>${t}</b><em style="color:${ok?BM_C.ok:BM_C.light}">${ok?'Balanced':'Lopsided'}</em></div><div class="bmsplit"><span style="width:${pa}%"></span></div><div class="bmbalf"><span>${a} ${fmt(av)}</span><span>${b} ${fmt(bv)}</span></div>${ok?'':`<div class="hint">${tip}</div>`}</div>`}).join('');
+  const pmax=Math.max(1,...Object.values(c.pat));
+  const pats=BM_PAT.map(([k,nm])=>{const v=c.pat[k]/c.wks;return `<div class="bar" style="--c:${v<.5?BM_C.neg:v<1?BM_C.light:'var(--accent)'}"><span>${nm}</span><div class="tr"><div class="fl" style="width:${Math.max(3,c.pat[k]/pmax*100)}%"></div></div><span class="pct">${fmt(v)}/wk</span></div>`}).join('');
+  const single=c.legShare!=null?`<div class="hint">Single-leg and side-to-side work is ${Math.round(c.legShare*100)}% of your leg exercises${c.legShare<.3&&(goals.includes('gaa')||goals.includes('run'))?'. Field sports and running are done on one leg at a time, so aim for at least a third.':'.'}</div>`:'';
+  const untag=c.untag.length?`<div class="hint">Keel couldn't place ${c.untag.length} exercise${c.untag.length>1?'s':''}: ${c.untag.slice(0,5).map(esc).join(', ')}. They're left out for now.</div>`:'';
+  return toggle+controls+`<div class="panel bmpanel">
+    <div class="bmhead"><h3>${bmS.lvl===1?'Body areas':'Muscles'}, last ${wl}</h3><div class="bmsum"><span style="--c:${BM_C.neg}">${n('neg')} neglected</span><span style="--c:${BM_C.light}">${n('light')} light</span><span style="--c:${BM_C.ok}">${n('ok')} covered</span></div></div>
+    <div class="bmfigs">${bmFig(BM_FRONT,col,'Front')}${bmFig(BM_BACK,col,'Back')}</div>
+    ${selR&&bmS.lvl===2?`<div class="bmsel"><b>${esc(selR.nm)}</b> · <span style="color:${BM_C[selR.st]}">${BM_W[selR.st]}</span> · ${fmt(selR.pw)} a week, needs ${fmt(selR.t)}</div>`:`<div class="hint" style="text-align:center">${bmS.lvl===2?'Tap a muscle to see what works it':'Tap an area to see its muscles'}</div>`}
+    <div class="bmlist">${list}</div>${untag}</div>
+    <div class="panel"><h3>Balance</h3>${bal}${single}</div>
+    <div class="panel"><h3>Movement patterns</h3><div class="hint">Times a week, from every session logged</div>${pats}</div>
+    <div class="panel bmnext"><span class="label">Coming next</span><div><b>Stage 2:</b> tap a muscle for why it matters, what it supports and what leans on it, a deeper muscle level, and fixes you can add to your plan.</div><div><b>Stage 3:</b> links to your niggles and injuries, and to your food and supplements.</div></div>`}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-bmlvl]')){bmS.lvl=+x.dataset.bmlvl;if(bmS.lvl===1)bmS.sel=null;render();return}
+  if(x=c('[data-bmm]')){if(bmS.lvl===1){bmS.lvl=2}const k=x.dataset.bmm;bmS.sel=bmS.sel===k?null:k;render();return}
+  if(x=c('[data-bmgoal]')){const g=bmGoals().slice();toggleIn(g,x.dataset.bmgoal);if(sampleMode)bmS.sg=g;else persistMeta('settings',Object.assign({},meta.settings||{},{bmGoals:g}));render();return}});
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='bmWin'){const w=BM_WK[+e.target.value];const lb=$('#bmWinL');if(lb)lb.textContent=w===13?'3 months':w===1?'1 week':w+' weeks'}});
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='bmWin'){bmS.wi=+e.target.value;render()}});
+
 // ================= render + events =================
 const TABS=['checkin','dashboard','training','mobility','recover','food','reports'];
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-tomob]')){location.hash='mobility';return}if(e.target.closest&&e.target.closest('[data-tview]')&&tab()==='mobility'){tView=e.target.closest('[data-tview]').dataset.tview;location.hash='training'}});
@@ -4703,7 +4895,7 @@ function render(){
   if(t!=='reports'&&t!=='dashboard'&&sampleMode){sampleMode=false;sDraft=null;dDraft=null}
   if(!PROFILE)return;
   const p1app=$('#app');if(p1same)p1app.style.minHeight=p1app.offsetHeight+'px';
-  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():pView==='patterns'?p1PatternsView()+p2HrTrends():pView==='export'?p1ExportView():viewReports());
+  $('#app').innerHTML=t==='profile'?viewProfile():t==='training'?viewTrainingTab():t==='checkin'?viewCheckin():t==='mobility'?'<a class="linkbtn backlink" href="#recover">‹ Back to Recover</a>'+viewMobility():t==='recover'?viewRecover():t==='food'?viewFood():t==='dashboard'?viewDashboard():progSub()+(pView==='learn'?viewLearn():pView==='patterns'?p1PatternsView()+p2HrTrends():pView==='export'?p1ExportView():pView==='body'?viewBody():viewReports());
   updateFab();kAvatarSet();setArea();kSignSet();kBands();setTimeout(()=>document.body.classList.remove('kloading'),900);kWording();kHideIrrelevant();if(tab()==='training'&&tView==='route')p1MapAfter();p1Anim();p1HdrSet();if(P1F.open&&document.querySelector('#p1Host .kshead'))p1FoodSheet();if(p1same){p1DApply(p1ds);window.scrollTo(0,p1y);requestAnimationFrame(()=>{window.scrollTo(0,p1y);p1app.style.minHeight=''})}else p1app.style.minHeight='';P1R.sig=p1sig;
 }
 function go(dIso){sel=parse(dIso);sDraft=null;dDraft=null;dEdit=false;confirmDel=false;scanState=null;fState={busy:false,msg:'',meal:null,text:null,manual:false};

@@ -1792,6 +1792,26 @@ details.pm{display:block!important}details.pm>.pmbody{width:auto!important;box-s
 .kuzch{flex-direction:column;align-items:flex-start;gap:0;border-color:var(--accent);font-weight:600}.kuzch small{font-weight:400;font-size:11px;color:var(--muted)}.kuzch.sug{border-style:dashed}.kuzcp{border-style:dashed}.kuzcp .ki,.kuzbar .ki{width:16px;height:16px}
 .kuzbar{display:flex;flex-wrap:wrap;gap:8px;padding:8px 16px 14px}.kuzbar button{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 14px;border-radius:9999px;border:1px solid var(--line);background:transparent;color:var(--fg);font-size:13px}
 .kuzitems{display:flex;flex-direction:column;gap:4px}.kuzlist{display:flex;flex-direction:column;padding:0 16px 12px}.kuzrow{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}.kuzrow input{font-weight:600;font-size:15px;background:transparent;border:0;padding:4px 0;color:var(--fg);min-width:0}.kuzrow small{grid-column:1;font-size:12px}.kuzrow .x{grid-column:2;grid-row:1/3}
+.bmctl{gap:16px}.bmwin{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}.bmwin b{font-size:15px}
+#bmWin{width:100%;accent-color:var(--accent);min-height:32px}.bmticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.bmgoals{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.bmgoals button{min-height:36px;padding:0 12px;border-radius:9999px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:13px}
+.bmgoals button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--sunk);font-weight:600}
+.bmhead{display:flex;flex-direction:column;gap:8px}.bmsum{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.bmsum span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:5px;vertical-align:1px}
+.bmfigs{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:420px;margin:0 auto;width:100%}
+.bmfig{margin:0;text-align:center}.bmfig svg{width:100%;height:auto;display:block;overflow:visible}.bmfig figcaption{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.bmm{fill:var(--mc);fill-opacity:.72;stroke:var(--surface);stroke-width:.8;cursor:pointer;transition:fill-opacity .2s,stroke .2s}
+.bmm:hover{fill-opacity:.9}.bmm.on{fill-opacity:1;stroke:var(--text,var(--fg));stroke-width:1.4}
+.bmsel{text-align:center;font-size:13px}
+.bmlist{display:flex;flex-direction:column}
+.bmrow{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:start;text-align:left;background:transparent;border:0;border-top:1px solid var(--line);padding:12px 0;color:inherit;font:inherit;width:100%}
+.bmrow i{width:10px;height:10px;border-radius:50%;margin-top:5px}.bmrow b{display:block;font-size:14px}.bmrow small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.bmrow em{font-style:normal;font-size:12px;font-weight:600;margin-top:2px}.bmrow.on{background:var(--sunk);border-radius:8px;padding-left:8px;padding-right:8px}
+.bmmore{display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:13px}
+.bmbal{display:flex;flex-direction:column;gap:6px;padding:4px 0}.bmbalh{display:flex;justify-content:space-between;font-size:14px}.bmbalh em{font-style:normal;font-size:12px;font-weight:600}
+.bmsplit{height:10px;border-radius:9999px;background:var(--k-clay,var(--status-caution));overflow:hidden;opacity:.85}.bmsplit span{display:block;height:100%;background:var(--accent)}
+.bmbalf{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.bmnext{gap:8px;font-size:13px;border-style:dashed}
+.p1nav5{grid-template-columns:repeat(5,minmax(0,1fr))}.p1nav5 button{min-height:72px;padding:10px 4px}.p1nav5 small{display:none}.p1nav5 b{font-size:12px}
 </style>
 </head>
 <body class="kloading">
@@ -1817,6 +1837,6 @@ details.pm{display:block!important}details.pm>.pmbody{width:auto!important;box-s
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p4j"></script>
+<script src="/p3/app.js?v=p4k"></script>
 </body>
 </html>
