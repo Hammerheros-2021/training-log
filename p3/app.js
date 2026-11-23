@@ -5973,7 +5973,8 @@ function p3DayPeek(k){const f=p3DayBits(k);const td=iso(todayDate());const rel=k
   let body='';const sf=sessionForm;try{sessionForm=()=>'';body=sessionHTML(f.d,f.pl)}catch(e){body=''}finally{sessionForm=sf}
   body=body.replace(/^<article class="card"[^>]*>/,'').replace(/<\/article>\s*$/,'').replace(/<div class="meta">[\s\S]*?<\/div>/,'');
   const stt=f.lg?(f.lg.status==='done'?'Done':f.lg.status==='partial'?'Partly done':'Missed'):(D()[k]||{}).trainIntent==='no'?'Skipping':f.ty!=='R'&&k>=td?trainTimeFor(k):f.st==='none'?'Not logged':'';
-  return `<div class="p3peek" style="--c:var(${TVAR[f.ty]||'--line'})">${head}${stt?`<span class="p3pks">${esc(stt)}</span>`:''}${adj}<div class="p3pkb">${body}</div>${f.ex.length?`<div class="p3pkn">Plus: ${esc(f.ex.map(x=>x.desc||x.kind).join(', '))}</div>`:''}${open}</div>`}
+  const brief=f.ty==='R'?'Rest day':sessionBrief(f.d,f.pl);const ttl=f.ty==='R'?'Rest':TNAME[f.ty];const line=brief&&brief!==ttl?brief.replace(ttl+': ',''):'';
+  return `<div class="p3peek" style="--c:var(${TVAR[f.ty]||'--line'})">${head}${stt?`<span class="p3pks">${esc(stt)}</span>`:''}<b class="p3pkt">${esc(ttl)}</b>${line?`<div class="p3pkn">${esc(line)}</div>`:''}${adj}${f.ex.length?`<div class="p3pkn">Plus: ${esc(f.ex.map(x=>x.desc||x.kind).join(', '))}</div>`:''}${f.ty!=='R'&&body?`<details class="p3pkd"${P3WK.det===k?' open':''} data-pkd="${k}"><summary>See the session</summary><div class="p3pkb">${body}</div></details>`:''}${open}</div>`}
 function p3WkScroll(){const sc=document.querySelector('.p3wscroll');if(!sc)return;const b=sc.querySelector(`[data-goto="${P3ED.on&&P3ED.k?P3ED.k:P3WK.sel}"]`)||sc.querySelector('.p3wk1.today');const g=b&&b.closest('.p3wgrp');if(g)sc.scrollLeft=g.offsetLeft-sc.offsetLeft}
 // team S&C card on the Plan tab: one line that opens up
 mypCard=(function(old){return function(where){const h=old(where);if(where!=='plan'||!h)return h;let line='';try{const k=iso(todayDate());const a=MYP.list.find(x=>!mypAt(x,k).finished);if(a){const t=mypAt(a,k),nx=mypNext(a,k);line=t.days.length?`Today: ${t.days.map(d=>d.title||'Session').join(', ')}`:nx?`Next: ${nx.d.title||'Session'}, ${fmtD(parse(nx.k),{weekday:'short'})}`:''}}catch(e){}
@@ -6118,7 +6119,7 @@ window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closes
   if(bmS.lvl===1&&(x=c('.bm2fig [data-bmm]'))){e.stopImmediatePropagation();const r=BM_M.find(m=>m[0]===x.dataset.bmm);bmS.area=r?(bmS.area===r[2]?null:r[2]):null;bmS.sel=null;render();return}
   if(x=c('[data-bmm]')){e.stopImmediatePropagation();const k=x.dataset.bmm;bmS.lvl=2;bmS.area=null;bmS.sel=bmS.sel===k?null:k;const inList=!!c('.bm2list');const y=window.scrollY;render();if(inList)window.scrollTo(0,y);else{const h=document.querySelector('.bm2card');if(h)h.scrollIntoView({block:'nearest'})}return}
   if(x=c('[data-bmlvl]')){e.stopImmediatePropagation();bmS.lvl=+x.dataset.bmlvl;bmS.sel=null;bmS.area=null;render();return}},true);
-window.addEventListener('toggle',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('bm2list'))bmS.listOpen=e.target.open},true);
+window.addEventListener('toggle',e=>{const pk=e.target;if(pk&&pk.dataset&&pk.dataset.pkd){P3WK.det=pk.open?pk.dataset.pkd:null}if(e.target&&e.target.classList&&e.target.classList.contains('bm2list'))bmS.listOpen=e.target.open},true);
 
 // You: team and appearance fold down to one line each
 teamPanel=(function(old){return function(){const h=old.apply(this,arguments);const n=(TEAM.list||[]).length;const line=TEAM.list==null?'Loading…':n?TEAM.list.map(m=>m.name||'Team').join(', '):'Join with a code from your coach';
@@ -6135,8 +6136,8 @@ viewFood=(function(old){return function(){const h=old.apply(this,arguments);if(f
   const back=q('a.backlink');if(back)back.remove();
   const day=q('.kuzday'),act=q('article.factions'),meals=q('article.p1meals'),tot=q('article.p1ftot'),cta=q('.bigcta'),plants=q('.p1plants');
   const fr=act&&act.querySelector('.frow');if(fr&&!fr.querySelector('[data-fvlist]')){const n=kuzSaved().length+favList().length;fr.insertAdjacentHTML('beforeend',`<button type="button" class="fbtn p3fvtile" data-fvlist><span aria-hidden="true">${ico('star')}</span><b>Favourites</b>${n?`<i>${n}</i>`:''}</button>`);
-    fr.querySelectorAll('.fbtn b').forEach(b=>{b.textContent=b.textContent.replace('Snap plate','Snap').replace('Say it','Say').replace('Type it','Type')})}
-  if(day&&act){day.after(act);if(meals)act.after(meals);if(meals&&tot)meals.after(tot);if(cta&&cta.parentNode===R)(plants||tot||meals||act).after(cta)}
+    fr.querySelectorAll('.fbtn').forEach(b=>{const t=(b.querySelector('b')||{}).textContent||'';b.setAttribute('aria-label',t.replace('Snap plate','Take a photo').replace('Say it','Say what you ate').replace('Type it','Type what you ate'));b.setAttribute('title',b.getAttribute('aria-label'))});fr.classList.add('p3icons')}
+  if(day&&act){if(tot){day.after(tot);tot.after(act)}else day.after(act);if(meals)act.after(meals);if(cta&&cta.parentNode===R)(plants||meals||act).after(cta);if(plants&&meals)meals.after(plants);if(cta&&plants)plants.after(cta)}
   return t.innerHTML}})(viewFood);
 // Favourites = whole meals (e.g. "Darren's porridge" = oats, milk, berries...). One button on the log opens them,
 // grouped under Breakfast, Lunch, Dinner and Snack. Open one to change the whole portion or any ingredient, add or

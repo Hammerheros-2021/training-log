@@ -1901,6 +1901,14 @@ details.p3fold>summary small{flex:1;color:var(--text-muted);font-size:13px;white
 .galbtn{font-size:12px!important;margin:0!important;padding:2px 0!important;min-height:0!important}
 .kuzday{margin:-4px 0 4px!important;padding:0!important}.kuzday button{min-height:30px!important;padding:2px 10px!important}
 .p1nav.p3navc{margin-bottom:6px!important}
+/* food actions: icon-only round buttons */
+.frow.p3icons{display:flex!important;justify-content:space-between;gap:8px!important;padding:0 6px}
+.frow.p3icons .fbtn{flex:0 0 auto;width:56px!important;height:56px!important;min-height:0!important;padding:0!important;border-radius:50%!important;display:flex!important;align-items:center;justify-content:center}
+.frow.p3icons .fbtn b{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.frow.p3icons .fbtn>span{display:flex;line-height:0}.frow.p3icons .fbtn .ki{display:flex;line-height:0}
+.frow.p3icons .fbtn svg{width:24px!important;height:24px!important;display:block}.frow.p3icons .p3fvtile i{top:-2px;right:-2px}
+.galbtn{display:none!important}
+article.p1ftot{margin-bottom:10px}
+.p3pkd{margin-top:8px}.p3peek .p3pko{position:absolute;right:16px;bottom:12px;margin:0}.p3peek{padding-bottom:14px}.p3peek:not(:has(.p3pkd)){padding-bottom:40px}.p3pkd>summary{cursor:pointer;font-size:14px;font-weight:600;list-style:none;color:var(--text)}.p3pkd>summary::-webkit-details-marker{display:none}.p3pkd>summary::after{content:' ›'}.p3pkd[open]>summary::after{content:' ‹'}
 </style>
 </head>
 <body class="kloading">
@@ -1926,6 +1934,6 @@ details.p3fold>summary small{flex:1;color:var(--text-muted);font-size:13px;white
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p4r"></script>
+<script src="/p3/app.js?v=p4s"></script>
 </body>
 </html>
