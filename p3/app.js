@@ -848,8 +848,12 @@ function adjFor(k){const a=ADJ()[k];return a||null}
 function weekFor(k){let t=TYPES;try{((meta.weekChanges&&meta.weekChanges.list)||[]).forEach(w=>{if(k>=w.from&&Array.isArray(w.week)&&w.week.length===7)t=w.week})}catch(e){}return t}
 const planCodes=()=>Object.keys(TNAME).filter(c=>c!=='O');
 function sessionBrief(d,p){const wi=p.wk-1,t=p.type;if(t==='T')return THRMIN[wi]?`${TNAME.T}: ${THR[wi]}`:'5 km time trial';if(t==='E')return `${TNAME.E}: ${EASY[wi]} min easy`;if(t==='X')return `${TNAME.X}: speed block then ${LONG[wi]} min long easy run`;return TNAME[t]}
+// what actually happened to a planned session, so Koach never counts a skipped plan plus your own session as two
+function planSkipped(k){const d=D()[k]||{},l=L()[k];return d.trainIntent==='no'&&!(l&&l.status&&l.status!=='missed')}
+function planNote(k){if(!planSkipped(k))return '';const ex=((D()[k]||{}).extras||[]).length;return ex?' (NOT done: they chose not to do it and did their own session instead, listed as extra. That is the only session that day)':' (NOT done: they chose not to do it today)'}
+function trainSig(k){const d=D()[k]||{},l=L()[k];return [d.trainIntent||'',l&&l.status||'',(d.extras||[]).length].join('|')}
 function loadHistory(k){const out=[];for(let i=6;i>=0;i--){const kk=iso(addD(parse(k),-i)),p=planFor(parse(kk)),l=L()[kk],dd=D()[kk];
-  out.push({date:kk,weekday:fmtD(parse(kk),{weekday:'short'}),planned:p?sessionBrief(parse(kk),p):'no plan yet',done:l&&l.status?`${l.status}${l.dur?`, ${l.dur} min`:''}${l.rpe?`, effort ${l.rpe}/10`:''}`:'',extra:(dd&&dd.extras||[]).map(x=>`${x.desc||x.kind}${x.dur?` ${x.dur} min`:''}${x.rpe?` effort ${x.rpe}`:''}`).join('; ')})}return out}
+  out.push({date:kk,weekday:fmtD(parse(kk),{weekday:'short'}),planned:p?sessionBrief(parse(kk),p)+planNote(kk):'no plan yet',done:l&&l.status?`${l.status}${l.dur?`, ${l.dur} min`:''}${l.rpe?`, effort ${l.rpe}/10`:''}`:'',extra:(dd&&dd.extras||[]).map(x=>`${x.desc||x.kind}${x.dur?` ${x.dur} min`:''}${x.rpe?` effort ${x.rpe}`:''}`).join('; ')})}return out}
 function cleanExtra(x){const kind=EXTRA_KINDS.includes(x.kind)?x.kind:(/run|jog/i.test(x.kind||x.desc||'')?'Run':/gym|weights|lift/i.test(x.kind||x.desc||'')?'Gym':'Other');
   return {kind,dur:Math.max(0,Math.round(+x.dur||0))||null,rpe:isNum(x.rpe)?Math.min(10,Math.max(1,Math.round(+x.rpe))):null,desc:String(x.desc||'').slice(0,80),via:'training'}}
 function extraPrompt(k,text){
@@ -857,7 +861,7 @@ function extraPrompt(k,text){
   const r=readiness(D()[k]);
   return `${XABOUT()} did training outside their plan on ${k} (${fmtD(d,{weekday:'long'})}). Turn what they said into session entries, then decide whether the next few days of their plan need a small change so they don't overload or double up.
 What they said: """${text.slice(0,3000)}"""
-Planned session that day: ${today?sessionBrief(d,today)+(L()[k]&&L()[k].status?` (already logged as ${L()[k].status})`:''):'none (their plan has not started yet)'}.
+Planned session that day: ${today?sessionBrief(d,today)+(L()[k]&&L()[k].status?` (already logged as ${L()[k].status})`:'')+(planSkipped(k)?' (they chose not to do it; what they said replaces it, so do not count the planned session as well)':''):'none (their plan has not started yet)'}.
 Last 7 days: ${JSON.stringify(loadHistory(k))}
 Balance that morning: ${r==null?'not checked in':r+'/100'}.
 Days you may change (only these): ${range.length?JSON.stringify(range):'none'}.
@@ -3177,8 +3181,8 @@ function p1Sheet(html){let h=document.getElementById('p1Host');if(!h){h=document
   if(prevT!=null&&prevT===newT){if(ns){ns.style.minHeight=ps?ps.style.minHeight:'';ns.scrollTop=st}if(nw)nw.scrollTop=wt;requestAnimationFrame(()=>{if(ns){ns.scrollTop=st;ns.style.minHeight=''}if(nw)nw.scrollTop=wt})}}
 // the overview refreshes quietly: it no longer pops open on its own
 var P1OV=P1OV||{tried:''};
-function p1Overview(k){if(sampleMode)return '';const savedAI=meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');const d=D()[k]||{};const stale=!savedAI||iso(new Date(savedAI.at))!==k;
-  if(sample&&stale&&!aiState.busy&&readiness(d)!=null&&P1OV.tried!==k){P1OV.tried=k;P1OV.auto=true;setTimeout(()=>{if(tab()==='dashboard')runAI()},800)}
+function p1Overview(k){if(sampleMode)return '';const savedAI=meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');const d=D()[k]||{};const stale=!savedAI||iso(new Date(savedAI.at))!==k||(savedAI.sig||'||0')!==trainSig(k);const tk=k+'#'+trainSig(k);
+  if(sample&&stale&&!aiState.busy&&readiness(d)!=null&&P1OV.tried!==tk){P1OV.tried=tk;P1OV.auto=true;setTimeout(()=>{if(tab()==='dashboard')runAI()},800)}
   const busy=aiState.busy;if(P1OV.auto)aiState.busy=false;const h=coachHTML(aiState.text&&P1OV.auto&&busy?(savedAI?savedAI.text:''):aiText,savedAI);aiState.busy=busy;return h}
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#aiBtn'))P1OV.auto=false},true);
 const _p2runAI=runAI;runAI=async function(){const r=await _p2runAI.apply(this,arguments);if(P1OV.auto){P1OV.auto=false}return r};
@@ -4187,7 +4191,7 @@ function p3AskCtx(){const t0=todayDate(),k=iso(t0);const dt=dayTypeFor(k);const 
   const sl=[1,2,3].map(i=>{const dd=D()[iso(addD(t0,-i+1))];const h=sleepHours(dd);return h!=null?h+'h':null}).filter(Boolean);
   let su=[];try{su=suppItems(d).map(s=>s.name)}catch(e){}
   const pl=planFor(t0);const foods=(d.food||[]).map(i=>`${i.meal} ${i.at||''}: ${i.name}${i.qty?' ('+i.qty+')':''}`).join('; ');
-  return `About them: ${typeof ABOUT!=='undefined'?ABOUT:''}. Eating approach: ${typeof APPROACH!=='undefined'?APPROACH:''}. Today is ${fmtD(t0,{weekday:'long',day:'numeric',month:'long'})}, a ${dt} day${pl&&!pl.pre?`, plan: ${TNAME[pl.type]}, week ${pl.wk} of 16`:''}.
+  return `About them: ${typeof ABOUT!=='undefined'?ABOUT:''}. Eating approach: ${typeof APPROACH!=='undefined'?APPROACH:''}. Today is ${fmtD(t0,{weekday:'long',day:'numeric',month:'long'})}, a ${dt} day${pl&&!pl.pre?`, plan: ${TNAME[pl.type]}${planSkipped(k)?` but they chose not to do it${(d.extras||[]).length?` and did their own session instead (${d.extras.map(x=>`${x.desc||x.kind}${x.dur?` ${x.dur} min`:''}`).join('; ')}), the only session today`:''}`:(d.extras||[]).length?`, plus extra: ${d.extras.map(x=>`${x.desc||x.kind}${x.dur?` ${x.dur} min`:''}`).join('; ')}`:''}, week ${pl.wk} of 16`:''}.
 Food today: ${foods||'nothing logged yet'}.
 Supplements taken today: ${su.join(', ')||'none'}.
 Nutrients (today vs target, with 7-day average over ${L7.length} logged days):
@@ -4549,7 +4553,7 @@ function nutritionPanels(now){
 function buildSummary(now){
   const DD=D(),LL=L(),T=targets();const lines=[];
   for(let i=27;i>=0;i--){const d=addD(now,-i),k=iso(d),dd=DD[k],l=LL[k],pl=planFor(d);if(!dd&&!l)continue;
-    const p=[`${k} (${DOW[(d.getDay()+6)%7]}, wk ${pl?pl.wk:'-'}, planned ${pl?TNAME[pl.type]:'-'})`];
+    const p=[`${k} (${DOW[(d.getDay()+6)%7]}, wk ${pl?pl.wk:'-'}, planned ${pl?TNAME[pl.type]+planNote(k):'-'})`];
     if(l)p.push(`session ${TNAME[l.type]} ${l.status}${l.dur?` ${l.dur}min`:''}${l.rpe?` RPE${l.rpe}`:''}${l.tb?` trapbar ${l.tb}kg`:''}${l.pace?` pace ${l.pace}/km`:''}${l.fivek?` 5k ${l.fivek}`:''}${l.hyrox&&l.hyrox.items?` hyrox: ${l.hyrox.items.map(x=>x.name).join(', ')}`:''}${l.notes?` note "${l.notes.slice(0,80)}"`:''}`);
     if(dd){const ft=foodTotals(dd),sh=sleepHours(dd),sg=screenGap(dd);
       p.push(`readiness ${readiness(dd)??'-'}; bed ${dd.bed||'-'} up ${dd.wake||'-'} (${sh??'-'}h) screens off ${sg??'-'}min before bed, sleep quality ${dd.sleepQ??'-'}; energy ${dd.energy??'-'} mood ${dd.mood??'-'} stress ${dd.stress??'-'} sore ${dd.sore??'-'}${isNum(dd.rhr)?`; morning pulse ${dd.rhr}`:''}; strain ${strain(k)??'-'}; sleep need ${sleepNeed(k)}h${(dd.flags||[]).length?'; '+dd.flags.join(', '):''}; farm ${isNum(dd.farm)?FARM[dd.farm]:'-'} ${dd.farmHrs??''}h, desk ${dd.deskHrs??'-'}h, car ${dd.carHrs??'-'}h, family time ${dd.familyHrs??'-'}h; habits ${(dd.habits||[]).join('/')||'none'}${ft.n?`; food ${ft.kcal}kcal protein ${Math.round(ft.protein)}g carbs ${Math.round(ft.carbs)}g fat ${Math.round(ft.fat)}g fibre ${Math.round(ft.fibre)}g; day type ${dayTypeFor(k)}; micros off target: ${NUTS.filter(n=>!n.macro&&status(ft[n.k],nutTarget(n.k,dayTypeFor(k)))!=='ok').map(n=>n.l).join(', ')||'none'}; plants ${plantsOn(dd).size}`:''}${fastHours(DD,k)!=null?`; overnight fast ${fastHours(DD,k)}h`:''}${dd.lastCaffeine?` last caffeine ${dd.lastCaffeine}`:''}${(dd.niggles||[]).length?'; niggles '+dd.niggles.map(n=>`${n.side} ${n.area} ${n.pain}/10${n.note?' ('+n.note+')':''}`).join(', '):''}${(dd.extras||[]).length?'; extra '+dd.extras.map(x=>`${x.kind} ${x.dur}min RPE${x.rpe}`).join(', '):''}${dd.notes?`; note "${dd.notes.slice(0,80)}"`:''}`)}
@@ -4567,7 +4571,7 @@ Use the session feedback to judge whether the plan, the recovery and the balance
   aiState={busy:true,text:'',err:''};render();
   try{const {text}=await sample(prompt,{onText:({text})=>{aiState.text=text;const el=$('#aiOut');if(el)el.textContent=text},cache:false});
     aiState={busy:false,text,err:''};
-    if(!sampleMode&&metaCol){try{meta.overview={text,at:new Date().toISOString()};await metaCol.doc('overview').set(meta.overview)}catch(e){}}
+    if(!sampleMode&&metaCol){try{meta.overview={text,at:new Date().toISOString(),sig:trainSig(iso(now))};await metaCol.doc('overview').set(meta.overview)}catch(e){}}
   }catch(e){const m={not_granted:'The overview needs your permission to use the AI coach.',rate_limited:'Too many requests just now. Try again in a few minutes.'};aiState={busy:false,text:e.text||'',err:m[e&&e.code]||'Could not finish the overview. Try again.'}}
   render();
 }
