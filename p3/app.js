@@ -687,7 +687,7 @@ function viewTraining(){
   return pre+(key===iso(todayDate())?injuryBanner():'')+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+(((!pl||pl.type==='R'||pl.pre)&&((D()[key]||{}).extras||[]).length&&tView==='today'&&!sampleMode)?'':extrasCardHTML(key))+patternHTML()+pill;
 }
 function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Overview']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
-function viewTrainingTab(){if(tView==='route')return planNav(tView)+routeHTML();return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?planBtn()+p1EvCard()+fullPlanTip()+viewPlan():viewTraining())}
+function viewTrainingTab(){if(tView==='route')return planNav(tView)+routeHTML();return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+ciChip(iso(sel))+checkinHTML(iso(sel))}
 function viewFood(){return dayHeader()+foodHTML(iso(sel))}
 function viewPlan(){
@@ -699,10 +699,10 @@ function viewPlan(){
       let lab={S:'Str',E:'Easy',H:'Class',T:THRMIN[w-1]?'Thr':'Test',X:'Spd',R:''}[k],v='';
       if(k==='E')v=EASY[w-1]+"'";if(k==='T')v=THRMIN[w-1]?THR[w-1].split(' /')[0]:'5 km';if(k==='X')v=LONG[w-1]+"'";
       if(col==='H'&&k==='T'){lab='Class';v='swap'}
-      let cls='pc';if(k==='R')cls+=' rest';else if(pl.pre)cls+=' pre';else if(l)cls+=l.status==='done'?' done':l.status==='partial'?' part':' miss';
+      const own=!l&&!pl.pre&&((DD[iso(d)]||{}).extras||[]).length&&(k==='R'||(DD[iso(d)]||{}).trainIntent==='no');let cls='pc';if(own){lab='Own';v='';cls+=' done own'}else if(k==='R')cls+=' rest';else if(pl.pre)cls+=' pre';else if(l)cls+=l.status==='done'?' done':l.status==='partial'?' part':' miss';
       if(iso(d)===td)cls+=' today';const rs=readiness(DD[iso(d)]);
       h+=`<button type="button" class="${cls}" style="--c:var(${TVAR[col]});--rc:${rColor(rs)}" data-goto="${iso(d)}" aria-label="${fmtD(d)} ${TNAME[col]}"><span class="k">${lab}</span>${v?`<span class="v">${esc(v)}</span>`:''}${rs!=null?'<span class="rb"></span>':''}</button>`}}
-  return h+`</div><div class="banner">Tap any day to open its training.</div>`;
+  return h+`</div><div class="banner">Tap any day to open it. To move, copy or cancel sessions, tap Edit plan.</div>`;
 }
 // ================= dashboard =================
 function ring(val,max,size,stroke,color,label,sub){const r=(size-stroke)/2,c=2*Math.PI*r,v=val==null?0:Math.max(0,Math.min(1,val/max));const fid='kf'+Math.random().toString(36).slice(2,7);const fd=color==='fade'?`<defs><linearGradient id="${fid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--fade-magenta)"/><stop offset=".5" style="stop-color:var(--fade-blue)"/><stop offset="1" style="stop-color:var(--fade-green)"/></linearGradient></defs>`:'';if(color==='fade')color=`url(#${fid})`;
@@ -850,8 +850,8 @@ const planCodes=()=>Object.keys(TNAME).filter(c=>c!=='O');
 function sessionBrief(d,p){const wi=p.wk-1,t=p.type;if(t==='T')return THRMIN[wi]?`${TNAME.T}: ${THR[wi]}`:'5 km time trial';if(t==='E')return `${TNAME.E}: ${EASY[wi]} min easy`;if(t==='X')return `${TNAME.X}: speed block then ${LONG[wi]} min long easy run`;return TNAME[t]}
 // what actually happened to a planned session, so Koach never counts a skipped plan plus your own session as two
 function planSkipped(k){const d=D()[k]||{},l=L()[k];return d.trainIntent==='no'&&!(l&&l.status&&l.status!=='missed')}
-function planNote(k){if(!planSkipped(k))return '';const ex=((D()[k]||{}).extras||[]).length;return ex?' (NOT done: they chose not to do it and did their own session instead, listed as extra. That is the only session that day)':' (NOT done: they chose not to do it today)'}
-function trainSig(k){const d=D()[k]||{},l=L()[k];return [d.trainIntent||'',l&&l.status||'',(d.extras||[]).length].join('|')}
+function planNote(k){const p=planFor(parse(k));const ch=p&&p.adj&&p.adj.was&&p.adj.was!==p.type?` (changed from ${TNAME[p.adj.was]}${p.adj.note?': '+p.adj.note:''})`:'';if(!planSkipped(k))return ch;const ex=((D()[k]||{}).extras||[]).length;return ex?' (NOT done: they chose not to do it and did their own session instead, listed as extra. That is the only session that day)':' (NOT done: they chose not to do it today)'}
+function trainSig(k){const d=D()[k]||{},l=L()[k],p=planFor(parse(k));return [p?p.type:'',d.trainIntent||'',l&&l.status||'',(d.extras||[]).length].join('|')}
 function loadHistory(k){const out=[];for(let i=6;i>=0;i--){const kk=iso(addD(parse(k),-i)),p=planFor(parse(kk)),l=L()[kk],dd=D()[kk];
   out.push({date:kk,weekday:fmtD(parse(kk),{weekday:'short'}),planned:p?sessionBrief(parse(kk),p)+planNote(kk):'no plan yet',done:l&&l.status?`${l.status}${l.dur?`, ${l.dur} min`:''}${l.rpe?`, effort ${l.rpe}/10`:''}`:'',extra:(dd&&dd.extras||[]).map(x=>`${x.desc||x.kind}${x.dur?` ${x.dur} min`:''}${x.rpe?` effort ${x.rpe}`:''}`).join('; ')})}return out}
 function cleanExtra(x){const kind=EXTRA_KINDS.includes(x.kind)?x.kind:(/run|jog/i.test(x.kind||x.desc||'')?'Run':/gym|weights|lift/i.test(x.kind||x.desc||'')?'Gym':'Other');
@@ -2928,7 +2928,7 @@ rVerdict=function(s,d){const k=d&&d.date;if(!k||maxPain(d)>=3)return _p1rV(s,d);
   if(d.sick&&d.sick.types&&d.sick.types.length)return ['var(--bad)','Look after yourself today.','You\'re not well, so rest from training and keep eating and drinking little and often.'];
   if(s==null)return _p1rV(s,d);
   const p=planFor(parse(k)),l=L()[k];const planned=!!(p&&p.type!=='R'&&!p.pre);const ex=(d.extras||[]).length;const done=!!(l&&(l.status==='done'||l.status==='partial'));const n=(done?1:0)+ex;
-  if(n){const head=n>1?`${n} sessions in today. Good going.`:'Session done. Nice work.';
+  if(n){const rp=p3Replaced(k);const head=rp?`Your own session's done, in place of ${TNAME[rp.was].toLowerCase()}. Good going.`:'Training done for today. Nice work.';
     return [s>=75?'var(--ok)':'var(--warn)',head,s>=75?'Refuel well and enjoy the rest of the day.':s>=55?`Keep the rest of the day easy${n>1?', no more training today,':''} and eat well.`:'You were running a bit low going in, so rest up, eat well and get to bed on time.']}
   const nm=planned?TNAME[p.type].replace(/^(Easy|Strength|Threshold|Speed|Other|Rest)/,m=>m.toLowerCase()):'';
   if(planned){if(s>=75)return ['var(--ok)',`Good to go for your ${nm}.`,'You\'re well recovered. Enjoy it.'];
@@ -3804,8 +3804,8 @@ viewPlan=(function(){return function(){const now=todayDate(),td=iso(now),LL=L(),
   const info=d=>{const k=iso(d),pl=planFor(d),ty=pl&&!pl.pre?pl.type:'R',lg=LL[k];const ex=(DD[k]&&DD[k].extras)||[];const st=lg?lg.status:ex.length?'done':k<td&&ty!=='R'?'none':'';return {k,ty,st,pl}};
   const strip=[0,1,2,3,4,5,6].map(i=>{const d=addD(mon,i),f=info(d);const mark=f.st==='done'?'✓':f.st==='partial'?'½':f.st==='missed'||f.st==='none'?'·':'';
     return `<button type="button" class="p3wk1${f.k===td?' today':''}${f.st==='done'?' done':''}${f.ty==='R'?' rest':''}" data-goto="${f.k}" aria-label="${fmtD(d,{weekday:'long'})}: ${f.ty==='R'?'Rest':esc(TNAME[f.ty])}"><small>${fmtD(d,{weekday:'narrow'})}</small><b>${d.getDate()}</b><i style="--c:var(${TVAR[f.ty]||'--line'})"></i><em>${mark}</em></button>`}).join('');
-  const t=info(now);const tt=t.ty==='R'?'Rest day':esc(TNAME[t.ty]);const lg=LL[td];
-  const todayCard=`<a class="p3wtoday" href="#training" data-goto="${td}" style="--c:var(${TVAR[t.ty]||'--line'})"><small>Today</small><b>${tt}</b><span>${t.ty==='R'?'Recover, walk, stretch':lg?(lg.status==='done'?'Done':lg.status==='partial'?'Partly done':'Missed'):esc(trainTimeFor(td))}</span><i aria-hidden="true">›</i></a>`;
+  const t=info(now);const tex=((DD[td]||{}).extras||[]).length;const town=!LL[td]&&tex&&(t.ty==='R'||(DD[td]||{}).trainIntent==='no');const tt=town?'Your own session':t.ty==='R'?'Rest day':esc(TNAME[t.ty]);const lg=LL[td];
+  const todayCard=`<a class="p3wtoday" href="#training" data-goto="${td}" style="--c:var(${TVAR[t.ty]||'--line'})"><small>Today</small><b>${tt}</b><span>${town?`Done · ${tex} logged${p3Replaced(td)?` · instead of ${esc(TNAME[p3Replaced(td).was])}`:''}`:t.ty==='R'?'Recover, walk, stretch':lg?(lg.status==='done'?'Done':lg.status==='partial'?'Partly done':'Missed'):esc(trainTimeFor(td))}</span><i aria-hidden="true">›</i></a>`;
   const ahead=[1,2,3].map(i=>{const d=addD(now,i),f=info(d);return `<button type="button" class="p3wa" data-goto="${f.k}"><span>${fmtD(d,{weekday:'short'})}</span><b>${f.ty==='R'?'Rest':esc(TNAME[f.ty])}</b><i style="--c:var(${TVAR[f.ty]||'--line'})"></i></button>`}).join('');
   return `<section class="card p3week2"><div class="p3wh"><h2>This week</h2><small>${pl0&&!pl0.pre?`Week ${pl0.wk} of 16 · ${esc(PHN[pl0.p]||'')}`:now<FIRST?`Plan starts ${fmtD(FIRST,{weekday:'short',day:'numeric',month:'short'})}`:''}</small></div><div class="p3wstrip">${strip}</div>${todayCard}<div class="p3wah">Next few days</div><div class="p3was">${ahead}</div></section>
     <details class="card p3all"><summary><b>All 16 weeks</b><small>The whole plan at a glance</small></summary>${_p3VP()}</details>`}})();
@@ -5914,6 +5914,80 @@ window.addEventListener('change',e=>{const t=e.target;if(!t||!t.dataset||t.datas
 // manage them under My food
 kitchenHTML=(function(old){return function(){const l=kuzSaved();const h=old.apply(this,arguments);if(sampleMode)return h;
   return `<article class="card"><div class="chead"><div style="flex:1"><h2>Your usual meals</h2><div class="sub">${l.length?'Tap a name to rename it.':'None yet. On the food log, open a meal and tap Save as usual.'}</div></div></div>${l.length?`<div class="kuzlist">${l.map((u,i)=>`<div class="kuzrow"><input type="text" value="${esc(u.name)}" data-kuzname="${i}" aria-label="Name"><small class="ds">${esc(u.meal)} · ${u.items.map(x=>esc(x.name)).join(', ')} · ${Math.round(u.items.reduce((a,x)=>a+kcalOf(x),0))} kcal</small><button type="button" class="x" data-kuzdel="${i}" aria-label="Remove ${esc(u.name)}">${ico('x')}</button></div>`).join('')}</div>`:''}</article>`+h}})(kitchenHTML);
+// ================= P3 (23 Nov): one story per day, and edit the plan by tapping =================
+// If you log your own session on a day the plan had a session you skipped or that got changed to rest,
+// the Day view shows one card ("Your session today, instead of Strength") rather than Extra + Adjusted + Rest.
+function p3Replaced(k){const p=planFor(parse(k)),d=D()[k]||{},l=L()[k];if(!p||p.pre||(l&&l.status&&l.status!=='missed')||!(d.extras||[]).length)return null;
+  const a=p.adj;const was=p.type!=='R'?p.type:(a&&a.was&&a.was!=='R'?a.was:null);if(!was)return null;
+  if(d.trainIntent==='no'||(p.type==='R'&&a&&a.was&&a.was!=='R'))return {was,adj:a&&a.was&&a.was!==p.type?a:null};return null}
+const P3RP={skip:null};
+sessChip=(function(old){return function(k){if(!sampleMode&&tView==='today'&&p3Replaced(k))return extrasCardHTML(k);return old.apply(this,arguments)}})(sessChip);
+viewTraining=(function(old){return function(){const k=iso(sel);P3RP.skip=!sampleMode&&p3Replaced(k)?k:null;try{return old.apply(this,arguments)}finally{P3RP.skip=null}}})(viewTraining);
+adjBanner=(function(old){return function(pl){if(P3RP.skip===iso(sel))return '';return old.apply(this,arguments)}})(adjBanner);
+moveHTML=(function(old){return function(pl){if(P3RP.skip===iso(sel))return '';return old.apply(this,arguments)}})(moveHTML);
+sessionHTML=(function(old){return function(d,pl){if(P3RP.skip&&P3RP.skip===iso(d))return '';return old.apply(this,arguments)}})(sessionHTML);
+restExtraHTML=(function(old){return function(key,pl){if(P3RP.skip===key)return '';return old.apply(this,arguments)}})(restExtraHTML);
+extrasCardHTML=(function(old){return function(k){if(P3RP.skip===k)return '';let h=old.apply(this,arguments);const r=p3Replaced(k);if(!h||!r)return h;
+  const today=k===iso(todayDate());const note=r.adj&&r.adj.note?r.adj.note:'';
+  h=h.replace('<h2>Extra training</h2>',`<h2>Your session${today?' today':''}</h2>`);
+  h=h.replace(/<div class="sub">Logged for [^<]*/,`<div class="sub">Instead of planned ${esc(TNAME[r.was])}${note?`. ${esc(note)}`:''}`);
+  h=h.replace(new RegExp(`<div class="adjb"><div>(?:(?!<div class="adjb">)[\\s\\S])*?data-xundo="${k}">Undo</button></div>`),'');
+  if(r.adj&&k>=iso(todayDate()))h=h.replace('</article>',`<div class="form" style="padding-top:8px"><button type="button" class="ghost" data-xundo="${k}" style="color:var(--muted)">Put ${esc(TNAME[r.was])} back in the plan</button></div></article>`);
+  return h}})(extrasCardHTML);
+
+// ---- Edit plan: tap a day, then move it, copy it to other days, change it or cancel it ----
+const P3ED={on:false,k:null,mode:null,clip:null};
+function p3EdOK(k){return k>=iso(todayDate())&&!L()[k]&&!!planFor(parse(k))&&!planFor(parse(k)).pre}
+async function p3SetDay(k,type,note,src){const p=planFor(parse(k));if(!p)return false;const cur=Object.assign({},ADJ());
+  if(type===p.base)delete cur[k];else cur[k]={type,note:String(note||'').slice(0,160),src,at:new Date().toISOString(),was:p.type,prev:cur[k]||null};
+  return persistMeta('adjust',{days:cur})}
+function p3EdWarn(k,type){if(!HARDC.includes(type))return '';const nb=[-1,1].map(i=>planFor(addD(parse(k),i))).some(p=>p&&HARDC.includes(p.type));return nb?' Heads up: two hard days back to back.':''}
+function p3EdBar(){if(!P3ED.on)return '';const dn=k=>fmtD(parse(k),{weekday:'short',day:'numeric'});
+  if(P3ED.mode==='move')return `<div class="p3edbar"><div><b>Move ${esc(TNAME[planFor(parse(P3ED.k)).type])}</b><small>Tap the day to move it to. The two days swap.</small></div><button type="button" class="ghost" data-p3ed="back">Cancel</button></div>`;
+  if(P3ED.mode==='copy')return `<div class="p3edbar"><div><b>Paste ${esc(TNAME[P3ED.clip])}</b><small>Tap each day to paste it on. Tap a pasted day again to undo it.</small></div><button type="button" class="primary" data-p3ed="back">Done</button></div>`;
+  if(!P3ED.k)return `<div class="p3edbar"><div><b>Edit your plan</b><small>Tap any day, this week or in All 16 weeks.</small></div><button type="button" class="primary" data-p3ed="off">Done</button></div>`;
+  const k=P3ED.k,p=planFor(parse(k)),ok=p3EdOK(k);
+  if(!ok)return `<div class="p3edbar"><div><b>${dn(k)} · ${esc(TNAME[p?p.type:'R'])}</b><small>${k<iso(todayDate())?'That day has passed.':'Already logged, so it stays as it is.'}</small></div><button type="button" class="ghost" data-p3ed="open">Open day</button><button type="button" class="ghost" data-p3ed="pick0">×</button></div>`;
+  const types=planCodes().filter(c=>c!==p.type);
+  return `<div class="p3edbar col"><div class="p3edh"><b>${dn(k)} · ${esc(TNAME[p.type])}</b>${p.adj&&p.adj.was&&p.adj.was!==p.type?`<small>Was ${esc(TNAME[p.adj.was])}</small>`:''}<button type="button" class="x" data-p3ed="pick0" aria-label="Close">×</button></div>
+    <div class="p3edacts">${p.type!=='R'?`<button type="button" class="ghost" data-p3ed="move">⇄ Move</button><button type="button" class="ghost" data-p3ed="copy">⧉ Copy</button><button type="button" class="ghost" data-p3ed="cancel">✕ Cancel it</button>`:''}${p.adj?`<button type="button" class="ghost" data-p3ed="undo">↺ Put back</button>`:''}<button type="button" class="ghost" data-p3ed="open">Open day ›</button></div>
+    <div class="p3edto"><small>${p.type==='R'?'Add a session':'Change to'}</small>${types.map(c=>`<button type="button" data-p3edto="${c}" style="--c:var(${TVAR[c]})">${esc(c==='R'?'Rest':TNAME[c])}</button>`).join('')}</div></div>`}
+viewPlan=(function(old){return function(){let h=old();
+  h=h.replace(/<button type="button" class="linkbtn" data-p3ra-toggle>[^<]*<\/button>/,`<button type="button" class="linkbtn" data-p3ed="${P3ED.on?'off':'on'}">${P3ED.on?'Done':'Edit plan'}</button>`);
+  const pick=P3ED.mode==='move'||P3ED.mode==='copy'?null:P3ED.k;
+  if(P3ED.on){h=h.replace('<div class="p3wstrip">','<div class="p3wstrip p3ra">').replace('<div class="pgrid">','<div class="pgrid p3edg">');
+    const mk=P3ED.mode?P3ED.k:pick;if(mk)h=h.replace(new RegExp(`class="(p3wk1|pc)([^"]*)"([^>]*)data-goto="${mk}"`,'g'),'class="$1$2 p3pick"$3data-goto="'+mk+'"');}
+  // order: this week, then voice, big days, then the full plan; the edit bar sits fixed at the bottom
+  h=h.replace(/(<section class="card p3week2">[\s\S]*?<\/section>)/,`$1<button type="button" class="p3say" data-open-voice>${ico('mic')}<span><b>Dictate a change</b><small>e.g. "move Thursday's run to Saturday" or "I'm away next weekend"</small></span></button>`);
+  h=h.replace('<details class="card p3all"',p1EvCard()+'<details class="card p3all"');
+  return h+p3EdBar()}})(viewPlan);
+async function p3EdRun(fn){const y=window.scrollY,s0=sel;try{await fn()}finally{sel=s0;sDraft=null;dDraft=null;render();window.scrollTo(0,y)}}
+window.addEventListener('click',async e=>{if(tab()!=='training'||tView!=='plan')return;const c=s=>e.target.closest&&e.target.closest(s);let x;
+  if(x=c('[data-p3ed]')){e.stopImmediatePropagation();e.preventDefault();const a=x.dataset.p3ed,k=P3ED.k;
+    if(a==='on'){Object.assign(P3ED,{on:true,k:null,mode:null});render();return}
+    if(a==='off'){Object.assign(P3ED,{on:false,k:null,mode:null});render();return}
+    if(a==='pick0'){P3ED.k=null;P3ED.mode=null;p3EdRun(async()=>{});return}
+    if(a==='back'){P3ED.mode=null;P3ED.k=null;p3EdRun(async()=>{});return}
+    if(a==='open'){Object.assign(P3ED,{on:false,k:null,mode:null});sel=parse(k);tView='today';render();window.scrollTo({top:0});return}
+    if(a==='move'){P3ED.mode='move';p3EdRun(async()=>{});return}
+    if(a==='copy'){P3ED.mode='copy';P3ED.clip=planFor(parse(k)).type;P3ED.from=k;p3EdRun(async()=>{});return}
+    if(a==='cancel'){const t=planFor(parse(k)).type;await p3EdRun(()=>p3SetDay(k,'R',`${TNAME[t]} cancelled`,'cancel'));toast(`${TNAME[t]} cancelled. Tap Put back to undo.`,3500);return}
+    if(a==='undo'){await p3EdRun(()=>undoAdjust(k));return}
+    return}
+  if(x=c('[data-p3edto]')){e.stopImmediatePropagation();e.preventDefault();const k=P3ED.k,t=x.dataset.p3edto,was=planFor(parse(k)).type;
+    await p3EdRun(()=>p3SetDay(k,t,t==='R'?`${TNAME[was]} cancelled`:`Changed from ${TNAME[was]}`,'edit'));toast(`${fmtD(parse(k),{weekday:'long'})}: ${t==='R'?'rest day':TNAME[t]}.${p3EdWarn(k,t)}`,3500);return}
+  if(!P3ED.on||!(x=c('.p3wk1[data-goto],.pgrid .pc[data-goto]')))return;
+  e.stopImmediatePropagation();e.preventDefault();const k=x.dataset.goto;
+  if(P3ED.mode==='move'){if(k===P3ED.k){P3ED.mode=null;p3EdRun(async()=>{});return}if(!p3EdOK(k)){toast('Pick a day from today on that isn\'t logged yet');return}
+    const a=P3ED.k;P3ED.mode=null;P3ED.k=null;await p3EdRun(()=>moveSession(a,k));return}
+  if(P3ED.mode==='copy'){if(k===P3ED.from)return;if(!p3EdOK(k)){toast('Pick a day from today on that isn\'t logged yet');return}
+    const p=planFor(parse(k));if(p.type===P3ED.clip&&p.adj&&p.adj.src==='copy'){await p3EdRun(()=>undoAdjust(k));return}
+    await p3EdRun(()=>p3SetDay(k,P3ED.clip,`Copied from ${fmtD(parse(P3ED.from),{weekday:'long'})}${p.type!=='R'?`, in place of ${TNAME[p.type]}`:''}`,'copy'));toast(`${TNAME[P3ED.clip]} pasted on ${fmtD(parse(k),{weekday:'long'})}.${p3EdWarn(k,P3ED.clip)}`,3000);return}
+  P3ED.k=P3ED.k===k?null:k;p3EdRun(async()=>{})},true);
+
+// goals moved off the Plan tab; still reachable from You
+viewProfile=(function(old){return function(){const h=old.apply(this,arguments);if(sampleMode)return h;return h.replace('<section class="panel"><h3>Your plan</h3>',planBtn()+'<section class="panel"><h3>Your plan</h3>')}})(viewProfile);
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
