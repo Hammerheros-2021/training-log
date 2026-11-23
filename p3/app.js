@@ -5884,12 +5884,12 @@ function kuzCopyCard(dIso){if(dIso>=kuzToday())return '';const ms=MEALS.filter(m
 foodTodayHTML=(function(old){return function(dIso){const h=old(dIso);return sampleMode?h:kuzDayBar(dIso)+kuzCopyCard(dIso)+h}})(foodTodayHTML);
 // buttons at the bottom of each meal
 p1MealHTML=(function(old){return function(m,its){const h=old(m,its);if(sampleMode)return h;const k=iso(sel);
-  const bar=`<div class="kuzbar"><button type="button" data-kuzsave="${m}">${ico('star')}<span>Save as usual</span></button>${k<kuzToday()?`<button type="button" data-kuzcopy="${m}">${ico('repeat')}<span>Copy to today</span></button>`:''}</div>`;
+  const bar=`<div class="kuzbar"><button type="button" data-kuzsave="${m}">${ico('star')}<span>Save as favourite</span></button>${k<kuzToday()?`<button type="button" data-kuzcopy="${m}">${ico('repeat')}<span>Copy to today</span></button>`:''}</div>`;
   const j=h.lastIndexOf('</details>');return j<0?h:h.slice(0,j)+bar+h.slice(j)}})(p1MealHTML);
 // save-as-usual sheet: name it, untick anything that isn't part of it
 let KUZS=null;
 function kuzSheetDraw(){const s=KUZS;if(!s){p1Sheet(null);return}
-  p1Sheet(`<div class="kshead"><div><h2>Save as a usual meal</h2><small class="ds">${esc(s.meal)} · tick what's in it</small></div><button type="button" class="x" id="kuzX" aria-label="Close">${ico('x')}</button></div>
+  p1Sheet(`<div class="kshead"><div><h2>Save as a favourite meal</h2><small class="ds">${esc(s.meal)} · tick what's in it</small></div><button type="button" class="x" id="kuzX" aria-label="Close">${ico('x')}</button></div>
   <div class="form" style="padding:0;gap:12px"><div class="field"><label class="label" for="kuzname">Name</label><input id="kuzname" type="text" value="${esc(s.name)}" maxlength="40"></div>
   <div class="kuzitems">${s.items.map((i,x)=>`<label class="toggle"><input type="checkbox" data-kuzit="${x}" ${s.on[x]?'checked':''}><span style="flex:1"><b>${esc(i.name)}</b>${i.qty?` · ${esc(i.qty)}`:''}<br><small class="ds">${kcalOf(i)} kcal · ${Math.round(+i.protein||0)} g protein</small></span></label>`).join('')}</div>
   <div class="actions"><button type="button" class="ghost" id="kuzX2" style="flex:1;color:var(--fg)">Cancel</button><button type="button" class="primary" id="kuzSave" style="flex:1">Save</button></div></div>`)}
@@ -5907,13 +5907,13 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
   if(e.target.id==='kuzX'||e.target.closest&&e.target.closest('#kuzX')||e.target.id==='kuzX2'){KUZS=null;p1Sheet(null);return}
   if(e.target.id==='kuzSave'){const s=KUZS;if(!s)return;const name=(($('#kuzname')||{}).value||'').trim().slice(0,40)||s.name;const items=s.items.filter((_,i)=>s.on[i]);if(!items.length){toast('Tick at least one food');return}
     const list=kuzSaved().filter(u=>u.name.toLowerCase()!==name.toLowerCase());list.unshift({name,meal:s.meal,items});KUZS=null;p1Sheet(null);
-    if(await kuzSaveList(list))toast(`Saved "${name}". It's in Usual ${s.meal.toLowerCase()} on the log.`,3500);render();return}
+    if(await kuzSaveList(list))toast(`Saved "${name}". It's in Favourites under ${s.meal}.`,3500);render();return}
   if(x=c('[data-kuzdel]')){const l=kuzSaved().slice();const u=l.splice(+x.dataset.kuzdel,1)[0];await kuzSaveList(l);toast('Removed '+(u?u.name:'usual'));render();return}
 },true);
 window.addEventListener('change',e=>{const t=e.target;if(!t||!t.dataset||t.dataset.kuzname==null)return;const l=clone(kuzSaved());const u=l[+t.dataset.kuzname];const n=String(t.value||'').trim().slice(0,40);if(!u||!n)return;u.name=n;kuzSaveList(l).then(()=>toast('Renamed'))});
 // manage them under My food
 kitchenHTML=(function(old){return function(){const l=kuzSaved();const h=old.apply(this,arguments);if(sampleMode)return h;
-  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Your usual meals</h2><div class="sub">${l.length?'Tap a name to rename it.':'None yet. On the food log, open a meal and tap Save as usual.'}</div></div></div>${l.length?`<div class="kuzlist">${l.map((u,i)=>`<div class="kuzrow"><input type="text" value="${esc(u.name)}" data-kuzname="${i}" aria-label="Name"><small class="ds">${esc(u.meal)} · ${u.items.map(x=>esc(x.name)).join(', ')} · ${Math.round(u.items.reduce((a,x)=>a+kcalOf(x),0))} kcal</small><button type="button" class="x" data-kuzdel="${i}" aria-label="Remove ${esc(u.name)}">${ico('x')}</button></div>`).join('')}</div>`:''}</article>`+h}})(kitchenHTML);
+  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Your favourite meals</h2><div class="sub">${l.length?'Tap a name to rename it.':'None yet. On the food log, open a meal and tap Save as favourite.'}</div></div></div>${l.length?`<div class="kuzlist">${l.map((u,i)=>`<div class="kuzrow"><input type="text" value="${esc(u.name)}" data-kuzname="${i}" aria-label="Name"><small class="ds">${esc(u.meal)} · ${u.items.map(x=>esc(x.name)).join(', ')} · ${Math.round(u.items.reduce((a,x)=>a+kcalOf(x),0))} kcal</small><button type="button" class="x" data-kuzdel="${i}" aria-label="Remove ${esc(u.name)}">${ico('x')}</button></div>`).join('')}</div>`:''}</article>`+h}})(kitchenHTML);
 // ================= P3 (23 Nov): one story per day, and edit the plan by tapping =================
 // If you log your own session on a day the plan had a session you skipped or that got changed to rest,
 // the Day view shows one card ("Your session today, instead of Strength") rather than Extra + Adjusted + Rest.
@@ -6136,24 +6136,61 @@ viewFood=(function(old){return function(){const h=old.apply(this,arguments);if(f
   const day=q('.kuzday'),act=q('article.factions'),meals=q('article.p1meals'),tot=q('article.p1ftot'),cta=q('.bigcta'),plants=q('.p1plants');
   if(day&&act){day.after(act);if(meals)act.after(meals);if(meals&&tot)meals.after(tot);if(cta&&cta.parentNode===R)(plants||tot||meals||act).after(cta)}
   return t.innerHTML}})(viewFood);
-// favourites: star any food you've logged, then it's one tap to add again (portion +/- on the row as before)
+// Favourites = whole meals (e.g. "Darren's porridge" = oats, milk, berries...). One button on the log opens them,
+// grouped under Breakfast, Lunch, Dinner and Snack. Open one to change the whole portion or any ingredient, add or
+// drop ingredients, then add it. Saved in meta 'usuals' (same as the old usual meals).
 const favList=()=>(meta.favs&&Array.isArray(meta.favs.list))?meta.favs.list:[];
-const favKey=n=>String(n||'').toLowerCase().trim();
-function favHas(i){const k=favKey(i.name);return favList().some(f=>favKey(f.name)===k)}
-p1FoodRow=(function(old){return function(i){const h=old.apply(this,arguments);if(sampleMode||i.src==='plan')return h;const on=favHas(i);
-  return h.replace(`<button type="button" class="x" data-del-food="${i.ix}"`,`<button type="button" class="p3fav${on?' on':''}" data-ffav="${i.ix}" aria-pressed="${on}" aria-label="${on?'Remove from':'Add to'} favourites">${ico('star')}</button><button type="button" class="x" data-del-food="${i.ix}"`)}})(p1FoodRow);
-let FAVL=[];
-kuzRowHTML=(function(old){return function(dIso){const h=old.apply(this,arguments);const m=p3ShownMeal();
-  FAVL=favList().slice().sort((a,b)=>(b.meal===m)-(a.meal===m));
-  const fav=`<div class="kuzq p3favq"><span class="label">Favourites</span>${FAVL.length?`<div class="kuztags">${FAVL.map((f,i)=>`<button type="button" class="kuzch p3favch" data-favadd="${i}">${ico('star')}<span>${esc(f.name)}</span><small>${kcalOf(f)} kcal</small></button>`).join('')}</div>`:`<small class="ds">Tap the ☆ on any food you've logged to keep it here.</small>`}</div>`;
-  return fav+h}})(kuzRowHTML);
+let FV=null;
+function fvScale(it,np){if(!it.base){it.base={};NK.forEach(q=>{if(isNum(it[q]))it.base[q]=+it[q]});it.base.kcal=kcalOf(it);it.pct=100}
+  np=Math.max(25,Math.min(400,np));it.pct=np;NK.forEach(q=>{if(it.base[q]!=null)it[q]=q==='kcal'?Math.round(it.base[q]*np/100):Math.round(it.base[q]*np/10)/10})}
+function fvRecent(){const seen=new Set((FV&&FV.items||[]).map(i=>String(i.name).toLowerCase().trim()));const out=[];
+  for(let i=0;i<28&&out.length<24;i++){const k=iso(addD(todayDate(),-i));((D()[k]||{}).food||[]).forEach(f=>{const n=String(f.name||'').toLowerCase().trim();if(!n||seen.has(n)||f.src==='plan')return;seen.add(n);const o=clone(f);delete o.ix;delete o.planRef;delete o.at;out.push(o)})}
+  return out}
+async function fvMigrate(){const f=favList();if(!f.length)return;const l=kuzSaved().slice();f.forEach(x=>{if(!l.some(u=>u.name.toLowerCase()===String(x.name).toLowerCase()))l.push({name:x.name,meal:x.meal||'Breakfast',items:[x]})});
+  await kuzSaveList(l);await persistMeta('favs',{list:[],updatedAt:new Date().toISOString()})}
+function fvTot(its){return its.reduce((a,i)=>({k:a.k+kcalOf(i),p:a.p+(+i.protein||0)}),{k:0,p:0})}
+function fvDraw(){if(!FV){p1Sheet(null);return}const X=`<button type="button" class="x" data-fvx aria-label="Close">${ico('x')}</button>`;
+  if(FV.view==='list'){const saved=kuzSaved();
+    const sec=MEALS.map(m=>{const mine=saved.map((u,i)=>({u,i})).filter(o=>(o.u.meal||'Breakfast')===m);let sug=[];try{sug=kuzSuggest(m)}catch(e){}
+      const rows=mine.map(({u,i})=>{const t=fvTot(u.items);return `<button type="button" class="fvrow" data-fvopen="s${i}"><span><b>${esc(u.name)}</b><small>${u.items.map(x=>esc(x.name)).join(', ')}</small></span><em>${t.k} kcal</em></button>`}).join('')
+        +sug.map((u,j)=>{FV.sug[m+j]=u;const t=fvTot(u.items);return `<button type="button" class="fvrow sug" data-fvopen="g${m}${j}"><span><b>${esc(u.name)}</b><small>You often have this · tap to check and save</small></span><em>${t.k} kcal</em></button>`}).join('');
+      return `<div class="fvsec${m===FV.meal?' cur':''}"><h4>${m}${m===FV.meal?' <small>adding here</small>':''}</h4>${rows||'<div class="ds fvnone">None yet</div>'}</div>`}).join('');
+    p1Sheet(`<div class="kshead"><div><h2>Favourites</h2><small class="ds">Tap one to check it, change portions, then add</small></div>${X}</div><div class="fvlist">${sec}</div>
+      <div class="ds" style="margin-top:12px;font-size:13px">To save a new one, log the meal once, open it on the log and tap <b>Save as favourite</b>.</div>`);return}
+  const t=fvTot(FV.items);const allP=FV.all||100;
+  const rec=FV.adding?fvRecent():[];
+  p1Sheet(`<div class="kshead"><button type="button" class="linkbtn" data-fvback>‹ Favourites</button>${X}</div>
+    <div class="form" style="padding:0;gap:12px"><input id="fvname" type="text" class="fvname" value="${esc(FV.name)}" maxlength="40" aria-label="Name">
+    <div class="fvwhole"><span><b>${t.k} kcal</b> · ${Math.round(t.p)} g protein</span><div class="p1por" role="group" aria-label="Whole meal portion"><button type="button" data-fvall="-25" aria-label="Smaller">${ico('minus')}</button><span class="num">${allP}%</span><button type="button" data-fvall="25" aria-label="Bigger">${ico('plus')}</button></div></div>
+    <div class="fvitems">${FV.items.map((i,x)=>`<div class="fvit"><span><b>${esc(i.name)}</b><small>${esc(i.qty||'')}${i.qty?' · ':''}${kcalOf(i)} kcal</small></span><div class="p1por" role="group" aria-label="Portion of ${esc(i.name)}"><button type="button" data-fvpct="${x}:-25" aria-label="Less">${ico('minus')}</button><span class="num">${i.pct||100}%</span><button type="button" data-fvpct="${x}:25" aria-label="More">${ico('plus')}</button></div><button type="button" class="x" data-fvdel="${x}" aria-label="Remove ${esc(i.name)}">${ico('x')}</button></div>`).join('')||'<div class="ds">No ingredients. Add one below.</div>'}</div>
+    ${FV.adding?`<div class="fvadd"><span class="label">Add an ingredient you've logged lately</span><div class="kuztags">${rec.map((r,j)=>`<button type="button" class="kuzcp" data-fvrec="${j}">${ico('plus')}<span>${esc(r.name)}</span></button>`).join('')||'<span class="ds">Nothing logged lately.</span>'}</div></div>`:`<button type="button" class="linkbtn" data-fvaddopen style="align-self:flex-start">+ Add an ingredient</button>`}
+    <div><span class="label">Add to</span><div class="p2mch">${MEALS.map(m=>`<button type="button" data-fvmeal="${m}" aria-pressed="${FV.meal===m}">${m}</button>`).join('')}</div></div>
+    <button type="button" class="primary" data-fvgo>Add to ${esc(FV.meal.toLowerCase())}</button>
+    <div class="fvfoot">${FV.src!=null?`<button type="button" class="linkbtn" data-fvsave>${FV.dirty?'Save changes to favourite':'Favourite saved'}</button><button type="button" class="linkbtn danger" data-fvrm>Delete favourite</button>`:`<button type="button" class="linkbtn" data-fvsave>Save as favourite</button>`}</div></div>`);
+  FV.rec=rec}
+kuzRowHTML=function(dIso){const n=kuzSaved().length+favList().length;
+  return `<div class="kuzq p3favq"><div class="kuztags"><button type="button" class="kuzcp p3favbtn" data-fvlist>${ico('star')}<span>Favourites${n?` · ${n}`:''}</span></button></div></div>`};
 window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
-  if(x=c('[data-ffav]')){e.preventDefault();e.stopImmediatePropagation();const ix=+x.dataset.ffav;const it=((D()[iso(sel)]||{}).food||[])[ix];if(!it)return;
-    const k=favKey(it.name);let l=favList().slice();const had=l.some(f=>favKey(f.name)===k);
-    if(had)l=l.filter(f=>favKey(f.name)!==k);else{const o=clone(it);delete o.ix;delete o.planRef;delete o.at;delete o.src;l.unshift(o)}
-    if(await persistMeta('favs',{list:l.slice(0,40),updatedAt:new Date().toISOString()}))toast(had?`${it.name} removed from favourites`:`${it.name} added to favourites`);render();return}
-  if(x=c('[data-favadd]')){e.preventDefault();e.stopImmediatePropagation();const f=FAVL[+x.dataset.favadd];if(!f)return;const m=p3ShownMeal();
-    const o=clone(f);o.meal=m;o.at=p3AtFor(m);o.src='fav';await addFood([o]);try{P2OPEN.add(m)}catch(z){}toast(`Added ${f.name}. Use − / + on it to change the portion.`,3000);render();return}},true);
+  const stop=()=>{e.preventDefault();e.stopImmediatePropagation()};
+  if(c('[data-fvlist]')){stop();await fvMigrate();FV={view:'list',meal:p3ShownMeal(),sug:{}};fvDraw();return}
+  if(!FV)return;
+  if(c('[data-fvx]')){stop();FV=null;p1Sheet(null);return}
+  if(c('[data-fvback]')){stop();FV={view:'list',meal:FV.meal,sug:{}};fvDraw();return}
+  const keepName=()=>{const v=(($('#fvname')||{}).value||'').trim();if(v&&v!==FV.name){FV.name=v.slice(0,40);FV.dirty=true}};
+  if(x=c('[data-fvopen]')){stop();const id=x.dataset.fvopen;let u,src=null;if(id[0]==='s'){src=+id.slice(1);u=kuzSaved()[src]}else u=FV.sug[id.slice(1)];if(!u)return;
+    FV={view:'edit',src,meal:FV.meal,name:u.name,items:u.items.map(i=>{const o=clone(i);delete o.ix;delete o.at;return o}),dirty:false,sug:{}};fvDraw();return}
+  if(x=c('[data-fvall]')){stop();keepName();const o=FV.all||100,n=Math.max(25,Math.min(300,o+(+x.dataset.fvall)));if(n===o)return;FV.all=n;FV.items.forEach(i=>fvScale(i,Math.round((i.pct||100)*n/o)));FV.dirty=true;fvDraw();return}
+  if(x=c('[data-fvpct]')){stop();keepName();const [i,d]=x.dataset.fvpct.split(':').map(Number);const it=FV.items[i];if(it){fvScale(it,(it.pct||100)+d);FV.dirty=true}fvDraw();return}
+  if(x=c('[data-fvdel]')){stop();keepName();FV.items.splice(+x.dataset.fvdel,1);FV.dirty=true;fvDraw();return}
+  if(c('[data-fvaddopen]')){stop();keepName();FV.adding=true;fvDraw();return}
+  if(x=c('[data-fvrec]')){stop();keepName();const r=(FV.rec||[])[+x.dataset.fvrec];if(r){FV.items.push(r);FV.dirty=true}FV.adding=false;fvDraw();return}
+  if(x=c('[data-fvmeal]')){stop();keepName();FV.meal=x.dataset.fvmeal;fvDraw();return}
+  if(c('[data-fvsave]')){stop();keepName();if(!FV.items.length){toast('Add at least one ingredient');return}const l=kuzSaved().slice();const item={name:FV.name,meal:FV.src!=null?(l[FV.src]||{}).meal||FV.meal:FV.meal,items:FV.items.map(i=>{const o=clone(i);delete o.ix;delete o.at;return o})};
+    if(FV.src!=null)l[FV.src]=item;else{l.unshift(item);FV.src=0}if(await kuzSaveList(l)){FV.dirty=false;toast(`Saved "${FV.name}"`)}fvDraw();return}
+  if(c('[data-fvrm]')){stop();const l=kuzSaved().slice();const u=l.splice(FV.src,1)[0];await kuzSaveList(l);toast(`Deleted ${u?u.name:'favourite'}`);FV={view:'list',meal:FV.meal,sug:{}};fvDraw();render();return}
+  if(c('[data-fvgo]')){stop();keepName();if(!FV.items.length){toast('Nothing to add');return}const m=FV.meal,nm=FV.name,dirty=FV.dirty&&FV.src!=null;
+    await addFood(kuzPaste(FV.items,m,p3AtFor(m)));try{P2OPEN.add(m)}catch(z){}FV=null;p1Sheet(null);
+    toast(`Added ${nm} to ${m.toLowerCase()}${dirty?'. Changes not saved to the favourite':''}`,3000);render();return}},true);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
