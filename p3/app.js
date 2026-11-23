@@ -6134,6 +6134,8 @@ viewFood=(function(old){return function(){const h=old.apply(this,arguments);if(f
   const t=document.createElement('template');t.innerHTML=h;const R=t.content;const q=s=>R.querySelector(s);
   const back=q('a.backlink');if(back)back.remove();
   const day=q('.kuzday'),act=q('article.factions'),meals=q('article.p1meals'),tot=q('article.p1ftot'),cta=q('.bigcta'),plants=q('.p1plants');
+  const fr=act&&act.querySelector('.frow');if(fr&&!fr.querySelector('[data-fvlist]')){const n=kuzSaved().length+favList().length;fr.insertAdjacentHTML('beforeend',`<button type="button" class="fbtn p3fvtile" data-fvlist><span aria-hidden="true">${ico('star')}</span><b>Favourites</b>${n?`<i>${n}</i>`:''}</button>`);
+    fr.querySelectorAll('.fbtn b').forEach(b=>{b.textContent=b.textContent.replace('Snap plate','Snap').replace('Say it','Say').replace('Type it','Type')})}
   if(day&&act){day.after(act);if(meals)act.after(meals);if(meals&&tot)meals.after(tot);if(cta&&cta.parentNode===R)(plants||tot||meals||act).after(cta)}
   return t.innerHTML}})(viewFood);
 // Favourites = whole meals (e.g. "Darren's porridge" = oats, milk, berries...). One button on the log opens them,
@@ -6168,8 +6170,7 @@ function fvDraw(){if(!FV){p1Sheet(null);return}const X=`<button type="button" cl
     <button type="button" class="primary" data-fvgo>Add to ${esc(FV.meal.toLowerCase())}</button>
     <div class="fvfoot">${FV.src!=null?`<button type="button" class="linkbtn" data-fvsave>${FV.dirty?'Save changes to favourite':'Favourite saved'}</button><button type="button" class="linkbtn danger" data-fvrm>Delete favourite</button>`:`<button type="button" class="linkbtn" data-fvsave>Save as favourite</button>`}</div></div>`);
   FV.rec=rec}
-kuzRowHTML=function(dIso){const n=kuzSaved().length+favList().length;
-  return `<div class="kuzq p3favq"><div class="kuztags"><button type="button" class="kuzcp p3favbtn" data-fvlist>${ico('star')}<span>Favourites${n?` · ${n}`:''}</span></button></div></div>`};
+kuzRowHTML=function(){return ''};
 window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   const stop=()=>{e.preventDefault();e.stopImmediatePropagation()};
   if(c('[data-fvlist]')){stop();await fvMigrate();FV={view:'list',meal:p3ShownMeal(),sug:{}};fvDraw();return}
