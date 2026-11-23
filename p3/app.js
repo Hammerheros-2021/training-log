@@ -5952,15 +5952,41 @@ function p3EdBar(){if(!P3ED.on)return '';const dn=k=>fmtD(parse(k),{weekday:'sho
   return `<div class="p3edbar col"><div class="p3edh"><b>${dn(k)} · ${esc(TNAME[p.type])}</b>${p.adj&&p.adj.was&&p.adj.was!==p.type?`<small>Was ${esc(TNAME[p.adj.was])}</small>`:''}<button type="button" class="x" data-p3ed="pick0" aria-label="Close">×</button></div>
     <div class="p3edacts">${p.type!=='R'?`<button type="button" class="ghost" data-p3ed="move">⇄ Move</button><button type="button" class="ghost" data-p3ed="copy">⧉ Copy</button><button type="button" class="ghost" data-p3ed="cancel">✕ Cancel it</button>`:''}${p.adj?`<button type="button" class="ghost" data-p3ed="undo">↺ Put back</button>`:''}<button type="button" class="ghost" data-p3ed="open">Open day ›</button></div>
     <div class="p3edto"><small>${p.type==='R'?'Add a session':'Change to'}</small>${types.map(c=>`<button type="button" data-p3edto="${c}" style="--c:var(${TVAR[c]})">${esc(c==='R'?'Rest':TNAME[c])}</button>`).join('')}</div></div>`}
+// Week card: weeks scroll sideways, tapping a day shows its plan right underneath (no jump to the Day tab)
+const P3WK={sel:null};
+function p3DayBits(k){const d=parse(k),pl=planFor(d),LL=L(),DD=D();const ty=pl&&!pl.pre?pl.type:'R',lg=LL[k];const ex=(DD[k]&&DD[k].extras)||[];
+  const own=!lg&&ex.length&&(ty==='R'||(DD[k]||{}).trainIntent==='no');const st=lg?lg.status:ex.length?'done':k<iso(todayDate())&&ty!=='R'?'none':'';return {k,d,pl,ty,lg,ex,own,st}}
+function p3WeekSec(){const now=todayDate(),td=iso(now);if(!P3WK.sel)P3WK.sel=td;const pl0=planFor(now);const mon0=addD(now,-((now.getDay()+6)%7));
+  let a=START<mon0?START:mon0;const endMon=addD(END,-6)>addD(mon0,14)?addD(END,-6):addD(mon0,14);const weeks=[];for(let m=a;m<=endMon&&weeks.length<20;m=addD(m,7))weeks.push(m);
+  const team=k=>{try{return (MYP.list||[]).some(x=>{const t=mypAt(x,k);return t.started&&!t.finished&&t.days.length})}catch(e){return false}};
+  const strip=weeks.map(m=>{const p=planFor(m);const lab=p&&!p.pre?`Week ${p.wk}${PHN[p.p]?' · '+PHN[p.p]:''}`:'';
+    return `<div class="p3wgrp" data-wkmon="${iso(m)}"><div class="p3wklb">${esc(lab)}<span>${fmtD(m,{day:'numeric',month:'short'})}</span></div><div class="p3wstrip">${[0,1,2,3,4,5,6].map(i=>{const f=p3DayBits(iso(addD(m,i)));const mark=f.st==='done'?'✓':f.st==='partial'?'½':f.st==='missed'||f.st==='none'?'·':'';
+      return `<button type="button" class="p3wk1${f.k===td?' today':''}${f.k===P3WK.sel?' sel':''}${f.st==='done'?' done':''}${f.ty==='R'&&!f.own?' rest':''}" data-goto="${f.k}" aria-label="${fmtD(f.d,{weekday:'long'})}: ${f.own?'Your own session':f.ty==='R'?'Rest':esc(TNAME[f.ty])}">${team(f.k)?'<span class="p3wteam">S&amp;C</span>':''}<small>${fmtD(f.d,{weekday:'narrow'})}</small><b>${f.d.getDate()}</b><i style="--c:var(${f.own?'--o':TVAR[f.ty]||'--line'})"></i><em>${mark}</em></button>`}).join('')}</div></div>`}).join('');
+  return `<section class="card p3week2"><div class="p3wh"><h2>Your plan</h2><button type="button" class="linkbtn" data-p3ed="${P3ED.on?'off':'on'}">${P3ED.on?'Done':'Edit plan'}</button><small>${pl0&&!pl0.pre?`Week ${pl0.wk} of 16 · swipe for next week`:now<FIRST?`Plan starts ${fmtD(FIRST,{weekday:'short',day:'numeric',month:'short'})}`:''}</small></div>
+    <div class="p3wscroll${P3ED.on?' p3ra':''}">${strip}</div>${P3ED.on?'':p3DayPeek(P3WK.sel)}</section>`}
+function p3DayPeek(k){const f=p3DayBits(k);const td=iso(todayDate());const rel=k===td?'Today':k===iso(addD(todayDate(),1))?'Tomorrow':k===iso(addD(todayDate(),-1))?'Yesterday':'';
+  const head=`<div class="p3pkh"><small>${rel?rel+' · ':''}${fmtD(f.d,{weekday:'long',day:'numeric',month:'short'})}</small></div>`;
+  const adj=f.pl&&f.pl.adj&&f.pl.adj.was&&f.pl.adj.was!==f.pl.type&&!f.own?`<div class="p3pkn">Changed from ${esc(TNAME[f.pl.adj.was])}${f.pl.adj.note?': '+esc(f.pl.adj.note):''}</div>`:'';
+  const open=`<button type="button" class="linkbtn p3pko" data-p3open="${k}">Open day ›</button>`;
+  if(f.own){const r=p3Replaced(k);return `<div class="p3peek" style="--c:var(--o)">${head}<b class="p3pkt">Your own session</b><div class="p3pkn">${r?`Instead of planned ${esc(TNAME[r.was])} · `:''}done</div><ul class="p3pkx">${f.ex.map(x=>`<li>${esc(x.desc||x.kind)}${x.dur?` · ${x.dur} min`:''}</li>`).join('')}</ul>${open}</div>`}
+  if(!f.pl||f.pl.pre)return `<div class="p3peek">${head}<b class="p3pkt">No plan for this day</b>${f.ex.length?`<ul class="p3pkx">${f.ex.map(x=>`<li>${esc(x.desc||x.kind)}</li>`).join('')}</ul>`:''}${open}</div>`;
+  let body='';const sf=sessionForm;try{sessionForm=()=>'';body=sessionHTML(f.d,f.pl)}catch(e){body=''}finally{sessionForm=sf}
+  body=body.replace(/^<article class="card"[^>]*>/,'').replace(/<\/article>\s*$/,'').replace(/<div class="meta">[\s\S]*?<\/div>/,'');
+  const stt=f.lg?(f.lg.status==='done'?'Done':f.lg.status==='partial'?'Partly done':'Missed'):(D()[k]||{}).trainIntent==='no'?'Skipping':f.ty!=='R'&&k>=td?trainTimeFor(k):f.st==='none'?'Not logged':'';
+  return `<div class="p3peek" style="--c:var(${TVAR[f.ty]||'--line'})">${head}${stt?`<span class="p3pks">${esc(stt)}</span>`:''}${adj}<div class="p3pkb">${body}</div>${f.ex.length?`<div class="p3pkn">Plus: ${esc(f.ex.map(x=>x.desc||x.kind).join(', '))}</div>`:''}${open}</div>`}
+function p3WkScroll(){const sc=document.querySelector('.p3wscroll');if(!sc)return;const b=sc.querySelector(`[data-goto="${P3ED.on&&P3ED.k?P3ED.k:P3WK.sel}"]`)||sc.querySelector('.p3wk1.today');const g=b&&b.closest('.p3wgrp');if(g)sc.scrollLeft=g.offsetLeft-sc.offsetLeft}
+// team S&C card on the Plan tab: one line that opens up
+mypCard=(function(old){return function(where){const h=old(where);if(where!=='plan'||!h)return h;let line='';try{const k=iso(todayDate());const a=MYP.list.find(x=>!mypAt(x,k).finished);if(a){const t=mypAt(a,k),nx=mypNext(a,k);line=t.days.length?`Today: ${t.days.map(d=>d.title||'Session').join(', ')}`:nx?`Next: ${nx.d.title||'Session'}, ${fmtD(parse(nx.k),{weekday:'short'})}`:''}}catch(e){}
+  return `<details class="card p3team"><summary><span class="p3tmi">${ico('dumbbell')}</span><span><b>Team S&amp;C</b><small>${esc(line)}</small></span></summary>${h.replace(/<section class="panel" id="mypCard"><h3>From your team · S&amp;C<\/h3>/g,'<section class="panel p3tmin" id="mypCard">')}</details>`}})(mypCard);
 viewPlan=(function(old){return function(){let h=old();
-  h=h.replace(/<button type="button" class="linkbtn" data-p3ra-toggle>[^<]*<\/button>/,`<button type="button" class="linkbtn" data-p3ed="${P3ED.on?'off':'on'}">${P3ED.on?'Done':'Edit plan'}</button>`);
-  const pick=P3ED.mode==='move'||P3ED.mode==='copy'?null:P3ED.k;
-  if(P3ED.on){h=h.replace('<div class="p3wstrip">','<div class="p3wstrip p3ra">').replace('<div class="pgrid">','<div class="pgrid p3edg">');
-    const mk=P3ED.mode?P3ED.k:pick;if(mk)h=h.replace(new RegExp(`class="(p3wk1|pc)([^"]*)"([^>]*)data-goto="${mk}"`,'g'),'class="$1$2 p3pick"$3data-goto="'+mk+'"');}
-  // order: this week, then voice, big days, then the full plan; the edit bar sits fixed at the bottom
-  h=h.replace(/(<section class="card p3week2">[\s\S]*?<\/section>)/,`$1<button type="button" class="p3say" data-open-voice>${ico('mic')}<span><b>Dictate a change</b><small>e.g. "move Thursday's run to Saturday" or "I'm away next weekend"</small></span></button>`);
+  h=h.replace(/<section class="card p3week2">[\s\S]*?<\/section>/,p3WeekSec());
+  if(P3ED.on){h=h.replace('<div class="pgrid">','<div class="pgrid p3edg">');const mk=P3ED.k;if(mk)h=h.replace(new RegExp(`class="(p3wk1|pc)([^"]*)"([^>]*)data-goto="${mk}"`,'g'),'class="$1$2 p3pick"$3data-goto="'+mk+'"')}
   h=h.replace('<details class="card p3all"',p1EvCard()+'<details class="card p3all"');
-  return h+p3EdBar()}})(viewPlan);
+  setTimeout(p3WkScroll,0);return h+p3EdBar()}})(viewPlan);
+window.addEventListener('click',e=>{if(tab()!=='training'||tView!=='plan'||P3ED.on)return;const c=s=>e.target.closest&&e.target.closest(s);let x;
+  if(x=c('[data-p3open]')){e.stopImmediatePropagation();e.preventDefault();sel=parse(x.dataset.p3open);sDraft=null;dDraft=null;tView='today';render();window.scrollTo({top:0});return}
+  if(!(x=c('.p3wk1[data-goto],.pgrid .pc[data-goto],.p3wa[data-goto]')))return;e.stopImmediatePropagation();e.preventDefault();const fromGrid=!!c('.pgrid');P3WK.sel=x.dataset.goto;const y=window.scrollY;render();
+  if(fromGrid){const pk=document.querySelector('.p3week2');if(pk)pk.scrollIntoView({block:'start'})}else window.scrollTo(0,y)},true);
 async function p3EdRun(fn){const y=window.scrollY,s0=sel;try{await fn()}finally{sel=s0;sDraft=null;dDraft=null;render();window.scrollTo(0,y)}}
 window.addEventListener('click',async e=>{if(tab()!=='training'||tView!=='plan')return;const c=s=>e.target.closest&&e.target.closest(s);let x;
   if(x=c('[data-p3ed]')){e.stopImmediatePropagation();e.preventDefault();const a=x.dataset.p3ed,k=P3ED.k;
@@ -5986,7 +6012,121 @@ window.addEventListener('click',async e=>{if(tab()!=='training'||tView!=='plan')
   P3ED.k=P3ED.k===k?null:k;p3EdRun(async()=>{})},true);
 
 // goals moved off the Plan tab; still reachable from You
-viewProfile=(function(old){return function(){const h=old.apply(this,arguments);if(sampleMode)return h;return h.replace('<section class="panel"><h3>Your plan</h3>',planBtn()+'<section class="panel"><h3>Your plan</h3>')}})(viewProfile);
+viewProfile=(function(old){return function(){const h=old.apply(this,arguments);if(sampleMode)return h;return h.replace('<section class="panel"><h3>Your plan</h3>',planBtn()+'<button type="button" class="kpbtn" data-p3move><span class="kpic">'+ico('calendar')+'</span><span class="kpt"><b>Move your start date</b><small>Shift the whole 16 weeks</small></span><span class="kpgo" aria-hidden="true">›</span></button><section class="panel"><h3>Your plan</h3>')}})(viewProfile);
+
+// ================= P3 (23 Nov): Today tidy — Ask Koach up top, small icon buttons for heart rate, alerts and meals =================
+function p3TodayActs(k){const d=D()[k]||{};const a=[];const isT=k===iso(todayDate());
+  if(isT&&!(d.hr||isNum(d.rhr))&&readiness(d))a.push(`<button type="button" class="p3act p3heart" data-p2hropen="${k}" aria-label="Add heart rate">${ico('heart-pulse')}</button>`);
+  let rs=[];try{rs=p3ULrisks()}catch(e){}
+  if(rs.length)a.push(`<button type="button" class="p3act p3warn" data-p3warn aria-label="${rs.length} nutrition alert${rs.length>1?'s':''}">${ico('triangle-alert')}<i>${rs.length}</i></button>`);
+  const due=planDue();if(due)a.push(`<button type="button" class="p3act" data-fview="plan" aria-label="${due==='none'?'Plan your meals':'Meal plan ends today'}">${ico('utensils')}<i class="dot"></i></button>`);
+  if(!d.foodDone&&(d.food||[]).length&&new Date().getHours()>=19)a.push(`<button type="button" class="p3act" id="signOpen" aria-label="Finished eating?">${ico('moon')}</button>`);
+  return a.length?`<div class="p3acts">${a.join('')}</div>`:''}
+p3Today=function(k,s){const tpl=document.createElement('template');tpl.innerHTML=p3Koach(k);[...tpl.content.querySelectorAll('.p3chips,.p3ulrow')].forEach(x=>x.remove());const ask=tpl.content.querySelector('.p3askbar');if(ask)ask.remove();
+  const rings=p3Rings(k,s);const acts=p3TodayActs(k);
+  return p1Top()+tpl.innerHTML+(ask?ask.outerHTML:'')+injuryBanner()+(acts?`<div class="p3ringrow">${rings}${acts}</div>`:rings)+p3Tiles()+p3SCToday()+p2Habits(k)};
+window.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3warn]');if(!x)return;e.stopImmediatePropagation();let rs=[];try{rs=p3ULrisks()}catch(z){}
+  p1Sheet(`<div class="kshead"><div><h2>Worth a look</h2><small class="ds">Over the safe limit too often lately</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <div class="p3warnl">${rs.map(r=>{const n=NUTS.find(z=>z.k===r.k);return `<button type="button" class="p3warni" data-nutinfo="${r.k}"><span class="p3ulic">!</span><span><b>${esc(n.l)} high</b><small>${r.o7>=3?`${r.o7} of the last ${r.n7} days`:`${r.o14} of the last ${r.n14} days`}</small></span><span aria-hidden="true">›</span></button>`}).join('')||'<p class="ds">Nothing to flag right now.</p>'}</div>`)},true);
+
+// Progress: compact tab row (icon + name on one line, scrolls sideways)
+progSub=(function(old){return function(){return old.apply(this,arguments).replace(/<nav class="p1nav([^"]*)">/,'<nav class="p1nav$1 p3navc">')}})(progSub);
+
+// ================= P3 (23 Nov): Body map v2 — body first, cleaner figure, 2-week default, honest about short history =================
+bmS.wi=1;
+const BM_WINS=[[0,'1 wk'],[1,'2 wk'],[3,'1 mo'],[7,'3 mo']];
+// how much of the window you've actually been logging, so a long window doesn't make everything look neglected
+function bmFirstLog(){const LL=L(),DD=D();let f=null;Object.keys(LL).forEach(k=>{if(LL[k]&&LL[k].status&&(!f||k<f))f=k});Object.keys(DD).forEach(k=>{if(((DD[k]||{}).extras||[]).length&&(!f||k<f))f=k});return f}
+bmCalc=(function(old){return function(){const r=old.apply(this,arguments);const now=sampleMode?SAMPLE.now:todayDate();const first=sampleMode?null:bmFirstLog();r.wksSel=r.wks;r.short=false;
+  if(first){const span=Math.round((now-parse(first))/DAY)+1;const eff=Math.max(1,Math.min(r.wks,span/7));if(eff<r.wks*.85){const f=r.wks/eff;r.short=span;r.wks=eff;
+    r.rows.forEach(x=>{x.pw*=f;x.r*=f;x.mob*=f;x.st=x.r<.4?'neg':x.r<.8?'light':'ok'});
+    r.regs.forEach(g=>{const rs=r.rows.filter(x=>x.rg===g.k);const tw=rs.reduce((a,x)=>a+x.t,0);g.r=rs.reduce((a,x)=>a+Math.min(x.r,1.3)*x.t,0)/tw;g.st=g.r<.4?'neg':g.r<.8?'light':'ok';g.low=rs.filter(x=>x.st!=='ok').sort((a,b)=>a.r-b.r).map(x=>x.nm)});
+    r.bal=r.bal.map(b=>[b[0],b[1],b[2]*f,b[3],b[4]*f,b[5]])}}
+  return r}})(bmCalc);
+// figure: one half drawn, mirrored. viewBox 0 0 200 440, centre line x=100
+const BM2_BODY_F='M100,14 C109,14 114,22 114,32 C114,42 110,48 107,51 L108,58 C116,61 128,62 138,66 C146,70 150,78 152,88 L156,118 C158,130 160,142 161,152 L166,196 C167,206 168,214 166,222 C164,228 160,226 159,220 L155,200 C152,186 149,170 147,158 L141,128 L138,150 C136,162 134,172 134,182 C138,196 139,212 138,228 C137,252 133,276 130,298 C131,312 130,330 128,346 C127,362 126,380 127,398 L128,412 C132,418 132,424 127,425 L112,425 C109,422 110,414 112,408 C112,392 112,372 111,352 C110,330 108,306 106,284 L103,232 L100,224 L97,232 L94,284 C92,306 90,330 89,352 C88,372 88,392 88,408 C90,414 91,422 88,425 L73,425 C68,424 68,418 72,412 L73,398 C74,380 73,362 72,346 C70,330 69,312 70,298 C67,276 63,252 62,228 C61,212 62,196 66,182 C66,172 64,162 62,150 L59,128 L53,158 C51,170 48,186 45,200 L41,220 C40,226 36,228 34,222 C32,214 33,206 34,196 L39,152 C40,142 42,130 44,118 L48,88 C50,78 54,70 62,66 C72,62 84,61 92,58 L93,51 C90,48 86,42 86,32 C86,22 91,14 100,14 Z';
+const BM2_F=[
+ ['delts','<path d="M63,67 C55,70 50,78 49,90 C49,98 51,104 54,108 C58,98 63,88 68,80 C68,74 66,70 63,67 Z"/>'],
+ ['chest','<path d="M98,66 C88,64 76,66 69,72 C64,80 62,90 66,98 C74,104 88,104 98,100 Z"/>'],
+ ['arms','<path d="M52,110 C48,118 46,128 46,138 C47,146 50,150 53,150 C57,142 60,132 61,122 C61,114 58,108 52,110 Z"/>'],
+ ['grip','<path d="M45,156 C42,168 39,182 38,196 C38,204 41,206 44,202 C48,190 52,176 54,162 C53,155 48,152 45,156 Z"/>'],
+ ['abs','<path d="M90,106 L98,106 L98,124 L90,124 C89,118 89,112 90,106 Z"/><path d="M90,127 L98,127 L98,145 L90,145 Z"/><path d="M90,148 L98,148 L98,170 C95,172 92,170 90,166 Z"/>'],
+ ['obliques','<path d="M86,106 C78,110 72,120 70,134 C69,148 70,160 74,170 C78,166 83,160 86,152 Z"/>'],
+ ['hipflex','<path d="M75,176 C78,186 84,196 92,206 C95,200 96,192 96,184 C90,180 82,178 75,176 Z"/>'],
+ ['quads','<path d="M68,190 C64,206 64,226 66,246 C68,262 72,280 78,292 C84,296 92,292 94,284 C96,262 96,236 94,214 C88,206 80,198 74,190 Z"/>'],
+ ['adductors','<path d="M96,214 C98,226 98,240 97,252 C96,258 95,262 94,262 C94,246 94,228 95,214 Z"/>'],
+ ['shins','<path d="M83,318 C80,336 79,356 81,376 C82,388 85,394 87,392 C89,372 90,350 89,330 C88,322 86,316 83,318 Z"/>'],
+ ['calves','<path d="M74,316 C71,330 71,346 74,360 C76,366 79,364 79,358 C79,342 79,328 77,318 Z"/>']];
+const BM2_B=[
+ ['upback','<path d="M98,52 C90,56 80,60 70,66 C74,76 82,90 90,104 C94,110 97,114 98,116 Z"/>'],
+ ['delts','<path d="M63,67 C55,70 50,78 49,90 C49,98 51,104 54,108 C58,98 63,88 68,80 C68,74 66,70 63,67 Z"/>'],
+ ['cuff','<path d="M70,74 C76,82 82,92 86,102 C80,104 74,100 70,94 C68,88 68,80 70,74 Z"/>'],
+ ['lats','<path d="M66,98 C64,112 66,126 70,140 C76,140 86,134 96,126 L96,120 C88,112 78,104 66,98 Z"/>'],
+ ['lowback','<path d="M86,138 C90,136 94,134 98,132 L98,172 C94,172 90,170 86,166 Z"/>'],
+ ['arms','<path d="M52,110 C48,118 46,128 46,138 C47,146 50,150 53,150 C57,142 60,132 61,122 C61,114 58,108 52,110 Z"/>'],
+ ['grip','<path d="M45,156 C42,168 39,182 38,196 C38,204 41,206 44,202 C48,190 52,176 54,162 C53,155 48,152 45,156 Z"/>'],
+ ['gmed','<path d="M68,170 C66,178 66,186 68,192 C72,188 77,182 80,176 C76,172 72,170 68,170 Z"/>'],
+ ['glutes','<path d="M98,176 C88,174 78,178 70,188 C66,198 66,210 72,220 C80,226 92,226 98,222 Z"/>'],
+ ['hams','<path d="M68,228 C66,246 68,266 74,284 C80,292 90,292 94,286 C96,268 97,248 96,230 C88,232 76,232 68,228 Z"/>'],
+ ['calves','<path d="M73,312 C69,326 70,342 75,356 C80,364 88,362 90,354 C92,340 91,326 88,314 C83,308 77,308 73,312 Z"/>']];
+function bm2Fig(parts,col,lbl,dim){const sh=parts.map(([k,svg])=>`<g class="bm2m${bmS.sel===k?' on':''}${dim&&!dim.includes(k)?' dim':''}" data-bmm="${k}" style="--mc:${col[k]}">${svg}</g>`).join('');
+  return `<figure class="bm2fig"><svg viewBox="28 6 144 426" role="img" aria-label="${lbl} of the body">
+   <path class="bm2body" d="${BM2_BODY_F}"/>${sh}<g transform="translate(200,0) scale(-1,1)">${sh}</g></svg><figcaption>${lbl}</figcaption></figure>`}
+const BM2_C={neg:'#E5534B',light:'#E8A33D',ok:'#3FB98A'};
+function bmWl(w){return w===13?'3 months':w===1?'1 week':w===4?'1 month':w+' weeks'}
+viewBody=function(){
+  const now=sampleMode?SAMPLE.now:todayDate();
+  if(!sampleMode&&MYP.list==null&&typeof mypLoad==='function')mypLoad();
+  const c=bmCalc();const goals=c.goals;const fmt=v=>v>=10?Math.round(v):v.toFixed(1);
+  const col={};c.rows.forEach(r=>{const reg=c.regs.find(x=>x.k===r.rg);col[r.k]=BM2_C[bmS.lvl===1?reg.st:r.st]});
+  const ctl=`<div class="bm2ctl"><div class="bm2win">${BM_WINS.map(([i,l])=>`<button type="button" data-bm2win="${i}" aria-pressed="${bmS.wi===i}">${l}</button>`).join('')}</div>
+    <div class="bm2lvl"><button type="button" data-bmlvl="2" aria-pressed="${bmS.lvl===2}">Muscles</button><button type="button" data-bmlvl="1" aria-pressed="${bmS.lvl===1}">Areas</button></div></div>`;
+  const ex=sampleMode?`<div class="bm2ex"><span class="sample">Example data</span><button type="button" class="linkbtn" id="sampleBtn">Show my data</button></div>`:'';
+  if(!c.sessions)return ctl+ex+`<div class="panel empty"><h3>Nothing logged in the last ${bmWl(c.wksSel)}</h3>Log a session, or look back further, and the map lights up.</div>`;
+  const n=s=>c.rows.filter(r=>r.st===s).length;
+  // selected muscle or area
+  const selR=bmS.sel&&c.rows.find(r=>r.k===bmS.sel);const selA=!selR&&bmS.area&&c.regs.find(g=>g.k===bmS.area);
+  const dim=selA?c.rows.filter(r=>r.rg===selA.k).map(r=>r.k):null;
+  let card='';
+  if(selR){card=`<div class="bm2card" style="--c:${BM2_C[selR.st]}"><div class="bm2ch"><b>${esc(selR.nm)}</b><em>${BM_W[selR.st]}</em><button type="button" class="x" data-bm2clear aria-label="Close">×</button></div>
+    <div class="bm2meter"><span style="width:${Math.min(100,selR.r*100)}%"></span></div><div class="bm2cs">${fmt(selR.pw)} a week · needs ${fmt(selR.t)}${selR.why!=='All-round'?` for ${esc(selR.why)}`:''}</div>
+    <div class="bm2cs">${selR.top.length?`Worked mostly by ${selR.top.map(esc).join(', ')}`:'Nothing you\'ve logged works this yet.'}${selR.mob>0?` · mobility about ${fmt(selR.mob)}× a week`:''}</div></div>`}
+  else if(selA){card=`<div class="bm2card" style="--c:${BM2_C[selA.st]}"><div class="bm2ch"><b>${esc(selA.nm)}</b><em>${BM_W[selA.st]}</em><button type="button" class="x" data-bm2clear aria-label="Close">×</button></div>
+    <div class="bm2meter"><span style="width:${Math.min(100,selA.r*100)}%"></span></div><div class="bm2cs">${selA.low.length?`Low: ${selA.low.map(esc).join(', ')}`:'Everything here is covered'}</div></div>`}
+  else card=`<div class="bm2tap">Tap the body to see what's working it</div>`;
+  const items=(bmS.lvl===1?c.regs:c.rows).slice().sort((a,b)=>a.r-b.r);
+  const list=items.map(r=>`<button type="button" class="bm2row${(bmS.lvl===2?bmS.sel:bmS.area)===r.k?' on':''}" ${bmS.lvl===2?`data-bmm="${r.k}"`:`data-bm2area="${r.k}"`}><i style="background:${BM2_C[r.st]}"></i><b>${esc(r.nm)}</b><span class="bm2bar"><span style="width:${Math.min(100,r.r*100)}%;background:${BM2_C[r.st]}"></span></span><em>${BM_W[r.st]}</em></button>`).join('');
+  const bal=c.bal.map(([t,a,av,b,bv,tip])=>{const tot=av+bv||1;const pa=Math.round(av/tot*100);const ok=t.startsWith('Front vs back of the thigh')?bv>=av*.66:t.startsWith('Push')?bv>=av*.95:bv>=av*.9;
+    return `<div class="bmbal"><div class="bmbalh"><b>${t}</b><em style="color:${ok?BM2_C.ok:BM2_C.light}">${ok?'Balanced':'Lopsided'}</em></div><div class="bmsplit"><span style="width:${pa}%"></span></div><div class="bmbalf"><span>${a} ${fmt(av)}</span><span>${b} ${fmt(bv)}</span></div>${ok?'':`<div class="hint">${tip}</div>`}</div>`}).join('');
+  const pmax=Math.max(1,...Object.values(c.pat));
+  const pats=BM_PAT.map(([k,nm])=>{const v=c.pat[k]/c.wks;return `<div class="bar" style="--c:${v<.5?BM2_C.neg:v<1?BM2_C.light:'var(--accent)'}"><span>${nm}</span><div class="tr"><div class="fl" style="width:${Math.max(3,c.pat[k]/pmax*100)}%"></div></div><span class="pct">${fmt(v)}/wk</span></div>`}).join('');
+  const single=c.legShare!=null?`<div class="hint">Single-leg and side-to-side work is ${Math.round(c.legShare*100)}% of your leg exercises${c.legShare<.3&&(goals.includes('gaa')||goals.includes('run'))?'. Field sports and running are done on one leg at a time, so aim for at least a third.':'.'}</div>`:'';
+  const untag=c.untag.length?`<div class="hint">Keel couldn't place ${c.untag.length} exercise${c.untag.length>1?'s':''}: ${c.untag.slice(0,5).map(esc).join(', ')}. They're left out for now.</div>`:'';
+  const short=c.short?`<div class="bm2note">You've only logged ${c.short} day${c.short>1?'s':''} of training, so this is based on those, not the full ${bmWl(c.wksSel)}.</div>`:'';
+  return ctl+ex+`<section class="bm2hero">
+    <div class="bm2sum"><span style="--c:${BM2_C.neg}">${n('neg')} neglected</span><span style="--c:${BM2_C.light}">${n('light')} light</span><span style="--c:${BM2_C.ok}">${n('ok')} covered</span></div>
+    <div class="bm2figs">${bm2Fig(BM2_F,col,'Front',dim)}${bm2Fig(BM2_B,col,'Back',dim)}</div>${card}${short}</section>
+    <details class="panel bm2list" ${bmS.listOpen?'open':''}><summary><h3>${bmS.lvl===1?'All areas':'All muscles'}</h3><small>weakest first</small></summary>${list}${untag}</details>
+    <details class="panel bm2more"><summary><h3>Balance</h3><small>push, pull, front, back</small></summary>${bal}${single}</details>
+    <details class="panel bm2more"><summary><h3>Movement patterns</h3><small>times a week</small></summary>${pats}</details>
+    <details class="panel bm2more"><summary><h3>Judged on</h3><small>all-round plus ${goals.length?goals.map(g=>BM_G[g].l).join(', '):'nothing else'}</small></summary><div class="bmgoals">${Object.entries(BM_G).map(([k,g])=>`<button type="button" data-bmgoal="${k}" aria-pressed="${goals.includes(k)}">${g.l}</button>`).join('')}</div></details>
+    ${sampleMode?'':`<div class="bm2ex"><button type="button" class="linkbtn" id="sampleBtn">See an example</button></div>`}`};
+window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-bm2win]')){e.stopImmediatePropagation();bmS.wi=+x.dataset.bm2win;render();return}
+  if(c('[data-bm2clear]')){e.stopImmediatePropagation();bmS.sel=null;bmS.area=null;render();return}
+  if(x=c('[data-bm2area]')){e.stopImmediatePropagation();bmS.area=bmS.area===x.dataset.bm2area?null:x.dataset.bm2area;bmS.sel=null;const y=window.scrollY;render();window.scrollTo(0,y);return}
+  if(bmS.lvl===1&&(x=c('.bm2fig [data-bmm]'))){e.stopImmediatePropagation();const r=BM_M.find(m=>m[0]===x.dataset.bmm);bmS.area=r?(bmS.area===r[2]?null:r[2]):null;bmS.sel=null;render();return}
+  if(x=c('[data-bmm]')){e.stopImmediatePropagation();const k=x.dataset.bmm;bmS.lvl=2;bmS.area=null;bmS.sel=bmS.sel===k?null:k;const inList=!!c('.bm2list');const y=window.scrollY;render();if(inList)window.scrollTo(0,y);else{const h=document.querySelector('.bm2card');if(h)h.scrollIntoView({block:'nearest'})}return}
+  if(x=c('[data-bmlvl]')){e.stopImmediatePropagation();bmS.lvl=+x.dataset.bmlvl;bmS.sel=null;bmS.area=null;render();return}},true);
+window.addEventListener('toggle',e=>{if(e.target&&e.target.classList&&e.target.classList.contains('bm2list'))bmS.listOpen=e.target.open},true);
+
+// You: team and appearance fold down to one line each
+teamPanel=(function(old){return function(){const h=old.apply(this,arguments);const n=(TEAM.list||[]).length;const line=TEAM.list==null?'Loading…':n?TEAM.list.map(m=>m.name||'Team').join(', '):'Join with a code from your coach';
+  return `<details class="panel p3fold" id="teamFold" ${P3YOU.team?'open':''}><summary><h3>Your team</h3><small>${esc(line)}</small></summary>${h.replace(/<section class="panel"( id="teamPanel")?>\s*<h3>Your team<\/h3>/,'<section class="p3foldin"$1>')}</details>`}})(teamPanel);
+const P3YOU={team:false,look:false};
+p3LookHTML=(function(old){return function(){const h=old.apply(this,arguments);let nm='';try{const m=h.match(/aria-pressed="true"[^>]*>[\s\S]*?<b>([^<]*)<\/b>/);nm=m?m[1]:''}catch(e){}
+  return `<details class="panel p3fold" id="lookFold" ${P3YOU.look?'open':''}><summary><h3>Appearance</h3><small>${esc(nm)}</small></summary>${h.replace(/<section class="card p3look">\s*<h3>Appearance<\/h3>/,'<section class="p3look p3foldin">')}</details>`}})(p3LookHTML);
+window.addEventListener('toggle',e=>{const t=e.target;if(!t||!t.id)return;if(t.id==='teamFold')P3YOU.team=t.open;if(t.id==='lookFold')P3YOU.look=t.open},true);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
