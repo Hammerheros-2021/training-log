@@ -1883,6 +1883,10 @@ details.bm2list>summary::after,details.bm2more>summary::after{content:'›';tran
 details.p3fold>summary{display:flex;align-items:baseline;gap:8px;cursor:pointer;list-style:none}details.p3fold>summary::-webkit-details-marker{display:none}details.p3fold>summary h3{margin:0}
 details.p3fold>summary small{flex:1;color:var(--text-muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}details.p3fold>summary::after{content:'›';transform:rotate(90deg);color:var(--text-muted)}details.p3fold[open]>summary::after{transform:rotate(-90deg)}
 .p3foldin{margin:10px 0 0!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
+.p3fav{flex:none;width:32px;height:32px;min-height:0;padding:0;border:0;border-radius:50%;background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center}
+.p3fav .ki{display:flex;line-height:0}.p3fav svg{width:18px;height:18px}.p3fav.on{color:#E8A33D}.p3fav.on svg{fill:currentColor}
+.p3favch{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:6px;border-radius:9999px!important;padding:8px 14px!important;width:auto!important;height:auto!important;min-height:36px!important;aspect-ratio:auto!important}.p3favch small{margin:0!important;opacity:.7}.p3favch .ki{display:flex;line-height:0;color:#E8A33D}.p3favch svg{width:14px;height:14px;fill:currentColor}
+.kuzday{padding:4px 0!important;margin:0 0 6px!important;min-height:0!important}.kuzday button{min-height:32px!important;padding:4px 12px!important;font-size:13px!important}
 </style>
 </head>
 <body class="kloading">
@@ -1908,6 +1912,6 @@ details.p3fold>summary small{flex:1;color:var(--text-muted);font-size:13px;white
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p4o"></script>
+<script src="/p3/app.js?v=p4p"></script>
 </body>
 </html>

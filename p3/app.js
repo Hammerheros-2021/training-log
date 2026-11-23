@@ -6128,6 +6128,33 @@ p3LookHTML=(function(old){return function(){const h=old.apply(this,arguments);le
   return `<details class="panel p3fold" id="lookFold" ${P3YOU.look?'open':''}><summary><h3>Appearance</h3><small>${esc(nm)}</small></summary>${h.replace(/<section class="card p3look">\s*<h3>Appearance<\/h3>/,'<section class="p3look p3foldin">')}</details>`}})(p3LookHTML);
 window.addEventListener('toggle',e=>{const t=e.target;if(!t||!t.id)return;if(t.id==='teamFold')P3YOU.team=t.open;if(t.id==='lookFold')P3YOU.look=t.open},true);
 
+// ================= P3 (23 Nov): slim top tabs everywhere, food log first, favourite foods =================
+p1Nav=(function(old){return function(){return old.apply(this,arguments).replace(/<nav class="p1nav([^"]*)">/,(m,a)=>a.includes('p3navc')?m:`<nav class="p1nav${a} p3navc">`)}})(p1Nav);
+viewFood=(function(old){return function(){const h=old.apply(this,arguments);if(fView!=='today')return h.replace('<a class="linkbtn backlink" href="#dashboard">‹ Today</a>','');
+  const t=document.createElement('template');t.innerHTML=h;const R=t.content;const q=s=>R.querySelector(s);
+  const back=q('a.backlink');if(back)back.remove();
+  const day=q('.kuzday'),act=q('article.factions'),meals=q('article.p1meals'),tot=q('article.p1ftot'),cta=q('.bigcta'),plants=q('.p1plants');
+  if(day&&act){day.after(act);if(meals)act.after(meals);if(meals&&tot)meals.after(tot);if(cta&&cta.parentNode===R)(plants||tot||meals||act).after(cta)}
+  return t.innerHTML}})(viewFood);
+// favourites: star any food you've logged, then it's one tap to add again (portion +/- on the row as before)
+const favList=()=>(meta.favs&&Array.isArray(meta.favs.list))?meta.favs.list:[];
+const favKey=n=>String(n||'').toLowerCase().trim();
+function favHas(i){const k=favKey(i.name);return favList().some(f=>favKey(f.name)===k)}
+p1FoodRow=(function(old){return function(i){const h=old.apply(this,arguments);if(sampleMode||i.src==='plan')return h;const on=favHas(i);
+  return h.replace(`<button type="button" class="x" data-del-food="${i.ix}"`,`<button type="button" class="p3fav${on?' on':''}" data-ffav="${i.ix}" aria-pressed="${on}" aria-label="${on?'Remove from':'Add to'} favourites">${ico('star')}</button><button type="button" class="x" data-del-food="${i.ix}"`)}})(p1FoodRow);
+let FAVL=[];
+kuzRowHTML=(function(old){return function(dIso){const h=old.apply(this,arguments);const m=p3ShownMeal();
+  FAVL=favList().slice().sort((a,b)=>(b.meal===m)-(a.meal===m));
+  const fav=`<div class="kuzq p3favq"><span class="label">Favourites</span>${FAVL.length?`<div class="kuztags">${FAVL.map((f,i)=>`<button type="button" class="kuzch p3favch" data-favadd="${i}">${ico('star')}<span>${esc(f.name)}</span><small>${kcalOf(f)} kcal</small></button>`).join('')}</div>`:`<small class="ds">Tap the ☆ on any food you've logged to keep it here.</small>`}</div>`;
+  return fav+h}})(kuzRowHTML);
+window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-ffav]')){e.preventDefault();e.stopImmediatePropagation();const ix=+x.dataset.ffav;const it=((D()[iso(sel)]||{}).food||[])[ix];if(!it)return;
+    const k=favKey(it.name);let l=favList().slice();const had=l.some(f=>favKey(f.name)===k);
+    if(had)l=l.filter(f=>favKey(f.name)!==k);else{const o=clone(it);delete o.ix;delete o.planRef;delete o.at;delete o.src;l.unshift(o)}
+    if(await persistMeta('favs',{list:l.slice(0,40),updatedAt:new Date().toISOString()}))toast(had?`${it.name} removed from favourites`:`${it.name} added to favourites`);render();return}
+  if(x=c('[data-favadd]')){e.preventDefault();e.stopImmediatePropagation();const f=FAVL[+x.dataset.favadd];if(!f)return;const m=p3ShownMeal();
+    const o=clone(f);o.meal=m;o.at=p3AtFor(m);o.src='fav';await addFood([o]);try{P2OPEN.add(m)}catch(z){}toast(`Added ${f.name}. Use − / + on it to change the portion.`,3000);render();return}},true);
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
