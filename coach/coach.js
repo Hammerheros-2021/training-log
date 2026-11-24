@@ -254,7 +254,7 @@ async function loadSquad(t){
   const {data:sq,error:e1}=await sb.rpc('keel_team_squad',{t:t.team_id});if(e1)throw e1;
   const rows=[];for(let off=0;off<50000;off+=1000){const {data,error}=await sb.rpc('keel_team_data',{t:t.team_id,from_day:from,to_day:to}).range(off,off+999);if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break}
   const by={};(sq||[]).forEach(m=>{by[m.user_id]=mkPlayer({id:m.user_id,name:m.display_name||(m.about&&m.about.name)||'Player',pos:m.pos||'',role:m.role,staff:m.staff,share:m.share,food:!!m.share_food,meals:!!m.share_meals,joined:m.joined_at,about:m.about||{}})});
-  rows.forEach(r=>{const p=by[r.user_id];if(!p)return;(r.kind==='day'?p.D:p.L)[r.key]=Object.assign({date:r.key},r.data)});
+  rows.forEach(r=>{const p=by[r.user_id];if(!p)return;if(r.kind==='meta'){p.TP=r.data;return}(r.kind==='day'?p.D:p.L)[r.key]=Object.assign({date:r.key},r.data)});
   SQUAD=Object.values(by).sort((a,b)=>a.name.localeCompare(b.name));
   const {data:nt}=await sb.from('team_notes').select('*').eq('team_id',t.team_id).order('created_at',{ascending:false}).limit(1000);NOTES=nt||[];attachNotes();await loadSC(t);await loadNut(t);await loadRehab(t);try{await loadHub(t)}catch(e){HUB.missing=true}SQUAD.forEach(p=>p._di={})}
 function attachNotes(){SQUAD.forEach(p=>{p.notes=NOTES.filter(n=>n.player_id===p.id);p._di={}})}
@@ -313,6 +313,7 @@ function viewToday(){const k=S.k,ps=sharing();if(!ps.length)return needTeam();
     if(i.av!=='avail'&&(i.pain>=3||i.sick))chips.push(`<span class="chip ${i.av==='out'?'alert':'caution'}">${ico(i.sick?'sick':'niggle')}${i.sick?'Unwell':esc(i.nig.d.niggles[0].area.split(' ')[0])+' '+i.pain}</span>`);
     if(i.rs&&i.rs.length&&!(i.pain>=3||i.sick))chips.push(`<span class="chip caution">${ico('clock')}Restricted</span>`);
     if(i.sleep!=null)chips.push(`<span class="chip">${ico('moon')}${i.sleep} h</span>`);
+    if(i.d&&i.d.trainIntent==='no')chips.push(`<span class="chip">${ico('clock')}Not training</span>`);
     const a=p.E.acwr(k);if(a!=null&&a>1.5)chips.push(`<span class="chip alert">${ico('spike')}Load</span>`);
     return `<button class="pt ${i.ci?'':'none'}" data-player="${esc(p.id)}"><span class="bar" style="background:${c}"></span><div class="row">${ring(i.s,52,i.st)}<div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="ps">${esc(p.pos||'')}</div><div class="ps" style="color:${i.ci?c:'var(--muted)'};font-weight:500;margin-top:2px">${i.av==='out'?'Unavailable':l}</div></div></div><div class="chips">${chips.join('')}</div></button>`};
   const seg=(key,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button data-set="${key}" data-val="${v}" aria-pressed="${S[key]===v}">${l}</button>`).join('')}</div>`;
@@ -410,6 +411,7 @@ const trendArrow=(now,before,goodUp)=>{if(now==null||before==null)return '<span 
 function sessionCall(p,k){const i=dayInfo(p,k),a=p.E.acwr(k),rs=activeRestr(p,k);
   if(i.rh)return ['hold',`Rehab: stage ${i.rh.stage+1} of ${i.rh.stages.length}`];
   if(i.av==='out')return ['hold','Unavailable'];
+  if(i.d&&i.d.trainIntent==='no')return ['skip','Told Keel: not training today'];
   if(rs.length)return ['hold','Restriction: '+rs[0].body];
   if(i.pain>=3)return ['hold',`${i.nig.d.niggles[0].area} ${i.pain}/10`];
   if(i.sick)return ['hold','Unwell'];
@@ -430,7 +432,7 @@ function viewSC(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k
   return kpiRow([kpiTile(Math.round(avg(rows.map(r=>r.w))),'Average load, last 7 days',{ic:'load'}),kpiTile(`${steady}<small>/ ${rows.length}</small>`,'In the steady zone',{ic:'check',col:'var(--good)',d:'80–130% of their usual week'}),
      kpiTile(spikes,'Spiking',{ic:'spike',col:'var(--alert)',d:'Over 150% of usual'}),kpiTile(under,'Under-loaded',{ic:'down',col:'var(--caution)',d:'Under 80% of usual'}),kpiTile(tot?Math.round(done/tot*100)+'<small>%</small>':'–','Sessions done, last 7 days',{ic:'check',d:`${done} done of ${tot}`})])
    +`<section class="card"><header><div><h2>Today's session</h2><p>Who to push, who trains as normal and who to hold back, from this morning's balance, recent load, niggles and staff restrictions</p></div></header>
-     <div class="av" style="grid-template-columns:repeat(4,minmax(0,1fr))">${col('push','Push on','var(--good)','Fresh and load is steady')}${col('normal','As planned','var(--blue)','Nothing stands out')}${col('hold','Hold back','var(--caution)','Lighter, modified or off')}${col('none','Not checked in','var(--faint)','Ask before training')}</div></section>`
+     <div class="av" style="grid-template-columns:repeat(5,minmax(0,1fr))">${col('push','Push on','var(--good)','Fresh and load is steady')}${col('normal','As planned','var(--blue)','Nothing stands out')}${col('hold','Hold back','var(--caution)','Lighter, modified or off')}${col('skip','Not training','var(--muted)','Told Keel they\'re skipping today')}${col('none','Not checked in','var(--faint)','Ask before training')}</div></section>`
    +viewLoad(true)
    +`<section class="card"><header><div><h2>How sessions are landing</h2><p>Last 2 weeks, by type of session. Effort is what players rated it out of 10.</p></div></header>
      ${tt.length?`<div style="overflow-x:auto"><table class="list"><tr><th>Session</th><th>Done</th><th>Average minutes</th><th>Average effort</th><th>How it felt</th><th>Harder than planned</th></tr>${tt.map(([n,t])=>`<tr><td><b style="color:var(--text)">${esc(n)}</b></td><td class="num">${t.n}</td><td class="num">${fx(avgOf(t.min))}</td><td class="num">${fx(avgOf(t.rpe),1)}</td><td>${t.feel.length?esc(FEEL[Math.round(avg(t.feel))]):'–'}</td><td>${t.hard?`<span class="chip caution">${t.hard}</span>`:'<span class="muted">0</span>'}</td></tr>`).join('')}</table></div>`:'<div class="empty">No sessions logged in the last 2 weeks.</div>'}</section>`}
@@ -697,9 +699,9 @@ function koachLoad(p,k){const i=dayInfo(p,k),a=p.E.acwr(k),rs=activeRestr(p,k);c
 const playerName=id=>{const p=SQUAD.find(x=>x.id===id);return p?p.name:'Player'};
 
 function viewSCHub(){const t=route().id||'squad';
-  const tabs=`<div class="toolbar"><div class="seg">${[['squad','Squad load'],['koach','Koach suggestions'],['programmes','Programmes'],['library','Exercise library']].map(([v,l])=>`<a href="#sc/${v}" aria-pressed="${t===v}" class="segl">${l}</a>`).join('')}</div></div>`;
-  if(SC.missing&&t!=='squad')return tabs+`<section class="card"><header><div><h2>One more database step</h2><p>Programmes and the exercise library need their own tables.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/sc.sql</b> and click Run, then confirm.</li><li>Refresh this page.</li></ol></section>`;
-  return tabs+({squad:viewSC,koach:viewKoach,programmes:()=>S.progEdit?viewProgEditor():viewProgrammes(),library:()=>bulkCard(S.libCat&&S.libCat!=='all'?S.libCat:'strength','programmes')+viewLibrary()}[t]||viewSC)()}
+  const tabs=`<div class="toolbar"><div class="seg">${[['squad','Squad load'],['body','Body map'],['koach','Koach suggestions'],['programmes','Programmes'],['library','Exercise library']].map(([v,l])=>`<a href="#sc/${v}" aria-pressed="${t===v}" class="segl">${l}</a>`).join('')}</div></div>`;
+  if(SC.missing&&t!=='squad'&&t!=='body')return tabs+`<section class="card"><header><div><h2>One more database step</h2><p>Programmes and the exercise library need their own tables.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/sc.sql</b> and click Run, then confirm.</li><li>Refresh this page.</li></ol></section>`;
+  return tabs+({squad:viewSC,body:()=>viewBodyMap(),koach:viewKoach,programmes:()=>S.progEdit?viewProgEditor():viewProgrammes(),library:()=>bulkCard(S.libCat&&S.libCat!=='all'?S.libCat:'strength','programmes')+viewLibrary()}[t]||viewSC)()}
 
 function viewKoach(){const k=S.k;const rows=SC.assigns.map(a=>{const p=SQUAD.find(x=>x.id===a.player_id);if(!p||!p.share)return null;const [pct,why]=koachLoad(p,k);return {a,p,pct,why}}).filter(Boolean).sort((x,y)=>Math.abs(y.pct-y.a.load_pct)-Math.abs(x.pct-x.a.load_pct));
   if(!rows.length)return `<section class="card"><div class="empty"><h2 style="margin-bottom:6px">No one is on a programme yet</h2><p>Build or draft one under <b>Programmes</b>, then assign it to players. Koach then suggests a load for each of them every day.</p></div></section>`;
@@ -1445,6 +1447,244 @@ document.addEventListener('keydown',e=>{if(e.target.id==='msgBody'&&e.key==='Ent
 document.addEventListener('dragover',e=>{const z=e.target.closest&&e.target.closest('#dropZone');if(z){e.preventDefault();z.classList.add('over')}});
 document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.closest('#dropZone');if(z)z.classList.remove('over')});
 document.addEventListener('drop',async e=>{const z=e.target.closest&&e.target.closest('#dropZone');if(!z)return;e.preventDefault();const cat=z.closest('[data-bulkcat]').dataset.bulkcat;await bulkVideos(e.dataTransfer.files,cat==='all'?'strength':cat)});
+
+// ================= Nov 2026 update: everything the app now logs, given a home =================
+// Phase 1: skipping, own sessions, mobility, recovery tools, sleep debt and consistency, distance, tidier load list
+// Phase 2: squad body map (S&C) and mobility against niggles (Physio)
+// Phase 3: heart rate by type, supplements, last coffee, work and driving hours (needs supabase/share2.sql)
+// Phase 4: each player's Keel week, plan changes and Koach's line for the day
+const BM_M=[
+ ['quads','Quads','legs',2],['hams','Hamstrings','legs',2],['calves','Calves','legs',2],['shins','Shins','legs',1],['adductors','Adductors (groin)','legs',1],
+ ['glutes','Glutes','hips',2],['gmed','Side glutes (glute med)','hips',1],['hipflex','Hip flexors','hips',1],
+ ['abs','Abs','core',2],['obliques','Obliques','core',1.5],['lowback','Lower back','core',1],
+ ['lats','Lats','back',1.5],['upback','Upper back','back',2],
+ ['delts','Shoulders','shoulders',1.5],['cuff','Rotator cuff','shoulders',1],['chest','Chest','shoulders',1.5],
+ ['arms','Arms','arms',1],['grip','Forearms and grip','arms',1]];
+const BM_R=[['legs','Legs'],['hips','Hips and glutes'],['core','Core'],['back','Back'],['shoulders','Shoulders and chest'],['arms','Arms and grip']];
+const BM_G={
+ hyrox:{l:'Hyrox',t:{quads:3,glutes:3,calves:2.5,hams:2,upback:2.5,lats:2,grip:2,delts:2,abs:2,obliques:1.5,arms:1.5}},
+ gaa:{l:'GAA football',t:{hams:3,glutes:2.5,quads:2.5,calves:2.5,adductors:2,gmed:2,hipflex:1.5,obliques:1.5,shins:1.5,lowback:1.5}},
+ run:{l:'Running event',t:{calves:3,glutes:2.5,hams:2,quads:2,gmed:1.5,shins:1.5,hipflex:1.5,abs:1.5}},
+ strong:{l:'Get stronger',t:{quads:2.5,hams:2.5,glutes:2.5,upback:2.5,lats:2,chest:2,delts:2,lowback:1.5,grip:1.5}},
+ weight:{l:'Lose weight',t:{quads:2.5,glutes:2.5,hams:2,upback:2,lats:2,chest:2}}};
+
+const BM_PAT=[['squat','Squat'],['hinge','Hinge'],['single','Single leg'],['push','Push'],['pull','Pull'],['carry','Carry'],['rotate','Rotation / anti-rotation'],['lateral','Side to side'],['sprint','Sprint'],['jump','Jump']];
+// exercise library: [regex, muscles {key:weight}, patterns]
+const BM_LIB=[
+ [/row ?erg|rowing|rower|^row$|^row \d|concept ?2/i,{quads:.6,glutes:.5,hams:.4,upback:.8,lats:.7,arms:.4,grip:.3},['pull']],
+ [/ski ?erg|ski\b/i,{lats:1,upback:.6,arms:.5,abs:.6,delts:.4},['pull']],
+ [/sled push|prowler/i,{quads:1,glutes:.8,calves:.7,delts:.3,chest:.3,arms:.3},['push']],
+ [/sled pull|rope pull/i,{upback:.9,lats:.7,arms:.6,grip:.8,hams:.6,glutes:.5},['pull']],
+ [/burpee/i,{quads:.8,glutes:.7,chest:.5,delts:.4,calves:.4,abs:.3},['jump','push']],
+ [/wall ?ball|thruster/i,{quads:1,glutes:.7,delts:.7,arms:.3,abs:.3},['squat','push']],
+ [/farmer|carry|suitcase/i,{grip:1,upback:.8,obliques:.6,abs:.4,glutes:.3,calves:.3},['carry']],
+ [/trap.?bar|deadlift|rdl|romanian|good ?morning/i,{hams:.8,glutes:1,quads:.5,lowback:.7,upback:.4,grip:.5},['hinge']],
+ [/swing/i,{glutes:1,hams:.8,lowback:.5,grip:.5,abs:.3},['hinge']],
+ [/nordic|ham(string)? curl/i,{hams:1},['hinge']],
+ [/bridge|hip thrust/i,{glutes:1,hams:.4},['hinge']],
+ [/copenhagen/i,{adductors:1,obliques:.6},['lateral']],
+ [/lateral bound|skater|side lunge|lateral lunge|cossack/i,{gmed:1,adductors:.6,glutes:.6,quads:.5,calves:.4},['lateral','single','jump']],
+ [/bound/i,{glutes:.8,hams:.8,calves:.6,hipflex:.5,quads:.5},['sprint','jump','single']],
+ [/split squat|lunge|step.?up|bulgarian|pistol/i,{quads:1,glutes:.9,adductors:.4,gmed:.4,hipflex:.3},['squat','single']],
+ [/squat/i,{quads:1,glutes:.8,adductors:.4,lowback:.3,abs:.3},['squat']],
+ [/calf raise|calf/i,{calves:1},[]],
+ [/tib|toe raise/i,{shins:1},[]],
+ [/pogo|skipping|jump rope|a-skip|b-skip/i,{calves:1,shins:.3},['jump']],
+ [/hurdle hop|box jump|jump|hop/i,{quads:.8,glutes:.6,calves:.6},['jump']],
+ [/5-0-5|decel|cut|change of direction|agility|shuttle/i,{quads:.8,glutes:.6,gmed:.6,adductors:.5,calves:.4},['lateral','sprint']],
+ [/curved/i,{gmed:.7,adductors:.6,calves:.6,hams:.5},['sprint','lateral']],
+ [/sprint|acceleration|flying|build.?up|strides/i,{hams:1,glutes:.8,hipflex:.7,calves:.7,quads:.5},['sprint']],
+ [/pallof|anti.?rotation|woodchop|russian twist|landmine rot/i,{obliques:1,abs:.5},['rotate']],
+ [/side plank/i,{obliques:1,gmed:.5},['rotate']],
+ [/dead ?bug|hollow|leg raise|sit.?up|crunch|ab wheel|rollout/i,{abs:1,hipflex:.4},[]],
+ [/mountain climber/i,{abs:.7,hipflex:.6,delts:.3},[]],
+ [/plank/i,{abs:1,delts:.4,obliques:.4},['rotate']],
+ [/face pull|pull.?apart|external rotation|ytw|y-t-w|band dislocate/i,{cuff:1,upback:.6,delts:.3},['pull']],
+ [/pull.?up|chin.?up|lat pull/i,{lats:1,arms:.6,grip:.5,upback:.4},['pull']],
+ [/row/i,{upback:1,lats:.8,arms:.5,grip:.3},['pull']],
+ [/push.?up|press.?up|bench|dip/i,{chest:1,delts:.6,arms:.6,abs:.3},['push']],
+ [/overhead|shoulder press|military|push press|landmine press/i,{delts:1,arms:.6,upback:.3,abs:.3},['push']],
+ [/curl/i,{arms:1,grip:.3},['pull']],
+ [/bike|assault|echo|cycle/i,{quads:1,glutes:.4,calves:.3},[]],
+ [/run|jog/i,{calves:.6,quads:.5,hams:.4,glutes:.4,hipflex:.4,shins:.3},[]]];
+const BM_RUN={calves:1,quads:.6,hams:.5,glutes:.5,hipflex:.5,shins:.4,gmed:.3,abs:.2};
+const BM_FIELD={hams:.8,quads:.7,calves:.7,glutes:.6,adductors:.6,gmed:.5,hipflex:.5,shins:.3,obliques:.3};
+const BM_FARM={grip:.5,upback:.4,lowback:.4,obliques:.3,quads:.2};
+const BM_REG={'Quads':{quads:.8},'Hamstrings':{hams:.8},'Glutes':{glutes:.8},'Calves':{calves:.8},'Hips / groin':{adductors:.6,hipflex:.5},'Lower back':{lowback:.8},'Core':{abs:.7,obliques:.5},'Shoulders':{delts:.8},'Upper back':{upback:.8,lats:.5},'Chest':{chest:.8},'Grip / forearms':{grip:.8}};
+const BM_MOB=[[/couch|hip flexor/i,['hipflex','quads']],[/90\/90/i,['glutes','gmed','hipflex']],[/adductor/i,['adductors']],[/calf/i,['calves']],[/thoracic|open book/i,['upback']],[/deep squat/i,['adductors','glutes','calves']],[/hamstring/i,['hams']]];
+const BM_MOBALL=['hipflex','quads','glutes','gmed','adductors','calves','upback','hams'];
+let bmS={lvl:2,wi:5,sel:null};
+
+function bmTag(name,regions){for(const [re,m,p] of BM_LIB)if(re.test(name))return {m,p};
+  if(Array.isArray(regions)&&regions.length){const m={};regions.forEach(r=>{const x=BM_REG[r];if(x)Object.entries(x).forEach(([k,v])=>m[k]=Math.max(m[k]||0,v))});if(Object.keys(m).length)return {m,p:[]}}
+  return null}
+
+const BM2_BODY_F='M100,14 C109,14 114,22 114,32 C114,42 110,48 107,51 L108,58 C116,61 128,62 138,66 C146,70 150,78 152,88 L156,118 C158,130 160,142 161,152 L166,196 C167,206 168,214 166,222 C164,228 160,226 159,220 L155,200 C152,186 149,170 147,158 L141,128 L138,150 C136,162 134,172 134,182 C138,196 139,212 138,228 C137,252 133,276 130,298 C131,312 130,330 128,346 C127,362 126,380 127,398 L128,412 C132,418 132,424 127,425 L112,425 C109,422 110,414 112,408 C112,392 112,372 111,352 C110,330 108,306 106,284 L103,232 L100,224 L97,232 L94,284 C92,306 90,330 89,352 C88,372 88,392 88,408 C90,414 91,422 88,425 L73,425 C68,424 68,418 72,412 L73,398 C74,380 73,362 72,346 C70,330 69,312 70,298 C67,276 63,252 62,228 C61,212 62,196 66,182 C66,172 64,162 62,150 L59,128 L53,158 C51,170 48,186 45,200 L41,220 C40,226 36,228 34,222 C32,214 33,206 34,196 L39,152 C40,142 42,130 44,118 L48,88 C50,78 54,70 62,66 C72,62 84,61 92,58 L93,51 C90,48 86,42 86,32 C86,22 91,14 100,14 Z';
+const BM2_F=[
+ ['delts','<path d="M63,67 C55,70 50,78 49,90 C49,98 51,104 54,108 C58,98 63,88 68,80 C68,74 66,70 63,67 Z"/>'],
+ ['chest','<path d="M98,66 C88,64 76,66 69,72 C64,80 62,90 66,98 C74,104 88,104 98,100 Z"/>'],
+ ['arms','<path d="M52,110 C48,118 46,128 46,138 C47,146 50,150 53,150 C57,142 60,132 61,122 C61,114 58,108 52,110 Z"/>'],
+ ['grip','<path d="M45,156 C42,168 39,182 38,196 C38,204 41,206 44,202 C48,190 52,176 54,162 C53,155 48,152 45,156 Z"/>'],
+ ['abs','<path d="M90,106 L98,106 L98,124 L90,124 C89,118 89,112 90,106 Z"/><path d="M90,127 L98,127 L98,145 L90,145 Z"/><path d="M90,148 L98,148 L98,170 C95,172 92,170 90,166 Z"/>'],
+ ['obliques','<path d="M86,106 C78,110 72,120 70,134 C69,148 70,160 74,170 C78,166 83,160 86,152 Z"/>'],
+ ['hipflex','<path d="M75,176 C78,186 84,196 92,206 C95,200 96,192 96,184 C90,180 82,178 75,176 Z"/>'],
+ ['quads','<path d="M68,190 C64,206 64,226 66,246 C68,262 72,280 78,292 C84,296 92,292 94,284 C96,262 96,236 94,214 C88,206 80,198 74,190 Z"/>'],
+ ['adductors','<path d="M96,214 C98,226 98,240 97,252 C96,258 95,262 94,262 C94,246 94,228 95,214 Z"/>'],
+ ['shins','<path d="M83,318 C80,336 79,356 81,376 C82,388 85,394 87,392 C89,372 90,350 89,330 C88,322 86,316 83,318 Z"/>'],
+ ['calves','<path d="M74,316 C71,330 71,346 74,360 C76,366 79,364 79,358 C79,342 79,328 77,318 Z"/>']];
+const BM2_B=[
+ ['upback','<path d="M98,52 C90,56 80,60 70,66 C74,76 82,90 90,104 C94,110 97,114 98,116 Z"/>'],
+ ['delts','<path d="M63,67 C55,70 50,78 49,90 C49,98 51,104 54,108 C58,98 63,88 68,80 C68,74 66,70 63,67 Z"/>'],
+ ['cuff','<path d="M70,74 C76,82 82,92 86,102 C80,104 74,100 70,94 C68,88 68,80 70,74 Z"/>'],
+ ['lats','<path d="M66,98 C64,112 66,126 70,140 C76,140 86,134 96,126 L96,120 C88,112 78,104 66,98 Z"/>'],
+ ['lowback','<path d="M86,138 C90,136 94,134 98,132 L98,172 C94,172 90,170 86,166 Z"/>'],
+ ['arms','<path d="M52,110 C48,118 46,128 46,138 C47,146 50,150 53,150 C57,142 60,132 61,122 C61,114 58,108 52,110 Z"/>'],
+ ['grip','<path d="M45,156 C42,168 39,182 38,196 C38,204 41,206 44,202 C48,190 52,176 54,162 C53,155 48,152 45,156 Z"/>'],
+ ['gmed','<path d="M68,170 C66,178 66,186 68,192 C72,188 77,182 80,176 C76,172 72,170 68,170 Z"/>'],
+ ['glutes','<path d="M98,176 C88,174 78,178 70,188 C66,198 66,210 72,220 C80,226 92,226 98,222 Z"/>'],
+ ['hams','<path d="M68,228 C66,246 68,266 74,284 C80,292 90,292 94,286 C96,268 97,248 96,230 C88,232 76,232 68,228 Z"/>'],
+ ['calves','<path d="M73,312 C69,326 70,342 75,356 C80,364 88,362 90,354 C92,340 91,326 88,314 C83,308 77,308 73,312 Z"/>']];
+
+const TSH={S:'Str',E:'Easy',H:'Class',T:'Thr',X:'Long',R:'Rest',O:'Own',skip:'Skip'};
+const TCOL={S:'var(--k-pink,#E23D9E)',E:'var(--k-green,#14B87A)',H:'var(--k-blue,#5B6CFF)',T:'var(--k-amber,#E8913A)',X:'var(--k-violet,#8B5CF6)',R:'var(--line)',O:'var(--k-green,#14B87A)',skip:'var(--line)'};
+const TNM={S:'Strength',E:'Easy run',H:'Hyrox class',T:'Threshold',X:'Speed + long',R:'Rest',O:'Own session',skip:'Skipping'};
+const tag=t=>t?`<i class="ktag" style="--c:${TCOL[t]||'var(--line)'}">${TSH[t]||t}</i>`:'';
+// ---------- demo: give the made-up squad the new data too ----------
+buildDemo=(function(old){return function(){const out=old();const R=rng(777);const T=todayK();
+  out.squad.forEach((p,ix)=>{const tp={days:{},changes:{},koachDay:T};const pat=[['S','E','R','T','H','X','R'],['E','S','R','H','E','X','R'],['R','S','E','R','T','R','X']][ix%3];
+    for(let i=-7;i<=14;i++){const k=addK(T,i);tp.days[k]=pat[(parse(k).getDay()+6)%7]}
+    if(ix%6===1){const k=addK(T,2);tp.changes[k]={was:tp.days[k],type:'R',note:'Away for work'};tp.days[k]='R'}
+    if(ix%7===2){const k=addK(T,3);tp.changes[k]={was:'T',type:tp.days[k]=='R'?'T':tp.days[k],note:'Moved from Thursday'}}
+    lastN(T,14).forEach((k,j)=>{const d=p.D[k];if(!d)return;
+      if(R()<.5)d.hr={type:R()<.7?'wake':'sit',bpm:Math.round(50+R()*8+(ix===6&&k>=addK(T,-1)?8:0)+(ix===14&&j>=11?6:0))};
+      if(ix%5===0&&R()<.8)d.blocks={work:Math.round(R()*4*2)/2,driving:Math.round(R()*2*2)/2,physical:Math.round((3+R()*5)*2)/2};
+      else if(R()<.6)d.blocks={work:Math.round((6+R()*3)*2)/2,driving:Math.round(R()*1.5*2)/2};
+      if(ix%3!==2&&R()<.85)d.supps=[{name:'Creatine',n:1}].concat(ix%4===0?[{name:'Vitamin D',n:1}]:[]).concat(ix===9?[{name:'Magnesium',n:2},{name:'Zinc',n:1}]:[]);
+      if(d.food&&R()<.8)d.lastCaf=['10:30','13:00','15:30','17:45'][Math.floor(R()*(ix===18||ix===14?4:3))];
+      if((ix===2||ix===8)&&R()<.4)d.mobility=[{name:ix===2?'Hamstring floss':'Calf stretch',min:10}];
+      if(ix%4===0&&R()<.3)d.mobility=(d.mobility||[]).concat([{name:'Couch stretch and 90/90',min:12}])});
+    const d0=p.D[T];if(d0&&(ix===7||ix===13)){d0.trainIntent='no';tp.days[T]='skip'}
+    const i0=d0?(d0.trainIntent==='no'?['Skipping today, as you said.','Easy walk if you feel like it, eat well and bed on time.']:['Good to go for your session.','You\'re well recovered. Enjoy it.']):null;if(i0)tp.koach=i0;
+    p.TP=tp;p._di={};p.E=engine(p.D,p.L)});
+  return out}})(buildDemo);
+// ---------- small helpers ----------
+function sdBed(p,k,n){const v=lastN(k,n||14).map(kk=>{const d=p.D[kk];const b=d&&tmin(d.bed);return b==null?null:(b<12*60?b+1440:b)}).filter(x=>x!=null);if(v.length<4)return null;const m=avg(v);return Math.round(Math.sqrt(avg(v.map(x=>(x-m)**2))))}
+function hrState(p,k){const rs=[];for(let i=0;i<28;i++){const d=p.D[addK(k,-i)];if(d&&d.hr&&isNum(d.hr.bpm))rs.push({i,t:d.hr.type||'wake',b:+d.hr.bpm})}if(!rs.length)return null;
+  const last=rs[0];const same=rs.filter(r=>r.t===last.t&&r.i>=2).map(r=>r.b);if(same.length<3)return {last,usual:null,diff:null};const s=same.slice().sort((a,b)=>a-b);const usual=s[Math.floor(s.length/2)];
+  const two=rs.filter(r=>r.t===last.t&&r.i<=1);return {last,usual,diff:last.b-usual,run:two.length>=2&&two.every(r=>r.b-usual>=5)}}
+const HRTN={wake:'on waking',lie:'lying down',sit:'sitting'};
+function kmWeek(p,k){let km=0;lastN(k,7).forEach(kk=>{const d=p.D[kk];(d&&d.extras||[]).forEach(x=>{if(isNum(x.km))km+=+x.km});const l=p.L[kk];if(l&&isNum(l.dist))km+=+l.dist});return Math.round(km*10)/10}
+function mobMin(p,k,n){return lastN(k,n||7).reduce((a,kk)=>{const d=p.D[kk];return a+((d&&d.mobility)||[]).reduce((s,x)=>s+(+x.min||0),0)},0)}
+function ownSess(p,k,n){let c=0;lastN(k,n||14).forEach(kk=>{const d=p.D[kk];if(d&&d.trainIntent==='no'&&(d.extras||[]).length)c++;const tp=p.TP&&p.TP.days&&p.TP.days[kk];if(tp==='O')c++});return c}
+// ---------- Phase 1/3: flags ----------
+flagsFor=(function(old){return function(p,k){const out=old(p,k);const d=p.D[k];
+  if(d&&d.trainIntent==='no')out.push({w:3,ic:'clock',col:'var(--muted)',t:'Not training today',s:'Told Keel this morning'});
+  const h=hrState(p,k);if(h&&h.run)out.push({w:6,ic:'wellness',col:'var(--alert)',t:`Heart rate up ${h.diff}`,s:`Above their normal ${HRTN[h.last.t]||''} two days running`});
+  if(p.TP&&p.TP.changes){const ch=Object.entries(p.TP.changes).filter(([kk])=>kk>=k&&kk<=addK(k,7));if(ch.length)out.push({w:2,ic:'clock',col:'var(--muted)',t:'Changed their week',s:ch.map(([kk,c])=>`${fmtK(kk,{weekday:'short'})}: ${TNM[c.was]||c.was} → ${TNM[c.type]||c.type}`).join(', ')})}
+  return out.sort((a,b)=>b.w-a.w)}})(flagsFor);
+// ---------- Phase 1: tidier "Each player this week" ----------
+viewLoad=(function(old){return function(noKpi){const h=old(noKpi);const parts=h.split('<div class="lrow"><button class="nm"');if(parts.length<=9)return h;
+  const head=parts[0],rows=parts.slice(1).map(x=>'<div class="lrow"><button class="nm"'+x);const last=rows[rows.length-1];const cut=last.lastIndexOf('</section>');const tail=last.slice(cut);rows[rows.length-1]=last.slice(0,cut);
+  return head+rows.slice(0,8).join('')+`<details class="kmore"><summary>Show all ${rows.length} players</summary>${rows.slice(8).join('')}</details>`+tail}})(viewLoad);
+// ---------- S&C: own sessions, distance and real-life load ----------
+viewSC=(function(old){return function(){const h=old();const ps=sharing();if(!ps.length)return h;const k=S.k;
+  const own=ps.reduce((a,p)=>a+ownSess(p,k,14),0);
+  const rows=ps.map(p=>{const km=kmWeek(p,k);let wk=0,dr=0,ph=0,n=0;lastN(k,7).forEach(kk=>{const b=p.D[kk]&&p.D[kk].blocks;if(b){n++;wk+=+b.work||0;dr+=+b.driving||0;ph+=+b.physical||0}});return {p,km,wk,dr,ph,n}});
+  const anyB=rows.some(r=>r.n);const anyKm=rows.some(r=>r.km>0);
+  const tbl=rows.filter(r=>r.n||r.km>0).sort((a,b)=>(b.ph+b.km/5)-(a.ph+a.km/5)).slice(0,12);
+  const life=(anyB||anyKm)?`<section class="card"><header><div><h2>Outside the sessions, last 7 days</h2><p>Running and cycling distance players logged, and hours of physical work and driving from players who share their day. A long day on the farm or site is load too.</p></div></header>
+    <div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Distance</th><th>Physical work</th><th>Driving</th><th>Desk or other work</th></tr>${tbl.map(r=>`<tr><td><button data-player="${esc(r.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(r.p.name)}</b></button></td><td class="num">${r.km?r.km+' km':'–'}</td><td class="num">${r.n?Math.round(r.ph)+' h':'–'}</td><td class="num">${r.n?Math.round(r.dr)+' h':'–'}</td><td class="num">${r.n?Math.round(r.wk)+' h':'–'}</td></tr>`).join('')}</table></div></section>`:'';
+  const note=own?`<div class="small muted" style="margin:-8px 0 14px">${own} own session${own>1?'s':''} in place of the player's Keel plan in the last 2 weeks. These count as done, not missed.</div>`:'';
+  return h.replace(/(<section class="card"><header><div><h2>How sessions are landing)/,note+'$1')+life}})(viewSC);
+// ---------- Physio: mobility against niggles ----------
+viewPhysio=(function(old){return function(){const h=old();const ps=sharing();if(!ps.length)return h;const k=S.k;
+  const rows=ps.map(p=>{const i=dayInfo(p,k);const m7=mobMin(p,k,7),m14=mobMin(p,k,14);const area=i.nig&&i.nig.d.niggles[0]?i.nig.d.niggles[0].area:'';const words=String(area).toLowerCase().split(/[\s/]+/).filter(w=>w.length>3);
+    let on=0;lastN(k,14).forEach(kk=>{const d=p.D[kk];((d&&d.mobility)||[]).forEach(x=>{const n=String(x.name||'').toLowerCase();if(words.some(w=>n.includes(w.slice(0,5))))on+=+x.min||0})});return {p,area,pain:i.pain,m7,m14,on}});
+  const nig=rows.filter(r=>r.area).sort((a,b)=>b.pain-a.pain);const none=rows.filter(r=>!r.area&&r.m14===0).length;
+  return h+`<section class="card"><header><div><h2>Mobility against niggles</h2><p>Stretching and mobility players logged in Keel. A niggle with no mobility work on that area is worth a word. The Mobility lens on S&C › Body map shows the whole squad.</p></div></header>
+    ${nig.length?`<div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Niggle</th><th>Mobility on that area, 2 weeks</th><th>All mobility, last 7 days</th></tr>${nig.map(r=>`<tr><td><button data-player="${esc(r.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(r.p.name)}</b></button></td><td>${esc(r.area)} ${painChip(r.pain)}</td><td>${r.on?`<span class="chip good">${r.on} min</span>`:'<span class="chip caution">None logged</span>'}</td><td class="num">${r.m7} min</td></tr>`).join('')}</table></div>`:'<div class="small muted">No active niggles.</div>'}
+    <div class="small muted" style="margin-top:8px">${none} of ${rows.length} players logged no mobility at all in the last 2 weeks.</div></section>`}})(viewPhysio);
+// ---------- Recovery: sleep debt, consistency, late coffee, heart rate, recovery tools ----------
+viewRecovery=(function(old){return function(){const h=old();const ps=sharing();if(!ps.length)return h;const k=S.k;
+  const rows=ps.map(p=>{const debt=p.E.debt(k);const sd=sdBed(p,k,14);let late=0;lastN(k,7).forEach(kk=>{const c=p.D[kk]&&p.D[kk].lastCaf;if(c&&tmin(c)>=14*60)late++});const hr=hrState(p,k);
+    const tools={};lastN(k,14).forEach(kk=>{const d=p.D[kk]||{};(d.recovery||[]).forEach(x=>tools[x.kind]=(tools[x.kind]||0)+1);(d.hc||[]).forEach(x=>tools[x.type]=(tools[x.type]||0)+1)});
+    return {p,debt,sd,late,hr,tools}});
+  const score=r=>(r.debt||0)+(r.sd||0)/15+r.late*.8+(r.hr&&r.hr.diff>=5?3:0);rows.sort((a,b)=>score(b)-score(a));
+  const sdW=v=>v==null?'–':v<=30?`<span class="chip good">Steady · ±${v} min</span>`:v<=60?`<span class="chip caution">±${v} min</span>`:`<span class="chip alert">All over · ±${v} min</span>`;
+  const hrW=x=>!x?'<span class="muted">–</span>':x.usual==null?`${x.last.b} <span class="muted small">${HRTN[x.last.t]||''}</span>`:`<span class="chip ${x.diff>=5?'alert':x.diff>=3?'caution':'good'}">${x.last.b} · ${x.diff>0?'+':''}${x.diff}</span> <span class="muted small">${HRTN[x.last.t]||''}</span>`;
+  const tw=Object.entries(rows.reduce((a,r)=>{Object.entries(r.tools).forEach(([t,n])=>a[t]=(a[t]||0)+n);return a},{})).sort((a,b)=>b[1]-a[1]);const users=rows.filter(r=>Object.keys(r.tools).length).length;
+  return h+`<section class="card"><header><div><h2>Sleep and heart rate, worst first</h2><p>Sleep debt over 7 nights, how steady bed times are over 2 weeks, coffee after 2pm (players sharing food), and the latest heart rate against that player's own normal for the same kind of reading.</p></div></header>
+    <div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Sleep debt</th><th>Bed time</th><th>Coffee after 2pm</th><th>Heart rate</th></tr>${rows.slice(0,14).map(r=>`<tr><td><button data-player="${esc(r.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(r.p.name)}</b></button></td><td>${r.debt!=null?`<span class="chip ${r.debt>=5?'alert':r.debt>=2.5?'caution':'good'}">${r.debt} h</span>`:'–'}</td><td>${sdW(r.sd)}</td><td class="num">${r.late?r.late+' of 7 days':'–'}</td><td>${hrW(r.hr)}</td></tr>`).join('')}</table></div>
+    ${rows.length>14?`<div class="small muted" style="margin-top:6px">Showing the 14 most worth a look.</div>`:''}</section>
+    <section class="card"><header><div><h2>Recovery tools in use, last 2 weeks</h2><p>${users} of ${rows.length} players logged something.</p></div></header>${tw.length?`<div style="display:flex;gap:8px;flex-wrap:wrap">${tw.map(([t,n])=>`<span class="chip">${esc(t)} · ${n}</span>`).join('')}</div>`:'<div class="small muted">Nothing logged yet.</div>'}</section>`}})(viewRecovery);
+// ---------- Nutrition: supplements ----------
+viewNutrition=(function(old){return function(){const h=old();const ps=sharing();if(!ps.length)return h;const k=S.k;
+  const by={};const who=[];ps.forEach(p=>{const t={};lastN(k,7).forEach(kk=>{const d=p.D[kk];((d&&d.supps)||[]).forEach(s=>{t[s.name]=(t[s.name]||0)+(+s.n||1)})});if(Object.keys(t).length)who.push({p,t});Object.entries(t).forEach(([n,c])=>{(by[n]=by[n]||{n:0,players:0}).n+=c;by[n].players++})});
+  if(!who.length)return h+`<section class="card"><header><div><h2>Supplements</h2><p>Nobody shares supplements yet. Players turn on <b>Share my supplements</b> under You › Your team in Keel.</p></div></header></section>`;
+  const dbl=who.filter(w=>Object.values(w.t).some(c=>c>7)||(w.t['Zinc']&&w.t['Magnesium']));
+  return h+`<section class="card"><header><div><h2>Supplements, last 7 days</h2><p>From players who share them. Worth checking anyone doubling up or taking a lot of minerals, and that everything is batch-tested for sport.</p></div></header>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${Object.entries(by).sort((a,b)=>b[1].players-a[1].players).map(([n,x])=>`<span class="chip">${esc(n)} · ${x.players} player${x.players>1?'s':''}</span>`).join('')}</div>
+    <div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Taken this week</th></tr>${who.map(w=>`<tr><td><button data-player="${esc(w.p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(w.p.name)}</b></button>${dbl.includes(w)?' <span class="chip caution">Check doses</span>':''}</td><td class="small">${Object.entries(w.t).map(([n,c])=>`${esc(n)} ×${c}`).join(' · ')}</td></tr>`).join('')}</table></div></section>`}})(viewNutrition);
+// ---------- Phase 4: each player's Keel week ----------
+function keelWeekCard(ps,start,title,sub){const keys=[];for(let i=0;i<7;i++)keys.push(addK(start,i));const has=ps.filter(p=>p.TP&&p.TP.days);
+  if(!has.length)return `<section class="card"><header><div><h2>${title}</h2><p>No one's Keel plan is coming through yet. It appears once players open the updated app and the database step (supabase/share2.sql) has been run.</p></div></header></section>`;
+  const T=todayK();
+  return `<section class="card"><header><div><h2>${title}</h2><p>${sub}</p></div></header><div style="overflow-x:auto"><table class="list kweek"><tr><th>Player</th>${keys.map(k=>`<th class="${k===T?'kt':''}">${fmtK(k,{weekday:'short'})}<br><span class="muted small">${parse(k).getDate()}</span></th>`).join('')}</tr>
+    ${has.sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<tr><td><button data-player="${esc(p.id)}" style="text-align:left"><b style="color:var(--text)">${esc(p.name)}</b></button></td>${keys.map(k=>{const t=p.TP.days[k];const ch=p.TP.changes&&p.TP.changes[k];return `<td class="${k===T?'kt':''}" ${ch?tipAttr(`<b>${esc(p.name)}</b>${esc(TNM[ch.was]||ch.was)} → ${esc(TNM[ch.type]||ch.type)}${ch.note?'<br>'+esc(ch.note):''}`):''}>${tag(t)}${ch?'<sup class="kch">•</sup>':''}</td>`}).join('')}</tr>`).join('')}</table></div>
+    <div class="small muted" style="margin-top:6px">${Object.entries(TSH).filter(([t])=>t!=='skip').map(([t,l])=>`${tag(t)} ${TNM[t]}`).join(' &nbsp; ')} &nbsp; • = moved or changed by the player</div></section>`}
+viewCalendar=(function(old){return function(){const h=old();if(HUB.missing)return h;return h+keelWeekCard(sharing(),weekStart(addK(todayK(),(S.calOff||0)*7)),'Players\' own Keel training','What each player\'s Keel plan has them doing outside team sessions this week, so the full load is in one place.')}})(viewCalendar);
+viewPlayer=(function(old){return function(id){let h=old(id);const p=SQUAD.find(x=>x.id===id);if(!p||!p.share)return h;const k=S.k;
+  const kl=p.TP&&p.TP.koach&&p.TP.koachDay===todayK()?`<section class="card kline"><div class="small muted">What Koach told ${esc(first(p.name))} this morning in Keel</div><b>${esc(p.TP.koach[0])}</b><div class="small">${esc(p.TP.koach[1]||'')}</div></section>`:'';
+  const wk=p.TP&&p.TP.days?keelWeekCard([p],weekStart(k),'Their Keel week','From the player\'s own plan in Keel, with any days they moved or cancelled.'):'';
+  const hr=hrState(p,k);const sup=(()=>{const t={};lastN(k,7).forEach(kk=>{((p.D[kk]&&p.D[kk].supps)||[]).forEach(s=>t[s.name]=(t[s.name]||0)+(+s.n||1))});return Object.keys(t).length?Object.entries(t).map(([n,c])=>`${esc(n)} ×${c}`).join(' · '):''})();
+  const extra=`<section class="card"><header><div><h2>Also from Keel</h2></div></header><div class="small" style="display:grid;gap:6px">
+    <div><b>Heart rate:</b> ${hr?`${hr.last.b} bpm ${HRTN[hr.last.t]||''}${hr.usual!=null?` (usual ${hr.usual})`:''}`:'<span class="muted">Not logged</span>'}</div>
+    <div><b>Bed times:</b> ${(()=>{const v=sdBed(p,k,14);return v==null?'<span class="muted">Not enough nights</span>':v<=30?'Steady':`Vary by about ±${v} min`})()}</div>
+    <div><b>Mobility last 7 days:</b> ${mobMin(p,k,7)} min</div><div><b>Distance last 7 days:</b> ${kmWeek(p,k)||0} km</div>
+    ${sup?`<div><b>Supplements this week:</b> ${sup}</div>`:''}</div></section>`;
+  const bm=bodyMapPlayer(p);
+  return h+kl+wk+extra+bm}})(viewPlayer);
+// ---------- Phase 2: body map ----------
+const BMX={wk:2,lens:'str',sel:null};
+const BM_GYM={quads:1,glutes:1,hams:.8,upback:.8,lats:.6,chest:.6,delts:.5,abs:.6,lowback:.4,arms:.3};
+function bmPlayer(p,k,wks){const hits={},mob={};BM_M.forEach(([m])=>{hits[m]=0;mob[m]=0});const from=addK(k,-wks*7+1);
+  const credit=(sess,m,f)=>Object.entries(m).forEach(([q,v])=>{if(q in hits)sess[q]=(sess[q]||0)+v*f});const flush=s=>Object.entries(s).forEach(([q,v])=>hits[q]+=Math.min(v,1.5));
+  for(let kk=from;kk<=k;kk=addK(kk,1)){const l=p.L[kk],d=p.D[kk]||{};
+    if(l&&l.status&&l.status!=='missed'){const f=l.status==='partial'?.6:1;const s={};if(l.type==='S')credit(s,BM_GYM,f);else if(l.type==='H')credit(s,BM_G.hyrox.t,.35*f);else credit(s,BM_RUN,f);flush(s)}
+    (d.extras||[]).forEach(x=>{const s={};const f=Math.min((+x.dur||60)/75,1.3);
+      if(x.sc){const a=(SC.assigns||[]).find(z=>z.id===x.sc);let names=[];if(a){const pos=progPos(a,kk);const dow=(parse(kk).getDay()+6)%7+1;const day=pos&&pos.week&&(pos.week.days||[]).find(z=>z.dow===dow);names=((day&&day.items)||[]).map(it=>((SC.ex||[]).find(e=>e.id===it.ex)||{}).name).filter(Boolean)}
+        if(names.length)names.forEach(nm=>{const tg=bmTag(nm);if(tg)credit(s,tg.m,1)});else credit(s,BM_GYM,.8)}
+      else if(x.kind==='Club training'||x.kind==='Match')credit(s,BM_FIELD,f);else if(x.kind==='Run')credit(s,BM_RUN,f);else if(x.kind==='Gym')credit(s,BM_GYM,f);else credit(s,BM_GYM,.3);flush(s)});
+    if(isNum(d.farm)&&d.farm>=3){const s={};credit(s,BM_FARM,1);flush(s)}
+    if(d.blocks&&+d.blocks.physical>=3){const s={};credit(s,BM_FARM,.7);flush(s)}
+    (d.mobility||[]).forEach(x=>{let hit=false;BM_MOB.forEach(([re,ms])=>{if(re.test(x.name||'')){hit=true;ms.forEach(m=>mob[m]+=1/ms.length*1.5)}});if(!hit)BM_MOBALL.forEach(m=>mob[m]+=.3)});
+    (d.recovery||[]).forEach(x=>{if(/stretch|yoga|foam/i.test(x.kind||''))BM_MOBALL.forEach(m=>mob[m]+=.3)})}
+  return BM_M.map(([m,nm,rg,base])=>{const t=Math.max(base,(BM_G.gaa.t[m]||0));const pw=hits[m]/wks,mw=mob[m]/wks;return {m,nm,rg,t,pw,mw,r:pw/t,mr:mw/2}})}
+const BMC={neg:'#E5534B',light:'#E8A33D',ok:'#3FB98A'};
+const bmSt=r=>r<.4?'neg':r<.8?'light':'ok';
+function bmFigC(parts,col,lbl){const sh=parts.map(([k,svg])=>`<g class="bm2m${BMX.sel===k?' on':''}" data-bmx="${k}" style="--mc:${col[k]}">${svg}</g>`).join('');
+  return `<figure class="bm2fig"><svg viewBox="28 6 144 426" role="img" aria-label="${lbl} of the body"><path class="bm2body" d="${BM2_BODY_F}"/>${sh}<g transform="translate(200,0) scale(-1,1)">${sh}</g></svg><figcaption>${lbl}</figcaption></figure>`}
+function bmHero(rowsByM,col,summary,card){return `<section class="bm2hero"><div class="bm2sum">${summary}</div><div class="bm2figs">${bmFigC(BM2_F,col,'Front')}${bmFigC(BM2_B,col,'Back')}</div>${card}</section>`}
+function viewBodyMap(){const ps=sharing();if(!ps.length)return needTeam();const k=S.k;const mobL=BMX.lens==='mob';
+  const per=ps.map(p=>({p,rows:bmPlayer(p,k,BMX.wk)}));
+  const sq=BM_M.map(([m,nm])=>{const xs=per.map(x=>{const r=x.rows.find(z=>z.m===m);return {p:x.p,r:mobL?r.mr:r.r,pw:mobL?r.mw:r.pw}});const r=avg(xs.map(x=>Math.min(x.r,1.3)));return {m,nm,r,st:bmSt(r),low:xs.slice().sort((a,b)=>a.r-b.r).slice(0,6),cov:xs.filter(x=>x.r>=.8).length,n:xs.length}});
+  const col={};sq.forEach(x=>col[x.m]=BMC[x.st]);const cnt=s=>sq.filter(x=>x.st===s).length;
+  const L=mobL?['not stretched','a little','covered']:['neglected','light','covered'];
+  const summary=`<span style="--c:${BMC.neg}">${cnt('neg')} ${L[0]}</span><span style="--c:${BMC.light}">${cnt('light')} ${L[1]}</span><span style="--c:${BMC.ok}">${cnt('ok')} ${L[2]}</span>`;
+  const sel=sq.find(x=>x.m===BMX.sel);
+  const card=sel?`<div class="bm2card" style="--c:${BMC[sel.st]}"><div class="bm2ch"><b>${esc(sel.nm)}</b><em>${sel.cov} of ${sel.n} players ${mobL?'stretching it enough':'covering it'}</em><button class="x" data-bmx="" aria-label="Close">×</button></div>
+     <div class="bm2meter"><span style="width:${Math.min(100,sel.r*100)}%"></span></div><div class="bm2cs">Least ${mobL?'mobility':'work'} on it:</div><div class="bm2who">${sel.low.map(x=>`<button data-player="${esc(x.p.id)}">${esc(x.p.name)} <small>${x.pw.toFixed(1)}/wk</small></button>`).join('')}</div></div>`
+    :`<div class="bm2tap">Tap a muscle to see who's missing it</div>`;
+  const ctl=`<div class="toolbar">${['1','2','4','8'].map(w=>`<button class="btn ghost sm" data-bmxwk="${w}" aria-pressed="${BMX.wk==w}">${w==1?'1 week':w==4?'1 month':w==8?'2 months':'2 weeks'}</button>`).join('')}<span style="flex:1"></span><button class="btn ghost sm" data-bmxlens="str" aria-pressed="${!mobL}">Strength</button><button class="btn ghost sm" data-bmxlens="mob" aria-pressed="${mobL}">Mobility</button></div>`;
+  const list=sq.slice().sort((a,b)=>a.r-b.r).map(x=>`<button class="bm2row${BMX.sel===x.m?' on':''}" data-bmx="${x.m}"><i style="background:${BMC[x.st]}"></i><b>${esc(x.nm)}</b><span class="bm2bar"><span style="width:${Math.min(100,x.r*100)}%;background:${BMC[x.st]}"></span></span><em>${x.cov}/${x.n}</em></button>`).join('');
+  return `<section class="card"><header><div><h2>Squad body map</h2><p>${mobL?'Stretching and mobility each muscle gets across the squad, against 2 or more times a week.':'How much work each muscle gets across the squad, from Keel sessions, club training, matches, your S&C programmes and heavy work days. Judged for GAA football.'} Tap a muscle for the players missing it.</p></div></header>${ctl}
+    <div class="bmgrid">${bmHero(sq,col,summary,card)}<div class="bmlist"><div class="small muted" style="margin-bottom:6px">Weakest first · players covering it</div>${list}</div></div></section>`}
+function bodyMapPlayer(p){const k=S.k;const rows=bmPlayer(p,k,2);const col={};rows.forEach(r=>col[r.m]=BMC[bmSt(r.r)]);const low=rows.filter(r=>r.r<.4).map(r=>r.nm);
+  return `<section class="card"><header><div><h2>Body map, last 2 weeks</h2><p>${low.length?'Neglected: '+esc(low.slice(0,6).join(', ')):'Everything is getting some work.'}</p></div></header><div style="max-width:420px">${bmHero(rows,col,'','')}</div></section>`}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-bmxwk]')){BMX.wk=+x.dataset.bmxwk;render();return}
+  if(x=c('[data-bmxlens]')){BMX.lens=x.dataset.bmxlens;render();return}
+  if((x=c('[data-bmx]'))&&!c('[data-player]')){const m=x.dataset.bmx;BMX.sel=m&&BMX.sel!==m?m:null;const y=window.scrollY;render();window.scrollTo(0,y)}});
 
 // ================= start =================
 (async()=>{
