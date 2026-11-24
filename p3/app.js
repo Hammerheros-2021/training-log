@@ -6354,6 +6354,33 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
   if(x=c('[data-supdel]')){e.preventDefault();e.stopImmediatePropagation();const id=x.dataset.supdel;if(x.dataset.sure!=='1'){x.dataset.sure='1';x.classList.add('armed');x.innerHTML='Delete?';return}
     const l=supps().filter(s=>String(s.id)!==String(id));if(await persistMeta('supps',{...(meta.supps||{}),list:l}))toast('Supplement deleted');render()}},true);
 
+// ================= P3 (24 Nov): what the team's staff can see — plan summary, Koach's line, new switches =================
+TEAM_SEES.push('Heart rate readings and which kind they are (on waking, lying, sitting)','Your Keel plan for the next few weeks, days you moved or cancelled, and Koach\'s line for the day');
+TEAM_NEVER.splice(0,1,'Food, unless you turn on food sharing below (daily totals, time of your last coffee; meals only if you also turn that on)','Supplements and your work or driving hours, unless you turn those on below');
+const TEAM2={m:null,loading:false};
+async function team2Load(){if(!sb||TEAM2.loading)return;TEAM2.loading=true;try{const {data,error}=await sb.rpc('keel_my_share2');if(error)throw error;TEAM2.m={};(data||[]).forEach(r=>TEAM2.m[r.team_id]=r)}catch(e){TEAM2.m={}}TEAM2.loading=false;render()}
+teamPanel=(function(old){return function(){let h=old.apply(this,arguments);if(!TEAM.list||sampleMode)return h;if(TEAM2.m==null){setTimeout(team2Load,0);return h}
+  TEAM.list.forEach(m=>{if(m.role==='coach'||!m.share)return;const s=TEAM2.m[m.team_id];if(!s)return;const mark=`data-teamleave="${m.team_id}">Leave</button></div>`;
+    const lab=(attr,on,t,sub)=>`<label style="display:flex;gap:10px;align-items:flex-start;font-size:14px;margin-top:4px"><input type="checkbox" ${attr}="${m.team_id}" ${on?'checked':''} style="margin-top:3px"><span>${t}<br><span class="ds">${sub}</span></span></label>`;
+    h=h.replace(mark,mark+lab('data-teamsupps',s.share_supps,'Share my supplements','Which ones you took each day and how many. Helps the nutritionist spot doubling up.')+lab('data-teamday',s.share_day,'Share my day','Hours of work, driving and physical work, so the staff count a heavy day on the farm or site as load. Not what you did or where.'))});
+  return h}})(teamPanel);
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset)return;const col=t.dataset.teamsupps?'share_supps':t.dataset.teamday?'share_day':null;if(!col)return;const id=t.dataset.teamsupps||t.dataset.teamday;const on=t.checked;
+  const {error}=await sb.from('team_members').update({[col]:on}).eq('team_id',id).eq('user_id',UID);
+  if(error){t.checked=!on;toast('That isn\'t switched on for this team yet. Ask the team owner to run the latest database update.',4000);return}
+  toast(on?(col==='share_supps'?'Supplements are now shared with the staff':'Your day is now shared with the staff'):'That\'s private again',3500);TEAM2.m=null;render()});
+// a small plan summary the staff dashboard can read (only reaches staff while you share with a team)
+let P3TP={t:null,last:''};
+function p3TeamPlanDigest(){const t0=todayDate();const days={},changes={};for(let i=-7;i<=21;i++){const d=addD(t0,i),k=iso(d);const p=planFor(d);if(!p||p.pre)continue;const dd=D()[k]||{};
+    let ty=p.type;if(i<=0&&p3Replaced(k))ty='O';else if(dd.trainIntent==='no'&&!L()[k]&&p.type!=='R')ty='skip';days[k]=ty;
+    if(p.adj&&p.adj.was&&p.adj.was!==p.type)changes[k]={was:p.adj.was,type:p.type,note:String(p.adj.note||'').slice(0,80)}}
+  const k=iso(t0),d=D()[k]||{};let koach=null;try{const v=rVerdict(readiness(d),d);if(v)koach=[v[1],v[2]]}catch(e){}
+  return {days,changes,koach,koachDay:k}}
+function p3TeamPlanSync(){if(sampleMode||!sb||!UID)return;if(TEAM.list==null){if(!TEAM.loading)teamLoad();return}
+  if(!TEAM.list.some(m=>m.role!=='coach'&&m.share))return;const dg=p3TeamPlanDigest();const js=JSON.stringify(dg);if(js===P3TP.last)return;
+  const cur=meta.teamplan?JSON.stringify({days:meta.teamplan.days,changes:meta.teamplan.changes,koach:meta.teamplan.koach,koachDay:meta.teamplan.koachDay}):'';P3TP.last=js;if(cur===js)return;
+  persistMeta('teamplan',{...dg,at:new Date().toISOString()})}
+render=(function(old){return function(){old.apply(this,arguments);clearTimeout(P3TP.t);P3TP.t=setTimeout(()=>{try{p3TeamPlanSync()}catch(e){}},4000)}})(render);
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
