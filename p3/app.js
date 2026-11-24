@@ -4595,14 +4595,14 @@ function viewReports(){
   const byType={S:[0,0],E:[0,0],H:[0,0],T:[0,0],X:[0,0]};planned.forEach(x=>{const k=x.p.type;byType[k][1]++;const l=LL[iso(x.d)];if(l&&l.status!=='missed')byType[k][0]+=l.status==='done'?1:.5});
   const swaps=entries.filter(e=>e.slot==='T'&&e.type==='H'&&e.status!=='missed').length;
   const cbars=Object.entries(byType).map(([k,[a,b]])=>{const pc=b?Math.round(a/b*100):0;return `<div class="bar" style="--c:var(${TVAR[k]})"><span>${TNAME[k]}</span><div class="tr"><div class="fl" style="width:${pc}%"></div></div><span class="pct num">${b?pc+'%':'-'}</span></div>`}).join('');
-  const series=f=>{const out=[];for(let i=41;i>=0;i--){const d=addD(now,-i),dd=DD[iso(d)];if(!dd)continue;const v=typeof f==='function'?f(dd):dd[f];if(isNum(v))out.push({x:d/DAY,y:+v,lab:short(d)})}return out};
+  const series=f=>{const out=[];for(let i=P3RG.d-1;i>=0;i--){const d=addD(now,-i),dd=DD[iso(d)];if(!dd)continue;const v=typeof f==='function'?f(dd):dd[f];if(isNum(v))out.push({x:d/DAY,y:+v,lab:short(d)})}return out};
   const sortD=(a,b)=>a.date<b.date?-1:1,pt=(arr,f)=>arr.map(e=>({x:parse(e.date)/DAY,y:f(e),lab:short(parse(e.date))}));
   const tb=pt(entries.filter(e=>e.tb).sort(sortD),e=>e.tb),ss=pt(entries.filter(e=>e.ss).sort(sortD),e=>e.ss);
   const pace=pt(entries.filter(e=>toSec(e.pace)&&e.type==='T').sort(sortD),e=>toSec(e.pace));
   const base=entries.find(e=>e.wk===1&&toSec(e.fivek)),re=entries.find(e=>e.wk===12&&toSec(e.fivek));
   let diff='-';if(base&&re){const dd=toSec(base.fivek)-toSec(re.fivek);diff=(dd>=0?'-':'+')+fromSec(Math.abs(dd))}
   const inj=injuryAnalysis(),slp=sleepTimingChart(now);
-  const rhr=series('rhr'),strn=[];for(let i=41;i>=0;i--){const d=addD(now,-i),s=strain(iso(d));if(s!=null)strn.push({x:d/DAY,y:s,lab:short(d)})}
+  const rhr=series('rhr'),strn=[];for(let i=P3RG.d-1;i>=0;i--){const d=addD(now,-i),s=strain(iso(d));if(s!=null)strn.push({x:d/DAY,y:s,lab:short(d)})}
   const savedAI=!sampleMode&&meta.overview;const aiText=aiState.text||(savedAI?savedAI.text:'');
   const aiPanel=coachHTML(aiText,savedAI);
   const W=(title,hint,body)=>`<section class="panel"><h3>${title}</h3>${hint?`<div class="hint">${hint}</div>`:''}${body}</section>`;
@@ -4614,8 +4614,8 @@ function viewReports(){
    `<div class="sect">Sleep &amp; recovery</div>`+
    W('Balance','Daily score from sleep, how you feel, niggles and, when logged, your morning pulse against your own 2-week baseline.',lineChart(series(d=>readiness(d)),{yMin:0,yMax:100,fmtY:v=>Math.round(v),color:'var(--k-green)'}))+
    W('Sleep timing','Each bar runs from bed to wake, last 28 nights. Darker = better quality. Orange tick = screens off.',slp.svg+slp.stats)+
-   W('Strain','Daily strain, 0-21, from training load plus farm work, in the style of Whoop. Higher strain raises the next night\'s sleep need.',lineChart(strn,{yMin:0,yMax:21,fmtY:v=>v.toFixed(1),color:'var(--h)',h:130}))+
-   (rhr.length>1?W('Morning pulse','Counted by hand before getting up. A rise of 5+ bpm above your usual is an early sign of being run down.',lineChart(rhr,{pad:2,fmtY:v=>Math.round(v),color:'var(--t)',h:110})):'')+
+   W('Training strain','How hard each day was on your body, 0 to 21: training plus physical work. A hard day means you need more sleep that night.',lineChart(strn,{yMin:0,yMax:21,fmtY:v=>v.toFixed(1),color:'var(--h)',h:130}))+
+   (rhr.length>1?W('Resting heart rate','Taken before you get up. 5 or more above your usual is an early sign you\'re run down.',lineChart(rhr,{pad:2,fmtY:v=>Math.round(v),color:'var(--t)',h:110})):'')+
    W('Energy and mood','Energy, 1 flat to 5 flying.',lineChart(series('energy'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--e)',h:110})+'<div class="hint">Mood, 1 low to 5 great.</div>'+lineChart(series('mood'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--x)',h:110}))+
    W('Stress and soreness','Stress, 1 calm to 5 very stressed.',lineChart(series('stress'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--warn)',h:110})+'<div class="hint">Soreness, 1 fresh to 5 very sore.</div>'+lineChart(series('sore'),{yMin:1,yMax:5,fmtY:v=>v.toFixed(0),color:'var(--s)',h:110}))+
    W('Habits','',habitGrid(now))+
@@ -6288,7 +6288,7 @@ p2HrTrends=function(){const DD=D();const end=sampleMode?SAMPLE.now:todayDate();c
     const i0=pts[0].i;const x=i=>P+(W-2*P)*(i-i0)/((N-1-i0)||1),y=b=>H-P-(H-2*P)*(b-lo)/(hi-lo||1);
     const path=pts.map((p,j)=>`${j?'L':'M'}${x(p.i).toFixed(1)},${y(p.b).toFixed(1)}`).join('');
     const tone=diff>=5?'var(--status-alert,#E5534B)':diff<=-3?'var(--accent,#3FB98A)':'var(--text)';
-    return `<div class="p3hr"><div class="p3hrh"><span><b>${l.replace(/ for 5 minutes|, still in bed/,'')}</b><small>usual ${Math.round(us)} bpm · ${pts.length} readings</small></span><span class="p3hrv" style="color:${tone}">${last}<small> bpm</small><em>${diff>0?'+':''}${diff} vs usual</em></span></div>
+    return `<div class="p3hrc"><div class="p3hrh"><span><b>${l.replace(/ for 5 minutes|, still in bed/,'')}</b><small>usual ${Math.round(us)} bpm · ${pts.length} readings</small></span><span class="p3hrv" style="color:${tone}">${last}<small> bpm</small><em>${diff>0?'+':''}${diff} vs usual</em></span></div>
       <svg viewBox="0 0 ${W} ${H}" class="p3hrsvg" preserveAspectRatio="none"><rect x="0" y="${Math.min(y(us+5),y(us-5)).toFixed(1)}" width="${W}" height="${Math.abs(y(us-5)-y(us+5)).toFixed(1)}" class="band"/><line x1="0" x2="${W}" y1="${y(us).toFixed(1)}" y2="${y(us).toFixed(1)}" class="us"/><path d="${path}" class="ln"/>${pts.map(p=>`<circle cx="${x(p.i).toFixed(1)}" cy="${y(p.b).toFixed(1)}" r="2.6" class="pt"/>`).join('')}</svg>
       <div class="p3hrx"><span>${fmtD(addD(end,-(N-1-pts[0].i)),{day:"numeric",month:"short"})}</span><span>today</span></div></div>`}).join('');
   return cards?`<article class="card"><div class="chead"><div style="flex:1"><h2>Heart rate</h2><div class="sub">Shaded band is your normal (usual ± 5). A reading above it, two days running, means take it easier.</div></div></div><div class="form" style="gap:14px">${cards}</div></article>`:''};
@@ -6300,6 +6300,13 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
     <div class="p3sllinks"><span class="label">Tonight</span><div class="p3slrow"><button type="button" data-prog="478">${ico('moon')}<span><b>4-7-8 wind-down</b><small>4 min breathing before bed</small></span></button><button type="button" data-prog="scan">${ico('waves')}<span><b>Body scan</b><small>Let the day go</small></span></button></div>
     <button type="button" class="p3pagebtn" data-p3sltr>${ico('trending-up')}<span>Sleep and recovery trends</span><span aria-hidden="true">›</span></button></div>`)},true);
 document.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-p3sltr]')))return;p1Sheet(null);pView='me';location.hash='reports';p3OpenSec('SLEEP')});
+
+// Progress: pick how far back the charts look
+const P3RG={d:42};
+viewReports=(function(old){return function(){const h=old.apply(this,arguments);const opts=[[14,'2 wks'],[42,'6 wks'],[91,'3 mo'],[182,'6 mo']];
+  const bar=`<div class="p3rg"><span class="label">Charts show</span><div class="bm2win">${opts.map(([d,l])=>`<button type="button" data-p3rg="${d}" aria-pressed="${P3RG.d===d}">${l}</button>`).join('')}</div></div>`;
+  return bar+h}})(viewReports);
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3rg]');if(!b)return;P3RG.d=+b.dataset.p3rg;const y=window.scrollY;render();window.scrollTo(0,y)});
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
