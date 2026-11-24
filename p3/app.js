@@ -6159,7 +6159,7 @@ async function fvParse(text,split){if(!FV||FV.busy)return;FV.busy=true;fvDraw();
 function fvTot(its){return its.reduce((a,i)=>({k:a.k+kcalOf(i),p:a.p+(+i.protein||0)}),{k:0,p:0})}
 function fvDraw(){if(!FV){p1Sheet(null);return}const X=`<button type="button" class="x" data-fvx aria-label="Close">${ico('x')}</button>`;
   if(FV.view==='list'){const saved=kuzSaved();
-    const sec=MEALS.map(m=>{const mine=saved.map((u,i)=>({u,i})).filter(o=>(o.u.meal||'Breakfast')===m);let sug=[];try{sug=kuzSuggest(m)}catch(e){}
+    const sec=MEALS.map(m=>{const mine=saved.map((u,i)=>({u,i})).filter(o=>(o.u.meal||'Breakfast')===m);const sug=[];
       const rows=mine.map(({u,i})=>{const t=fvTot(u.items);const arm=FV.armed===i;return `<div class="fvline"><button type="button" class="fvrow" data-fvopen="s${i}"><span><b>${esc(u.name)}</b><small>${u.items.length} ingredient${u.items.length>1?'s':''}: ${u.items.map(x=>esc(x.name)).join(', ')}</small></span><em>${t.k} kcal</em></button><button type="button" class="fvbin${arm?' armed':''}" data-fvbin="${i}" aria-label="${arm?'Tap again to delete':'Delete'} ${esc(u.name)}">${arm?'Delete?':ico('trash')}</button></div>`}).join('')
         +sug.map((u,j)=>{FV.sug[m+j]=u;const t=fvTot(u.items);return `<button type="button" class="fvrow sug" data-fvopen="g${m}${j}"><span><b>${esc(u.name)}</b><small>You often have this · tap to check and save</small></span><em>${t.k} kcal</em></button>`}).join('');
       return `<div class="fvsec${m===FV.meal?' cur':''}"><h4>${m}${m===FV.meal?' <small>adding here</small>':''}</h4>${rows||'<div class="ds fvnone">None yet</div>'}</div>`}).join('');
