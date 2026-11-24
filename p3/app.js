@@ -2278,7 +2278,7 @@ function routeHTML(){const L0=RT.loops[RT.pick];const eff=L0?p1Effort(L0.m/1000,
     <div class="field"><span class="label">Start from</span><div class="p1start"><button type="button" class="ghost" id="rtLoc">${ico('locate')} Here</button><input id="rtq" type="search" placeholder="A place, e.g. Glencar Lake" value="${esc(RT.q)}" enterkeyhint="search"><button type="button" class="ghost" id="rtFind" aria-label="Search">${ico('search')}</button></div>
       <div class="hint" style="font-size:12px;color:var(--muted)">${RT.start?'Start set. Tap the map to move it.':'Or tap the map, for example where you\'d park.'}</div></div>
     </div>
-    <div class="p1mapwrap"><div id="p1map" class="p1map" aria-label="Map"></div><div class="p1mapctl"><div class="segmini">${[['map','Map'],['hills','Hills']].map(([v,l])=>`<button type="button" data-rtbase="${v}" aria-pressed="${RT.base===v}">${l}</button>`).join('')}</div></div></div>
+    <div class="p1mapwrap"><div id="p1map" class="p1map" aria-label="Map"></div></div>
     <div class="form">    ${p1Seg('rtkind',[['walk','Walk'],['run','Run'],['cycle','Cycle']],RT.kind)}
     ${RT.mode==='loop'?`<div class="field"><span class="label">Distance</span><div class="p1kms">${chips.map(v=>`<button type="button" data-rtkm="${v}" aria-pressed="${+RT.km===v}">${v} km</button>`).join('')}<input id="rtkm" type="number" inputmode="decimal" step="0.5" min="1" max="${RT.kind==='cycle'?120:42}" value="${RT.km}" aria-label="Distance in km"></div></div>
       <div class="field"><span class="label">Hills</span>${p1Seg('rthills',[['flat','Keep it flat'],['any','Don\'t mind'],['hilly','Hills please']],RT.hills)}</div>`:''}
@@ -2294,7 +2294,7 @@ function routeHTML(){const L0=RT.loops[RT.pick];const eff=L0?p1Effort(L0.m/1000,
     ${RT.mode==='trace'&&RT.tgeo?`<div class="form"><div class="p1rstat"><div><b class="num">${RT.tkm}</b><small>km</small></div><div><b class="num">${RT.tclimb!=null?RT.tclimb:'–'}</b><small>m climb</small></div><div><b>${te.word}</b><small>effort</small></div></div>${p1Profile(RT.tprof,'#E23D9E')}
       <div class="row2"><div class="field"><label class="label" for="rtmin">Minutes it took</label><input id="rtmin" type="number" inputmode="numeric" value="${esc(RT.tmin)}"></div><div class="field"><label class="label" for="rtrpe">How hard (1-10)</label><input id="rtrpe" type="number" inputmode="numeric" min="1" max="10"></div></div><button type="button" class="primary" id="rtLog">Log this ${RT.kind}</button></div>`:''}
     <div class="ds p1attr">Maps &copy; OpenStreetMap contributors, CARTO, OpenTopoMap, Esri. Routes by OSRM. Heights by Open-Meteo. Places by Nominatim.</div></article>`}
-function p1SetBase(L){const key=RT.base==='hills'&&RT.hillsBad?'hills2':RT.base;const b=P1BASE[key]||P1BASE.map;if(RT.tiles)RT.map.removeLayer(RT.tiles);const hill=key!=='map';
+function p1SetBase(L){RT.base='hills';const key=RT.hillsBad?'hills2':'hills';const b=P1BASE[key]||P1BASE.map;if(RT.tiles)RT.map.removeLayer(RT.tiles);const hill=key!=='map';
   RT.tiles=L.tileLayer(b[0],{subdomains:b[1]||'abc',maxNativeZoom:b[2],maxZoom:20,detectRetina:!hill}).addTo(RT.map);
   if(key==='hills'){let bad=0,good=0;RT.tiles.on('tileload',()=>{good++});RT.tiles.on('tileerror',()=>{bad++;if(bad>=3&&good<2&&!RT.hillsBad){RT.hillsBad=true;p1SetBase(L)}})}}
 function p1Pin(L,ll,html,cls){return L.marker(ll,{icon:L.divIcon({className:'p1di',html:`<span class="${cls}">${html}</span>`,iconSize:null}),keyboard:false})}
