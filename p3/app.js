@@ -6255,6 +6255,23 @@ document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest
 function p3OpenSec(word){let n=0;const go=()=>{const ds=[...document.querySelectorAll('details.ksec')];const t=ds.find(x=>((x.querySelector('summary')||{}).textContent||'').toUpperCase().includes(word));
   if(!t){if(n++<15)setTimeout(go,100);return}ds.forEach(x=>{if(x!==t)x.open=false});t.open=true;t.scrollIntoView({block:'start',behavior:'smooth'})};setTimeout(go,120)}
 
+// ================= P3 (24 Nov): drinks — favourites, a clear "other drink" button, tighter =================
+const dFavs=()=>(meta.drinkfavs&&Array.isArray(meta.drinkfavs.list))?meta.drinkfavs.list:[];
+p1DrinksDraw=(function(old){return function(){old();const host=document.querySelector('#p1Host .ksheet');if(!host)return;
+  const cof=[...host.querySelectorAll('section.p1blk')].find(s=>/Coffee and tea/.test((s.querySelector('h3')||{}).textContent||''));if(!cof)return;
+  const fv=dFavs();const us=fv.length?fv:p3Usuals();P3US=us;let row=cof.querySelector('.p3us');
+  const html=`<span class="label">${fv.length?'Favourites':'Your usual'}</span><div class="p3dchips">${us.map((x,i)=>`<button type="button" data-p3us="${i}">${p3Pic(x.name,22)}<span>${esc(x.name)}</span></button>`).join('')}</div>`;
+  if(us.length){if(!row){row=document.createElement('div');const anchor=cof.querySelector('details.p3more');if(anchor)anchor.insertAdjacentElement('beforebegin',row);else cof.appendChild(row)}row.className='p3us p3dfav';row.innerHTML=html}else if(row)row.remove();
+  const sm=cof.querySelector('details.p3more>summary');if(sm){sm.classList.add('p3otherbtn');sm.textContent=us.length?'+ Other coffee or tea':'+ Add a coffee or tea'}
+  const k=iso(todayDate());const food=(D()[k]||{}).food||[];const keys=new Set(fv.map(f=>String(f.name).toLowerCase()));
+  cof.querySelectorAll('.p1cafi').forEach(r=>{if(r.querySelector('[data-p3dfav]'))return;const del=r.querySelector('[data-del-food]');if(!del)return;const it=food[+del.dataset.delFood];if(!it)return;const on=keys.has(String(it.name).toLowerCase());
+    del.insertAdjacentHTML('beforebegin',`<button type="button" class="p3dstar${on?' on':''}" data-p3dfav="${del.dataset.delFood}" aria-pressed="${on}" aria-label="${on?'Remove from':'Save to'} favourites">${ico('star')}</button>`)});
+  if(!cof.querySelector('.p3dhint')&&cof.querySelector('.p1cafi')&&!fv.length)cof.querySelector('.p1caf').insertAdjacentHTML('beforeend','<div class="p3dhint ds">Tap ☆ on a drink to keep it in Favourites.</div>')}})(p1DrinksDraw);
+document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-p3dfav]');if(!b)return;e.stopImmediatePropagation();const k=iso(todayDate());const it=((D()[k]||{}).food||[])[+b.dataset.p3dfav];if(!it)return;
+  const key=String(it.name).toLowerCase();let l=dFavs().slice();const had=l.some(f=>String(f.name).toLowerCase()===key);
+  if(had)l=l.filter(f=>String(f.name).toLowerCase()!==key);else{const o=clone(it);delete o.at;delete o.meal;delete o.ix;delete o.planRef;l.push(o)}
+  if(await persistMeta('drinkfavs',{list:l.slice(0,12),updatedAt:new Date().toISOString()}))toast(had?`${it.name} removed from favourites`:`${it.name} saved to favourites`);p1DrinksDraw()},true);
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
