@@ -11,7 +11,8 @@ export default async function handler(req, res) {
   if ((u.email || '').toLowerCase() !== process.env.OWNER_EMAIL.toLowerCase()) return res.status(403).json({ error: 'Not allowed' });
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) return res.status(501).json({ error: 'Add SUPABASE_SERVICE_ROLE_KEY in Vercel to turn this on' });
-  const H = { apikey: key, Authorization: `Bearer ${key}` };
+  // New Supabase secret keys (sb_secret_...) go in the apikey header only; old service_role keys also need the Bearer header.
+  const H = key.startsWith('sb_') ? { apikey: key } : { apikey: key, Authorization: `Bearer ${key}` };
   try {
     const [ur, pr, er, sr] = await Promise.all([
       fetch(`${SB()}/auth/v1/admin/users?per_page=500`, { headers: H }),
