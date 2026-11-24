@@ -2233,7 +2233,7 @@ function p1Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d
 
 // ---------- routes ----------
 Object.assign(RT,{base:'map',q:'',sig:'',mapEl:null,grp:null,tiles:null,tprof:null});
-const P1BASE={map:['https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png','abcd',20],hills:['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png','abc',17]};
+const P1BASE={map:['https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png','abcd',20],hills:['https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png','abc',17],hills2:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}','',18]};
 const LOOPC=['#5B6CFF','#14B87A','#E8913A'];
 async function p1Climb(coords){const s=p1Sample(coords,Math.max(50,p1Len(coords)/95));
   const r=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${s.map(p=>p[0].toFixed(4)).join(',')}&longitude=${s.map(p=>p[1].toFixed(4)).join(',')}`);const j=await r.json();const e=j.elevation||[];if(!e.length)throw new Error('no heights');
@@ -2285,15 +2285,18 @@ function routeHTML(){const L0=RT.loops[RT.pick];const eff=L0?p1Effort(L0.m/1000,
     ${RT.mode==='loop'?`<button type="button" class="primary" id="rtGo" ${RT.busy?'disabled':''}>${RT.busy?'Finding loops…':RT.loops.length?'Find different loops':'Find loops'}</button>`:`<button type="button" class="ghost" id="rtUndo" ${RT.trace.length?'':'disabled'}>Undo last point</button>`}
     ${RT.msg?`<div class="hsum" role="status">${esc(RT.msg)}</div>`:''}</div>
     ${RT.mode==='loop'&&RT.loops.length?`<div class="p1loops">${RT.loops.map((x,i)=>{const e=p1Effort(x.m/1000,x.climb||0,RT.kind);return `<button type="button" class="p1loop" data-rtpick="${i}" aria-pressed="${RT.pick===i}" style="--lc:${LOOPC[i]}"><b>Loop ${i+1}</b><span class="num">${(x.m/1000).toFixed(1)} km</span><span>${x.climb!=null?`${x.climb} m up`:'climb unknown'}</span><span>${e.word}</span></button>`}).join('')}</div>
-      ${eff?`<div class="form"><div class="p1rstat"><div><b class="num">${(L0.m/1000).toFixed(1)}</b><small>km</small></div><div><b class="num">${L0.climb!=null?L0.climb:'–'}</b><small>m climb</small></div><div><b class="num">~${eff.mins}</b><small>min</small></div><div><b>${eff.word}</b><small>effort</small></div></div>
-        <div class="hint" style="font-size:12px;color:var(--muted)">Effort counts every 100 m of climb as an extra ${RT.kind==='cycle'?'2 km':'1 km'} on the flat, so this is like ${eff.eq} km flat.</div>
+      ${eff?`<div class="form"><div class="p1rstat"><div><b class="num">${(L0.m/1000).toFixed(1)}</b><small>km</small></div><div><b class="num">${L0.climb!=null?L0.climb:'–'}</b><small>m climb</small></div><div><b class="num">~${eff.mins}</b><small>min</small></div><div><b class="p1rw">${eff.word}</b><small>effort</small></div><div><b class="num">~${p3Kcal(eff.eq,RT.kind)}</b><small>kcal</small></div></div>
+        <div class="hint" style="font-size:12px;color:var(--muted)">Calories are a rough guide for your weight. Effort counts every 100 m of climb as an extra ${RT.kind==='cycle'?'2 km':'1 km'} on the flat, so this is like ${eff.eq} km flat.</div>
         ${p1Profile(L0.prof,lc)}
         <button type="button" class="primary" id="rtSave">Plan this for today</button>
-        <div class="row2"><a class="ghost p1btn" href="${p1GLink(L0.coords,RT.kind)}" target="_blank" rel="noopener">${ico('navigation')} Google Maps</a><button type="button" class="ghost p1btn" id="rtGpx">${ico('download')} GPX for a watch</button></div></div>`:''}`:''}
+        <div class="row2"><a class="ghost p1btn" href="${p1GLink(L0.coords,RT.kind)}" target="_blank" rel="noopener">${ico('navigation')} Google Maps</a><button type="button" class="ghost p1btn" id="rtGpx">${ico('download')} GPX file for your watch</button></div>
+        <div class="hint" style="font-size:12px;color:var(--muted)">GPX is a route file. Download it, then import it into Garmin Connect, COROS or Strava (Routes) and send it to your watch. The watch then shows the route and tells you when to turn.</div></div>`:''}`:''}
     ${RT.mode==='trace'&&RT.tgeo?`<div class="form"><div class="p1rstat"><div><b class="num">${RT.tkm}</b><small>km</small></div><div><b class="num">${RT.tclimb!=null?RT.tclimb:'–'}</b><small>m climb</small></div><div><b>${te.word}</b><small>effort</small></div></div>${p1Profile(RT.tprof,'#E23D9E')}
       <div class="row2"><div class="field"><label class="label" for="rtmin">Minutes it took</label><input id="rtmin" type="number" inputmode="numeric" value="${esc(RT.tmin)}"></div><div class="field"><label class="label" for="rtrpe">How hard (1-10)</label><input id="rtrpe" type="number" inputmode="numeric" min="1" max="10"></div></div><button type="button" class="primary" id="rtLog">Log this ${RT.kind}</button></div>`:''}
-    <div class="ds p1attr">Maps &copy; OpenStreetMap contributors, CARTO, OpenTopoMap. Routes by OSRM. Heights by Open-Meteo. Places by Nominatim.</div></article>`}
-function p1SetBase(L){const b=P1BASE[RT.base]||P1BASE.map;if(RT.tiles)RT.map.removeLayer(RT.tiles);RT.tiles=L.tileLayer(b[0],{subdomains:b[1],maxZoom:b[2],detectRetina:true}).addTo(RT.map)}
+    <div class="ds p1attr">Maps &copy; OpenStreetMap contributors, CARTO, OpenTopoMap, Esri. Routes by OSRM. Heights by Open-Meteo. Places by Nominatim.</div></article>`}
+function p1SetBase(L){const key=RT.base==='hills'&&RT.hillsBad?'hills2':RT.base;const b=P1BASE[key]||P1BASE.map;if(RT.tiles)RT.map.removeLayer(RT.tiles);const hill=key!=='map';
+  RT.tiles=L.tileLayer(b[0],{subdomains:b[1]||'abc',maxNativeZoom:b[2],maxZoom:20,detectRetina:!hill}).addTo(RT.map);
+  if(key==='hills'){let bad=0,good=0;RT.tiles.on('tileload',()=>{good++});RT.tiles.on('tileerror',()=>{bad++;if(bad>=3&&good<2&&!RT.hillsBad){RT.hillsBad=true;p1SetBase(L)}})}}
 function p1Pin(L,ll,html,cls){return L.marker(ll,{icon:L.divIcon({className:'p1di',html:`<span class="${cls}">${html}</span>`,iconSize:null}),keyboard:false})}
 function p1Along(c,every){const out=[];let acc=0,next=every;for(let i=1;i<c.length;i++){const d=p1Dist(c[i-1],c[i]);while(acc+d>=next){const f=(next-acc)/d;out.push({p:[c[i-1][0]+(c[i][0]-c[i-1][0])*f,c[i-1][1]+(c[i][1]-c[i-1][1])*f],b:p1Brg(c[i-1],c[i]),at:next});next+=every}acc+=d}return out}
 function p1Brg(a,b){const r=Math.PI/180;const y=Math.sin((b[1]-a[1])*r)*Math.cos(b[0]*r),x=Math.cos(a[0]*r)*Math.sin(b[0]*r)-Math.sin(a[0]*r)*Math.cos(b[0]*r)*Math.cos((b[1]-a[1])*r);return (Math.atan2(y,x)/r+360)%360}
@@ -6316,6 +6319,12 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-bm2lens]');if(!b)return;bmS.lens=b.dataset.bm2lens;bmS.sel=null;bmS.area=null;render()});
 document.addEventListener('change',e=>{if(!e.target||e.target.id!=='bm2cw')return;const v=Math.round(+e.target.value);if(v>=1&&v<=104){bmS.cw=v;render()}});
 const _bmWl=bmWl;bmWl=function(w){return w===26?'6 months':w===52?'a year':_bmWl(w)};
+
+// Routes: rough calories from flat-equivalent km and body weight; no team card on Routes
+function p3Kcal(eqKm,kind){let kg=80;try{const DD=D();const ks=Object.keys(DD).sort().reverse();for(const k of ks){if(isNum(DD[k].kg)){kg=+DD[k].kg;break}}}catch(e){}
+  return Math.round(kg*eqKm*(kind==='walk'?0.55:kind==='cycle'?0.28:1.0)/10)*10}
+mypCard=(function(old){return function(where){if(where==='plan'&&tView==='route')return '';return old.apply(this,arguments)}})(mypCard);
+mytPlanCard=(function(old){return function(){if(tView==='route')return '';return old.apply(this,arguments)}})(mytPlanCard);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
