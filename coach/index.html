@@ -488,11 +488,22 @@ details.kmore>summary{cursor:pointer;padding:10px 0;font-weight:600;color:var(--
 .bm2row i{width:10px;height:10px;border-radius:50%}.bm2row b{font-size:13px;font-weight:500}.bm2row em{font-style:normal;font-size:12px;color:var(--text-muted);text-align:right}.bm2row.on b{font-weight:700}
 .bm2bar{height:5px;border-radius:3px;background:color-mix(in srgb,var(--text) 10%,transparent);overflow:hidden}.bm2bar span{display:block;height:100%}
 .toolbar .btn[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+
+/* GPS */
+.gpwrap{max-width:640px}.gpwrap.gbig{max-width:none}.gpitch{width:100%;height:auto;display:block}
+.gturf{fill:#1f5a33}[data-look="bone"] .gturf{fill:#2b6b3d}.glines line,.glines rect,.glines path{stroke:rgba(255,255,255,.75);stroke-width:1.2;fill:none}
+.gspr{stroke:#fff;stroke-width:2;stroke-linecap:round;opacity:.9}.gdir{fill:rgba(255,255,255,.8);font-size:11px;font-weight:600}
+.gbar{height:8px;border-radius:4px;background:color-mix(in srgb,var(--text) 8%,transparent);overflow:hidden}.gbar i{display:block;height:100%;background:var(--status-caution)}
+.gtable td,.gtable th{white-space:nowrap}.gok{color:var(--status-good);font-weight:700}
+.gthirds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.gthirds div{padding:10px;border-radius:12px;background:color-mix(in srgb,var(--text) 5%,transparent);text-align:center}.gthirds b{display:block;font-size:20px}.gthirds small{color:var(--text-muted)}
+.gleg{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin-top:8px}.gleg i{flex:0 0 160px;height:8px;border-radius:4px;background:linear-gradient(90deg,rgb(40,90,255),rgb(40,220,200),rgb(250,220,60),rgb(255,120,40),rgb(230,30,60))}
+.gpat{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}.gpi{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:12px;border:1px solid var(--line)}.gpi>button{flex:0 0 120px;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:var(--text)}
+.gai{display:grid;gap:10px;margin-top:12px}.gimp{padding:14px;border-radius:14px;border:1px dashed var(--line)}.gimp h3{margin:0 0 6px}.gsec{margin:24px 0 10px;font-family:var(--font-display)}
 </style>
 </head>
 <body>
 <div id="root"><div class="spin"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/coach/coach.js?v=c8"></script>
+<script src="/coach/coach.js?v=c8x"></script>
 </body>
 </html>

@@ -594,7 +594,7 @@ function render(){if(render._busy){setTimeout(render,0);return}render._busy=true
 function render2(){TIPS={};tipN=0;const rt=route();const root=$('#root');
   if(!SESSION){root.innerHTML=gateHTML();return}
   const title=rt.v==='player'?'Player':(VIEWS.find(v=>v[0]===rt.v)||VIEWS[0])[1];
-  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,trends:viewTrends,calendar:viewCalendar,messages:viewMessages,sc:viewSCHub,physio:viewPhysioHub,recovery:viewRecovery,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
+  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,gps:()=>viewGPS(),trends:viewTrends,calendar:viewCalendar,messages:viewMessages,sc:viewSCHub,physio:viewPhysioHub,recovery:viewRecovery,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
   const sy=scrollY;root.innerHTML=shell(body,title);try{enhancePickers();const ms=$('#msgScroll');if(ms)ms.scrollTop=ms.scrollHeight}catch(e){}if(render._v===location.hash)scrollTo(0,sy);else scrollTo(0,0);render._v=location.hash}
 let GATE={mode:'in',msg:''};
 function gateHTML(){if(GATE.mode==='up')return `<div class="gate"><form class="gcard" id="signup">${kwm()}<div><h1>Join the backroom team</h1><p class="muted small" style="margin-top:4px">For coaches, S&amp;C, physios, nutritionists and mindset coaches. You need the staff code from your team's manager.</p></div>
@@ -1686,10 +1686,236 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
   if(x=c('[data-bmxlens]')){BMX.lens=x.dataset.bmxlens;render();return}
   if((x=c('[data-bmx]'))&&!c('[data-player]')){const m=x.dataset.bmx;BMX.sel=m&&BMX.sel!==m?m:null;const y=window.scrollY;render();window.scrollTo(0,y)}});
 
+// ================= GPS (STATSports and other trackers) =================
+// Import: STATSports Apex session summary CSV (one row per player), or a raw trace (CSV with lat/lon or x/y, or GPX)
+// for one player. Traces are boiled down here: headline numbers, a 5 m heat-map grid and sprint lines. Stored in team_gps.
+const GPS={rows:[],missing:false,loaded:false,tab:'sessions',sess:null,pl:null,hm:{scope:'session',who:'all',layer:'all',sess:null,weeks:4},imp:null,ai:null,aiBusy:false};
+const PW=145,PH=90,GC=5,GW=Math.ceil(PW/GC),GH=Math.ceil(PH/GC);
+const HSR_KMH=19.8,SPR_KMH=25.2;
+const GM=[['dist','Distance','m',0],['hsr','High-speed running','m',0],['sprint','Sprint distance','m',0],['acc','Accelerations','',0],['dec','Decelerations','',0],['vmax','Top speed','km/h',1],['mpm','Metres per minute','',0],['dur','Minutes','',0]];
+const gnum=v=>v==null||isNaN(v)?null:+v;
+async function loadGPS(t){GPS.missing=false;GPS.loaded=true;
+  if(t.team_id===DEMO_ID){GPS.rows=buildDemoGPS();return}
+  try{const out=[];for(let off=0;off<20000;off+=1000){const {data,error}=await sb.from('team_gps').select('id,player_id,day,session,kind,metrics,heat,sprints,source').eq('team_id',t.team_id).gte('day',addK(todayK(),-400)).order('day',{ascending:false}).range(off,off+999);if(error)throw error;out.push(...(data||[]));if(!data||data.length<1000)break}
+    GPS.rows=out.map(r=>({...r,day:String(r.day).slice(0,10),m:r.metrics||{}}))}catch(e){GPS.rows=[];GPS.missing=/team_gps|relation|schema/i.test(String(e&&e.message))}}
+loadSquad=(function(old){return async function(t){await old(t);try{await loadGPS(t)}catch(e){GPS.missing=true}}})(loadSquad);
+// ---------- maths ----------
+function gpsSessions(){const m={};GPS.rows.forEach(r=>{const k=r.day+'|'+r.session;(m[k]=m[k]||{key:k,day:r.day,session:r.session,kind:r.kind,rows:[]}).rows.push(r)});return Object.values(m).sort((a,b)=>b.day.localeCompare(a.day)||a.session.localeCompare(b.session))}
+const gRowsOf=pid=>GPS.rows.filter(r=>r.player_id===pid).sort((a,b)=>a.day.localeCompare(b.day));
+function gSum(rows,key){return rows.reduce((a,r)=>a+(+r.m[key]||0),0)}
+function gWeek(pid,k){const from=addK(k,-6);return GPS.rows.filter(r=>r.player_id===pid&&r.day>=from&&r.day<=k)}
+function gAcwr(pid,k,key){const a=gSum(gWeek(pid,k),key);let c=0;for(let w=0;w<4;w++)c+=gSum(gWeek(pid,addK(k,-7*w)),key);c/=4;return c>0?a/c:null}
+function gBest(pid,key,uptoK){const v=GPS.rows.filter(r=>r.player_id===pid&&(!uptoK||r.day<=uptoK)).map(r=>+r.m[key]||0);return v.length?Math.max(...v):null}
+function gUsual(pid,key,kind,beforeK){const v=GPS.rows.filter(r=>r.player_id===pid&&r.kind===kind&&r.day<beforeK&&r.day>=addK(beforeK,-28)).map(r=>+r.m[key]).filter(x=>isNum(x));return v.length?avg(v):null}
+// ---------- turning a raw trace into numbers + heat map ----------
+function traceToPitch(pts){// pts: [{t(s),x,y(m) or lat,lon, v(m/s)?}]
+  if(pts.length&&pts[0].lat!=null){const la0=avg(pts.map(p=>p.lat)),lo0=avg(pts.map(p=>p.lon));const kx=111320*Math.cos(la0*Math.PI/180),ky=110540;pts.forEach(p=>{p.x=(p.lon-lo0)*kx;p.y=(p.lat-la0)*ky})}
+  // line the long axis of the movement up with the pitch, then fit the middle 98% of points to 145 x 90 m
+  const mx=avg(pts.map(p=>p.x)),my=avg(pts.map(p=>p.y));let sxx=0,syy=0,sxy=0;pts.forEach(p=>{const dx=p.x-mx,dy=p.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy});const ang=.5*Math.atan2(2*sxy,sxx-syy);const ca=Math.cos(-ang),sa=Math.sin(-ang);
+  pts.forEach(p=>{const dx=p.x-mx,dy=p.y-my;p.u=dx*ca-dy*sa;p.w=dx*sa+dy*ca});
+  const q=(a,f)=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.max(0,Math.min(s.length-1,Math.floor(f*(s.length-1))))]};
+  const u0=q(pts.map(p=>p.u),.01),u1=q(pts.map(p=>p.u),.99),w0=q(pts.map(p=>p.w),.01),w1=q(pts.map(p=>p.w),.99);
+  const su=Math.max(u1-u0,1),sw=Math.max(w1-w0,1);const fit=Math.min(PW/su,PH/sw,1.15);// a whole-pitch session fills it; a small drill stays small
+  const cu=(u0+u1)/2,cw=(w0+w1)/2;pts.forEach(p=>{p.px=Math.max(0,Math.min(PW,PW/2+(p.u-cu)*fit));p.py=Math.max(0,Math.min(PH,PH/2+(p.w-cw)*fit))});return pts}
+function traceMetrics(raw){const pts=raw.filter(p=>isNum(p.t)).sort((a,b)=>a.t-b.t);if(pts.length<20)return null;
+  // speed from positions when the file has none
+  for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];if(!isNum(b.v)){const dt=b.t-a.t||.1;b.v=Math.hypot((b.x||0)-(a.x||0),(b.y||0)-(a.y||0))/dt}}if(!isNum(pts[0].v))pts[0].v=0;
+  // smooth speed a little (GPS noise)
+  const sv=pts.map((p,i)=>{let s=0,n=0;for(let j=Math.max(0,i-2);j<=Math.min(pts.length-1,i+2);j++){s+=pts[j].v;n++}return s/n});pts.forEach((p,i)=>p.vs=Math.min(sv[i],11.5));
+  let dist=0,hsr=0,spr=0,acc=0,dec=0,vmax=0,hr=[],inA=false,inD=false;const all=new Array(GW*GH).fill(0),hs=new Array(GW*GH).fill(0);const sprints=[];let sp=null;
+  for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i];const dt=Math.min(b.t-a.t,2);if(dt<=0)continue;const d=b.vs*dt;dist+=d;const kmh=b.vs*3.6;if(kmh>=HSR_KMH)hsr+=d;if(kmh>=SPR_KMH)spr+=d;if(kmh>vmax)vmax=kmh;
+    const ac=(b.vs-a.vs)/dt;if(ac>=3&&!inA){acc++;inA=true}else if(ac<1)inA=false;if(ac<=-3&&!inD){dec++;inD=true}else if(ac>-1)inD=false;if(isNum(b.hr))hr.push(+b.hr);
+    const gx=Math.min(GW-1,Math.floor(b.px/GC)),gy=Math.min(GH-1,Math.floor(b.py/GC));all[gy*GW+gx]+=dt;if(kmh>=HSR_KMH)hs[gy*GW+gx]+=dt;
+    if(kmh>=SPR_KMH){if(!sp){sp=[a.px,a.py,b.px,b.py,kmh];sp.len=d}else{sp[2]=b.px;sp[3]=b.py;sp[4]=Math.max(sp[4],kmh);sp.len+=d}}else if(sp){if(sp.len>=8)sprints.push(sp.slice(0,5).map(x=>Math.round(x*10)/10));sp=null}}
+  const dur=(pts[pts.length-1].t-pts[0].t)/60;
+  return {m:{dist:Math.round(dist),hsr:Math.round(hsr),sprint:Math.round(spr),acc,dec,vmax:Math.round(vmax*10)/10,dur:Math.round(dur),mpm:dur?Math.round(dist/dur):null,hr:hr.length?Math.round(avg(hr)):null},
+    heat:{w:GW,h:GH,all:all.map(v=>Math.round(v)),hsr:hs.map(v=>Math.round(v))},sprints:sprints.slice(0,80)}}
+// ---------- file reading ----------
+function csvRows(txt){const lines=txt.replace(/\r/g,'').split('\n').filter(l=>l.trim());if(!lines.length)return [];const sep=(lines[0].match(/;/g)||[]).length>(lines[0].match(/,/g)||[]).length?';':(lines[0].includes('\t')?'\t':',');
+  const split=l=>{const out=[];let cur='',q=false;for(const ch of l){if(ch==='"'){q=!q;continue}if(ch===sep&&!q){out.push(cur);cur='';continue}cur+=ch}out.push(cur);return out.map(s=>s.trim())};
+  // STATSports exports can start with a few lines of title text: find the header row
+  let hi=0;for(let i=0;i<Math.min(lines.length,15);i++){const c=split(lines[i]);if(c.length>=4&&c.some(x=>/player|athlete|name|lat|time/i.test(x))){hi=i;break}}
+  const head=split(lines[hi]);return lines.slice(hi+1).map(l=>{const c=split(l);const o={};head.forEach((h,i)=>o[h]=c[i]);return o}).filter(o=>Object.values(o).some(v=>v))}
+const GCOLS=[['player',/^(player|athlete)( ?name)?$|^name$|player display name/i],['date',/^(session )?date$|^date$|start date/i],['session',/session (title|name)|^session$|drill( title)?|activity/i],
+  ['dist',/total distance|^distance( \(m\))?$/i],['hsr',/high speed running(?! .*%| .*per)|^hsr( distance)?( \(m\))?$|hsr \(abs/i],['sprint',/sprint distance|^sprint( \(m\))?$/i],['acc',/^accel(eration)?s?( count)?$|accelerations(?! .*zone)/i],
+  ['dec',/^decel(eration)?s?( count)?$|decelerations(?! .*zone)/i],['vmax',/max(imum)? speed|top speed|vmax/i],['dur',/duration|total time|^time$/i],['dsl',/dynamic stress load|^dsl$/i],['hmld',/hml distance|^hmld$/i],['hr',/av(era)?g(e)? (heart rate|hr)|hr avg/i]];
+function gTime(v){if(v==null||v==='')return null;const s=String(v);if(/^\d+:\d{2}(:\d{2})?$/.test(s)){const p=s.split(':').map(Number);return p.length===3?p[0]*60+p[1]+p[2]/60:p[0]+p[1]/60}const n=parseFloat(s);return isNaN(n)?null:n}
+function gDate(v){if(!v)return null;const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);if(m){const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${pad(+m[2])}-${pad(+m[1])}`}const d=new Date(s);return isNaN(d)?null:iso(d)}
+const nrm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\s+/g,' ').trim();
+function matchPlayer(name){const n=nrm(name);if(!n)return null;const ps=allPlayers();let p=ps.find(x=>nrm(x.name)===n);if(p)return p.id;const parts=n.split(' ');
+  p=ps.find(x=>{const q=nrm(x.name).split(' ');return q[q.length-1]===parts[parts.length-1]&&q[0][0]===parts[0][0]});if(p)return p.id;p=ps.filter(x=>nrm(x.name).includes(parts[parts.length-1]));return p.length===1?p[0].id:null}
+function parseSummary(txt){const rows=csvRows(txt);if(!rows.length)return {err:'No rows found in that file.'};const head=Object.keys(rows[0]);const map={};GCOLS.forEach(([k,re])=>{const h=head.find(x=>re.test(x));if(h)map[k]=h});
+  if(!map.player)return {err:'Could not find a player name column. Export the session summary from STATSports Apex with one row per player.'};if(!map.dist&&!map.hsr)return {err:'Could not find distance columns in that file.'};
+  const out=rows.map(r=>{const m={};['dist','hsr','sprint','acc','dec','vmax','dsl','hmld','hr'].forEach(k=>{if(map[k]){const v=parseFloat(String(r[map[k]]).replace(/,/g,''));if(!isNaN(v))m[k]=v}});
+    if(map.dur)m.dur=Math.round(gTime(r[map.dur])||0)||null;if(m.vmax!=null&&m.vmax<15)m.vmax=Math.round(m.vmax*3.6*10)/10;if(m.dist&&m.dur)m.mpm=Math.round(m.dist/m.dur);
+    return {name:r[map.player],pid:matchPlayer(r[map.player]),day:gDate(map.date&&r[map.date]),session:(map.session&&r[map.session])||'',m}}).filter(x=>x.name);
+  return {rows:out,cols:map}}
+function parseTrace(txt,fname){let pts=[];if(/<gpx|<trkpt/i.test(txt)){const re=/<trkpt[^>]*lat="([-\d.]+)"[^>]*lon="([-\d.]+)"[^>]*>([\s\S]*?)<\/trkpt>/g;let m,t0=null;while((m=re.exec(txt))){const tm=(m[3].match(/<time>([^<]+)<\/time>/)||[])[1];const t=tm?Date.parse(tm)/1000:null;if(t0==null&&t!=null)t0=t;const hr=(m[3].match(/<(?:gpxtpx:)?hr>(\d+)</)||[])[1];pts.push({lat:+m[1],lon:+m[2],t:t!=null?t-t0:pts.length,hr:hr?+hr:null})}}
+  else{const rows=csvRows(txt);if(!rows.length)return {err:'No rows in that file.'};const h=Object.keys(rows[0]);const f=re=>h.find(x=>re.test(x));
+    const cLat=f(/^lat(itude)?$/i),cLon=f(/^lon(g(itude)?)?$/i),cX=f(/^x( ?\(m\))?$|pos(ition)? ?x/i),cY=f(/^y( ?\(m\))?$|pos(ition)? ?y/i),cT=f(/^(time|timestamp|seconds|elapsed)/i),cV=f(/speed|velocity/i),cH=f(/heart|^hr$/i);
+    if(!((cLat&&cLon)||(cX&&cY)))return {err:'That file has no lat/lon or x/y columns.'};let t0=null;
+    rows.forEach((r,i)=>{let t=r[cT];let ts=null;if(t!=null&&t!==''){if(/^\d+(\.\d+)?$/.test(t))ts=+t;else if(/:/.test(t)&&!/T|-/.test(t)){ts=gTime(t)*60}else{const d=Date.parse(t);ts=isNaN(d)?null:d/1000}}if(ts==null)ts=i*.1;if(t0==null)t0=ts;
+      const p={t:ts-t0,hr:cH?+r[cH]:null};if(cLat){p.lat=+r[cLat];p.lon=+r[cLon]}else{p.x=+r[cX];p.y=+r[cY]}if(cV){let v=parseFloat(r[cV]);if(!isNaN(v)){if(/km/i.test(cV))v/=3.6;p.v=v}}if((p.lat!=null&&!isNaN(p.lat))||(p.x!=null&&!isNaN(p.x)))pts.push(p)});
+    if(pts.length>2&&pts[pts.length-1].t>36000)pts.forEach(p=>p.t/=1000)}// milliseconds
+  if(pts.length<20)return {err:'Not enough points in that file.'};
+  // 10 Hz is more than needed: keep about 2 points a second
+  const step=Math.max(1,Math.round(pts.length/((pts[pts.length-1].t||pts.length)*2)));const thin=pts.filter((_,i)=>i%step===0);traceToPitch(thin);const r=traceMetrics(thin);return r?{...r,name:(fname||'').replace(/\.[a-z]+$/i,'')}:{err:'Could not read the movement in that file.'}}
+async function gpsSave(rows){if(isDemo()){rows.forEach(r=>{GPS.rows=GPS.rows.filter(x=>!(x.player_id===r.player_id&&x.day===r.day&&x.session===r.session));GPS.rows.unshift({...r,id:'dg'+Math.random(),m:r.metrics})});return true}
+  const body=rows.map(r=>({team_id:TEAM.team_id,player_id:r.player_id,day:r.day,session:r.session,kind:r.kind,metrics:r.metrics,heat:r.heat||null,sprints:r.sprints||null,source:r.source}));
+  const {error}=await sb.from('team_gps').upsert(body,{onConflict:'team_id,player_id,day,session'});if(error){toast('Could not save: '+error.message,5000);return false}await loadGPS(TEAM);return true}
+// ---------- pitch + heat map drawing ----------
+function pitchSVG(inner,o){o=o||{};const W=o.w||580,H=Math.round(W*PH/PW);const s=W/PW;
+  const L=(x1,y1,x2,y2)=>`<line x1="${x1*s}" y1="${y1*s}" x2="${x2*s}" y2="${y2*s}"/>`;const mk=[13,20,45].flatMap(d=>[L(d,0,d,PH),L(PW-d,0,PW-d,PH)]).join('')+L(PW/2,PH/2-5,PW/2,PH/2+5);
+  const box=(x,dir)=>`<rect x="${(dir>0?x:x-4.5)*s}" y="${(PH/2-3.25)*s}" width="${4.5*s}" height="${6.5*s}"/><rect x="${(dir>0?x:x-13)*s}" y="${(PH/2-9.5)*s}" width="${13*s}" height="${19*s}"/><path d="M${(x+dir*20)*s},${(PH/2-13)*s} A${13*s},${13*s} 0 0 ${dir>0?1:0} ${(x+dir*20)*s},${(PH/2+13)*s}"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="gpitch" role="img" aria-label="${esc(o.label||'Pitch')}"><defs><filter id="gblur${o.id||''}" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="${7*s}"/></filter></defs>
+    <rect class="gturf" x="0" y="0" width="${W}" height="${H}" rx="6"/>${inner}<g class="glines">${mk}${box(0,1)}${box(PW,-1)}<rect x="0" y="0" width="${W}" height="${H}" fill="none" rx="6"/></g>
+    ${o.arrow?`<text x="${W-8}" y="${H-8}" text-anchor="end" class="gdir">Attacking →</text>`:''}</svg>`}
+function heatLayer(grids,layer,o){o=o||{};const s=(o.w||580)/PW;const sum=new Array(GW*GH).fill(0);grids.forEach(g=>{const a=g&&(layer==='hsr'?g.hsr:g.all);if(a)a.forEach((v,i)=>sum[i]+=v)});const mx=Math.max(1,...sum);
+  const col=v=>{const t=Math.sqrt(v/mx);const st=[[0,[40,90,255]],[.35,[40,220,200]],[.6,[250,220,60]],[.85,[255,120,40]],[1,[230,30,60]]];let a=st[0],b=st[st.length-1];for(let i=1;i<st.length;i++)if(t<=st[i][0]){a=st[i-1];b=st[i];break}const f=(t-a[0])/((b[0]-a[0])||1);return `rgb(${a[1].map((c,j)=>Math.round(c+(b[1][j]-c)*f)).join(',')})`};
+  let out='';sum.forEach((v,i)=>{if(v<=0)return;const x=i%GW,y=Math.floor(i/GW);out+=`<rect x="${x*GC*s}" y="${y*GC*s}" width="${GC*s+1}" height="${GC*s+1}" fill="${col(v)}" fill-opacity="${Math.min(.92,.25+.7*Math.sqrt(v/mx))}"/>`});
+  return `<g filter="url(#gblur${o.id||''})">${out}</g>`}
+function sprintLayer(rows,o){const s=(o&&o.w||580)/PW;let out='';rows.forEach(r=>(r.sprints||[]).forEach(([x1,y1,x2,y2,v])=>{out+=`<line class="gspr" x1="${x1*s}" y1="${y1*s}" x2="${x2*s}" y2="${y2*s}" marker-end="url(#garr)"><title>${Math.round(v)} km/h</title></line>`}));
+  return `<defs><marker id="garr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#fff"/></marker></defs><g>${out}</g>`}
+// ---------- views ----------
+const gChip=(v,u)=>{if(v==null)return '<span class="muted">–</span>';const pc=Math.round(v*100);return `<span class="chip ${v>1.3?'alert':v>1.15?'caution':v<.7?'':'good'}">${pc}%</span>`};
+const gfx=(v,d)=>v==null||v===''?'–':(d?(+v).toFixed(1):Math.round(+v).toLocaleString('en-IE'));
+function gpsTabs(){return `<div class="toolbar"><div class="seg">${[['sessions','Sessions'],['players','Players'],['heat','Heat maps'],['patterns','Patterns and Koach'],['import','Import']].map(([v,l])=>`<a href="#gps/${v}" aria-pressed="${GPS.tab===v}" class="segl">${l}</a>`).join('')}</div></div>`}
+function viewGPS(){GPS.tab=route().id||GPS.tab||'sessions';if(GPS.missing)return gpsTabs()+`<section class="card"><header><div><h2>One database step for GPS</h2><p>GPS sessions need their own table.</p></div></header><ol class="steps"><li>Open Supabase › SQL Editor › New query.</li><li>Paste in everything from <b>supabase/gps.sql</b> and click Run.</li><li>Refresh this page.</li></ol></section>`;
+  if(!GPS.rows.length&&GPS.tab!=='import')return gpsTabs()+`<section class="card"><div class="empty"><h2>No GPS yet</h2><p style="margin:6px 0 12px">Export a session from STATSports Apex (session summary, one row per player) and drop it in on Import. Raw traces (CSV or GPX) give heat maps and sprint lines too.</p><a class="btn" href="#gps/import">Import GPS</a></div></section>`;
+  return gpsTabs()+({sessions:gpsSessionsView,players:gpsPlayersView,heat:gpsHeatView,patterns:gpsPatternsView,import:gpsImportView}[GPS.tab]||gpsSessionsView)()}
+function gpsSessionsView(){const ss=gpsSessions();const cur=ss.find(x=>x.key===GPS.sess)||ss[0];GPS.sess=cur.key;const P=id=>SQUAD.find(p=>p.id===id);
+  const rows=cur.rows.map(r=>{const p=P(r.player_id);const us=k=>gUsual(r.player_id,k,r.kind,r.day);const best=gBest(r.player_id,'vmax',r.day);return {r,p,hsrVs:us('hsr')?r.m.hsr/us('hsr'):null,distVs:us('dist')?r.m.dist/us('dist'):null,vpc:best&&r.m.vmax?r.m.vmax/best:null}}).sort((a,b)=>(+b.r.m.hsr||0)-(+a.r.m.hsr||0));
+  const A=k=>avgOf(cur.rows.map(r=>isNum(r.m[k])?+r.m[k]:null));
+  const sel=`<select class="sel" id="gSess">${ss.map(x=>`<option value="${esc(x.key)}" ${x.key===cur.key?'selected':''}>${esc(fmtK(x.day,{weekday:'short',day:'numeric',month:'short'}))} · ${esc(x.session)} (${x.rows.length})</option>`).join('')}</select>`;
+  const mx=Math.max(1,...rows.map(x=>+x.r.m.hsr||0));
+  return kpiRow([kpiTile(gfx(A('dist')),'Average distance (m)',{ic:'load'}),kpiTile(gfx(A('hsr')),'Average high-speed running (m)',{ic:'spike',d:`Above ${HSR_KMH} km/h`}),kpiTile(gfx(A('sprint')),'Average sprint distance (m)',{ic:'zap',d:`Above ${SPR_KMH} km/h`}),kpiTile(gfx(A('vmax'),1),'Average top speed (km/h)',{ic:'trends'}),kpiTile(rows.filter(x=>x.hsrVs!=null&&x.hsrVs>1.3).length,'Well above their usual HSR',{ic:'spike',col:'var(--alert)',d:'Over 130% of their own 4-week average'})])
+   +`<section class="card"><header style="flex-wrap:wrap"><div><h2>${esc(cur.session)}</h2><p>${esc(fmtK(cur.day,{weekday:'long',day:'numeric',month:'long'}))} · ${esc(cur.kind)} · ${cur.rows.length} players. "Vs usual" compares with that player's own average for the same kind of session over the 4 weeks before. Top speed is shown against their best ever.</p></div><div class="toolbar">${sel}</div></header>
+   <div style="overflow-x:auto"><table class="list gtable"><tr><th>Player</th><th>Distance</th><th>Vs usual</th><th>HSR</th><th>Vs usual</th><th style="min-width:110px"></th><th>Sprint</th><th>Acc / Dec</th><th>Top speed</th><th>m/min</th><th>Min</th></tr>
+   ${rows.map(({r,p,hsrVs,distVs,vpc})=>`<tr><td><button data-player="${esc(r.player_id)}" style="text-align:left"><b style="color:var(--text)">${esc(p?p.name:'Unknown')}</b><br><span class="tiny muted">${esc(p&&p.pos||'')}</span></button></td><td class="num">${gfx(r.m.dist)}</td><td>${gChip(distVs)}</td><td class="num"><b>${gfx(r.m.hsr)}</b></td><td>${gChip(hsrVs)}</td><td><div class="gbar"><i style="width:${(+r.m.hsr||0)/mx*100}%"></i></div></td><td class="num">${gfx(r.m.sprint)}</td><td class="num">${gfx(r.m.acc)} / ${gfx(r.m.dec)}</td><td class="num">${gfx(r.m.vmax,1)} ${vpc!=null?`<span class="tiny ${vpc>=.95?'gok':'muted'}">${Math.round(vpc*100)}%</span>`:''}</td><td class="num">${gfx(r.m.mpm)}</td><td class="num">${gfx(r.m.dur)}</td></tr>`).join('')}</table></div></section>
+   ${cur.rows.some(r=>r.heat)?`<section class="card"><header><div><h2>Where the squad played</h2><p>Time spent on each part of the pitch, every player together. Open Heat maps for one player, a line or high-speed running only.</p></div></header><div class="gpwrap">${pitchSVG(heatLayer(cur.rows.map(r=>r.heat),'all',{id:'s'}),{id:'s',arrow:true})}</div></section>`:''}`}
+function gpsPlayersView(){const ps=allPlayers().filter(p=>GPS.rows.some(r=>r.player_id===p.id)).sort((a,b)=>a.name.localeCompare(b.name));if(!ps.length)return '';const p=ps.find(x=>x.id===GPS.pl)||ps[0];GPS.pl=p.id;return `<div class="toolbar"><select class="sel" id="gPl">${ps.map(x=>`<option value="${esc(x.id)}" ${x.id===p.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`+gpsPlayerBlock(p,true)}
+function gpsPlayerBlock(p,full){const k=todayK();const rs=gRowsOf(p.id);if(!rs.length)return '';
+  const weeks=[];for(let w=11;w>=0;w--){const end=addK(k,-7*w);const wr=gWeek(p.id,end);weeks.push({k:end,lab:fmtK(addK(end,-6),{day:'numeric',month:'short'}),y:gSum(wr,'hsr'),d:gSum(wr,'dist'),il:p.E?p.E.load7(end):null})}
+  const vm=rs.filter(r=>isNum(r.m.vmax)).slice(-20).map(r=>({k:r.day,lab:fmtK(r.day,{day:'numeric',month:'short'}),y:+r.m.vmax}));const a=gAcwr(p.id,k,'hsr'),ad=gAcwr(p.id,k,'dist');const best=gBest(p.id,'vmax');
+  const recent=rs.slice(-8).reverse();const last4=rs.filter(r=>r.day>=addK(k,-28)&&r.heat);
+  // external (GPS) vs internal (Keel minutes x effort) per week: a rising ratio means the same running is costing them more
+  const ratio=weeks.filter(w=>w.d&&w.il).map(w=>({k:w.k,lab:w.lab,y:Math.round(w.il/(w.d/1000))}));
+  return kpiRow([kpiTile(gfx(gSum(gWeek(p.id,k),'hsr')),'HSR, last 7 days (m)',{ic:'spike'}),kpiTile(a!=null?Math.round(a*100)+'<small>%</small>':'–','HSR against usual week',{ic:'load',col:a>1.5?'var(--alert)':a>1.3?'var(--caution)':'var(--good)',d:'Over 150% is the injury-risk zone'}),kpiTile(ad!=null?Math.round(ad*100)+'<small>%</small>':'–','Distance against usual',{ic:'load'}),kpiTile(gfx(best,1),'Best top speed (km/h)',{ic:'trends'})])
+   +`<div class="grid g2"><section class="card"><header><div><h2>High-speed running by week</h2><p>Metres above ${HSR_KMH} km/h each week, last 12 weeks</p></div></header>${barChart(weeks,{label:'HSR',tip:x=>`${Math.round(x.y)} m HSR · ${Math.round(x.d)} m total`})}</section>
+    <section class="card"><header><div><h2>Top speed each session</h2><p>km/h. A slide over a few weeks can mean fatigue or a niggle.</p></div></header>${vm.length>1?lineChart(vm,{label:'Top speed',unit:' km/h'}):'<div class="small muted">Needs two sessions.</div>'}</section></div>
+   ${ratio.length>2?`<section class="card"><header><div><h2>How hard the running felt</h2><p>Keel load (minutes × effort the player logged) per km covered on GPS, by week. Going up means the same running is costing them more: tiredness, illness or a niggle.</p></div></header>${lineChart(ratio,{label:'Effort per km'})}</section>`:''}
+   ${last4.length?`<section class="card"><header><div><h2>Heat map, last 4 weeks</h2><p>${last4.length} session${last4.length>1?'s':''}. White lines are sprints over ${SPR_KMH} km/h.</p></div></header><div class="gpwrap">${pitchSVG(heatLayer(last4.map(r=>r.heat),'all',{id:'p'+p.id.slice(-4)})+sprintLayer(last4.slice(-3)),{id:'p'+p.id.slice(-4),arrow:true})}</div></section>`:''}
+   ${full?`<section class="card"><header><div><h2>Sessions</h2></div></header><div style="overflow-x:auto"><table class="list"><tr><th>Day</th><th>Session</th><th>Distance</th><th>HSR</th><th>Sprint</th><th>Acc / Dec</th><th>Top speed</th><th>Balance that morning</th></tr>${recent.map(r=>{const i=dayInfo(p,r.day);return `<tr><td>${esc(fmtK(r.day,{weekday:'short',day:'numeric',month:'short'}))}</td><td>${esc(r.session)}</td><td class="num">${gfx(r.m.dist)}</td><td class="num">${gfx(r.m.hsr)}</td><td class="num">${gfx(r.m.sprint)}</td><td class="num">${gfx(r.m.acc)} / ${gfx(r.m.dec)}</td><td class="num">${gfx(r.m.vmax,1)}</td><td>${i.s!=null?`<span class="chip ${i.st==='good'?'good':i.st==='caution'?'caution':'alert'}">${i.s}</span>`:'<span class="muted">–</span>'}</td></tr>`}).join('')}</table></div></section>`:''}`}
+const GLINES={all:'Whole squad',GK:'Goalkeepers',DEF:'Backs',MID:'Midfield',FWD:'Forwards'};
+function posLine(p){const s=String(p&&p.pos||'').toLowerCase();if(/goal/.test(s))return 'GK';if(/back/.test(s))return 'DEF';if(/mid/.test(s))return 'MID';if(/forward/.test(s))return 'FWD';return null}
+function gpsHeatView(){const H=GPS.hm;const ss=gpsSessions().filter(x=>x.rows.some(r=>r.heat));if(!ss.length)return `<section class="card"><div class="empty"><h2>No heat maps yet</h2><p style="margin-top:6px">Heat maps need position data: import a raw trace (CSV with lat/lon or x/y, or a GPX) per player. Session summaries alone have no positions.</p></div></section>`;
+  if(!H.sess||!ss.some(x=>x.key===H.sess))H.sess=ss[0].key;const k=todayK();
+  let rows=H.scope==='session'?ss.find(x=>x.key===H.sess).rows:GPS.rows.filter(r=>r.day>=addK(k,-7*H.weeks)&&r.heat);
+  const P=id=>SQUAD.find(p=>p.id===id);if(H.who!=='all'){rows=GLINES[H.who]?rows.filter(r=>posLine(P(r.player_id))===H.who):rows.filter(r=>r.player_id===H.who)}
+  const ps=allPlayers().filter(p=>GPS.rows.some(r=>r.player_id===p.id&&r.heat)).sort((a,b)=>a.name.localeCompare(b.name));
+  const ctl=`<div class="toolbar" style="flex-wrap:wrap;gap:8px">${seg('gScope',[['session','One session'],['range','Over weeks']])}
+    ${H.scope==='session'?`<select class="sel" id="gHSess">${ss.map(x=>`<option value="${esc(x.key)}" ${x.key===H.sess?'selected':''}>${esc(fmtK(x.day,{weekday:'short',day:'numeric',month:'short'}))} · ${esc(x.session)}</option>`).join('')}</select>`:seg('gWeeks',[[2,'2 weeks'],[4,'4 weeks'],[8,'8 weeks'],[12,'12 weeks']])}
+    <select class="sel" id="gWho">${Object.entries(GLINES).map(([v,l])=>`<option value="${v}" ${H.who===v?'selected':''}>${l}</option>`).join('')}<optgroup label="Players">${ps.map(p=>`<option value="${esc(p.id)}" ${H.who===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</optgroup></select>
+    ${seg('gLayer',[['all','All time on the pitch'],['hsr','High-speed running only'],['spr','Sprint lines']])}</div>`;
+  const W=760;const lay=H.layer==='spr'?heatLayer(rows.map(r=>r.heat),'all',{w:W,id:'h'}).replace('<g ','<g opacity=".45" ')+sprintLayer(rows,{w:W}):heatLayer(rows.map(r=>r.heat),H.layer,{w:W,id:'h'});
+  const nS=rows.reduce((a,r)=>a+(r.sprints||[]).length,0);const thirds=[0,0,0];rows.forEach(r=>{const a=r.heat&&(H.layer==='hsr'?r.heat.hsr:r.heat.all);if(a)a.forEach((v,i)=>{const x=(i%GW)*GC;thirds[x<PW/3?0:x<2*PW/3?1:2]+=v})});const tt=thirds.reduce((a,b)=>a+b,0)||1;
+  return ctl+`<section class="card"><header><div><h2>${esc(GLINES[H.who]||((P(H.who)||{}).name)||'')}${H.scope==='session'?'':' · last '+H.weeks+' weeks'}</h2><p>${rows.length} player-session${rows.length===1?'':'s'} · ${nS} sprints. Redder means more time there${H.layer==='hsr'?' running above '+HSR_KMH+' km/h':''}. Pitch is lined up to the long axis of play; attacking direction can flip between halves.</p></div></header>
+    <div class="gpwrap gbig">${pitchSVG(lay,{w:W,id:'h',arrow:true})}</div>
+    <div class="gthirds">${['Own third','Middle third','Attacking third'].map((l,i)=>`<div><b>${Math.round(thirds[i]/tt*100)}%</b><small>${l}</small></div>`).join('')}</div>
+    <div class="gleg"><span>Less</span><i></i><span>More</span></div></section>`}
+// ---------- patterns: worked out here, then Koach can dig deeper ----------
+function gpsPatterns(){const out=[];const k=todayK();
+  allPlayers().forEach(p=>{const rs=gRowsOf(p.id);if(rs.length<4)return;
+    // HSR spikes followed by a niggle
+    let spikes=0,hit=0;for(let w=0;w<12;w++){const end=addK(k,-7*w);const a=gAcwr(p.id,end,'hsr');if(a!=null&&a>1.4){spikes++;let n=false;for(let j=1;j<=7;j++){const d=p.D[addK(end,j)];if(d&&(d.niggles||[]).some(x=>+x.pain>=3))n=true}if(n)hit++}}
+    if(hit>=1)out.push({p,w:6+hit,t:'Niggles follow high-speed spikes',s:`${hit} of ${spikes} weeks where HSR jumped over 140% of usual were followed by a niggle within 7 days. Build HSR up more gradually for ${first(p.name)}.`});
+    // sleep the night before vs top speed / HSR
+    const pairs=rs.map(r=>{const sl=sleepHours(p.D[r.day]);const b=dayInfo(p,r.day).s;return {sl,b,v:+r.m.vmax||null,h:+r.m.hsr||null,kind:r.kind}}).filter(x=>x.sl!=null&&x.v);
+    if(pairs.length>=6){const c=corr(pairs.map(x=>x.sl),pairs.map(x=>x.v));if(c!=null&&c>=.35){const lo=pairs.filter(x=>x.sl<6.5),hi=pairs.filter(x=>x.sl>=7.5);if(lo.length&&hi.length)out.push({p,w:5,t:'Faster after a good night',s:`Top speed averages ${avg(hi.map(x=>x.v)).toFixed(1)} km/h after 7.5 h+ sleep and ${avg(lo.map(x=>x.v)).toFixed(1)} after under 6.5 h (${pairs.length} sessions).`})}}
+    const bp=rs.map(r=>({b:dayInfo(p,r.day).s,h:+r.m.hsr})).filter(x=>x.b!=null&&isNum(x.h));if(bp.length>=6){const lo=bp.filter(x=>x.b<60),hi=bp.filter(x=>x.b>=75);if(lo.length>=2&&hi.length>=2){const d=avg(lo.map(x=>x.h))/avg(hi.map(x=>x.h));if(d<.85)out.push({p,w:4,t:'Low balance mornings, less high-speed running',s:`On mornings with balance under 60, HSR is ${Math.round((1-d)*100)}% lower than on 75+ mornings.`})}}
+    // top speed sliding
+    const v=rs.filter(r=>isNum(r.m.vmax)).map(r=>+r.m.vmax);if(v.length>=6){const best=Math.max(...v),last3=avg(v.slice(-3));if(last3<best*.9)out.push({p,w:5,t:'Top speed down',s:`Last 3 sessions average ${last3.toFixed(1)} km/h, ${Math.round((1-last3/best)*100)}% off their best of ${best.toFixed(1)}. Check for a niggle or tiredness.`})}
+    // under-exposed to top speed
+    const s14=rs.filter(r=>r.day>=addK(k,-14));if(s14.length>=3&&v.length){const best=Math.max(...v);if(!s14.some(r=>+r.m.vmax>=best*.9))out.push({p,w:3,t:'Not near top speed for 2 weeks',s:`No session above 90% of their best (${best.toFixed(1)} km/h) in 14 days. A few short max-speed efforts protect hamstrings.`})}
+    const a=gAcwr(p.id,k,'hsr');if(a!=null&&a>1.5)out.push({p,w:9,t:'High-speed running spike now',s:`This week's HSR is ${Math.round(a*100)}% of their usual week.`});else if(a!=null&&a<.6&&s14.length)out.push({p,w:3,t:'Light on high-speed running',s:`This week's HSR is only ${Math.round(a*100)}% of usual. Returning from a lighter spell spikes risk later.`})});
+  return out.sort((a,b)=>b.w-a.w)}
+function gpsPatternsView(){const pt=gpsPatterns();const ai=GPS.ai;
+  return `<section class="card"><header><div><h2>Patterns Keel found</h2><p>Worked out from each player's GPS history alongside what they log in Keel: sleep, balance and niggles. These are patterns, not diagnoses. Use them to start a conversation.</p></div></header>
+    ${pt.length?`<div class="gpat">${pt.slice(0,30).map(x=>`<div class="gpi"><button data-player="${esc(x.p.id)}"><b>${esc(x.p.name)}</b></button><div><b>${esc(x.t)}</b><div class="small muted">${esc(x.s)}</div></div></div>`).join('')}</div>`:'<div class="small muted">Not enough history yet. Patterns appear once players have about 4 GPS sessions.</div>'}</section>
+   <section class="card"><header><div><h2>Ask Koach</h2><p>Koach reads 12 weeks of GPS for the squad with Keel's load, sleep, balance and niggles, and looks for what you might have missed: who is trending towards trouble, what came before past niggles, and what to change this week.</p></div></header>
+    <div class="toolbar"><input class="sel" id="gAsk" placeholder="Optional: a question, e.g. why is Fiachra's top speed down?" style="flex:1;min-width:240px" value="${esc(GPS.ask||'')}"><button class="btn" id="gAI" ${GPS.aiBusy?'disabled':''}>${GPS.aiBusy?'Koach is reading…':'Analyse the squad'}</button></div>
+    ${ai?`<div class="gai">${ai.summary?`<p><b>${esc(ai.summary)}</b></p>`:''}${(ai.findings||[]).map(f=>`<div class="gpi"><button data-player="${esc((allPlayers().find(p=>nrm(p.name)===nrm(f.player))||{}).id||'')}"><b>${esc(f.player||'Squad')}</b></button><div><b>${esc(f.finding||'')}</b><div class="small muted">${esc(f.evidence||'')}</div>${f.action?`<div class="small"><b>Do:</b> ${esc(f.action)}</div>`:''}</div></div>`).join('')}</div>`:''}</section>`}
+async function gpsAI(){GPS.ask=($('#gAsk')||{}).value||'';GPS.aiBusy=true;render();const k=todayK();
+  const data=allPlayers().filter(p=>GPS.rows.some(r=>r.player_id===p.id)).map(p=>{const wk=[];for(let w=11;w>=0;w--){const end=addK(k,-7*w);const g=gWeek(p.id,end);const days=lastN(end,7);
+      wk.push({wk:addK(end,-6),dist:Math.round(gSum(g,'hsr')?gSum(g,'dist'):0),hsr:Math.round(gSum(g,'hsr')),spr:Math.round(gSum(g,'sprint')),vmax:g.length?Math.max(...g.map(r=>+r.m.vmax||0)):null,keelLoad:p.E?Math.round(p.E.load7(end)):null,
+        sleep:avgOf(days.map(kk=>sleepHours(p.D[kk]))),bal:avgOf(days.map(kk=>dayInfo(p,kk).s)),niggles:[...new Set(days.flatMap(kk=>((p.D[kk]||{}).niggles||[]).filter(n=>+n.pain>=3).map(n=>n.area+' '+n.pain)))]})}
+    return {name:p.name,pos:p.pos||'',weeks:wk.map(w=>({...w,sleep:w.sleep&&+w.sleep.toFixed(1),bal:w.bal&&Math.round(w.bal)}))}});
+  const prompt=`You are Koach, a sports scientist for a ${(TEAM&&TEAM.name)||''} team (GAA football unless the data says otherwise). Below is 12 weeks of weekly data per player: GPS distance, high-speed running (HSR, m above ${HSR_KMH} km/h), sprint distance, top speed (km/h), Keel internal load (minutes x effort), average sleep (h), average balance (0-100 readiness) and niggles (area and pain/10).
+Find the patterns a head of S&C would want: HSR spikes or drops against each player's own history (acute:chronic), what came before past niggles, sleep or balance linked to output, top-speed exposure, external vs internal load drifting apart, and anything squad-wide. Be specific with numbers and weeks. Don't diagnose.
+${GPS.ask?`The coach also asks: ${GPS.ask}\n`:''}Reply with JSON only: {"summary":"one sentence","findings":[{"player":"name or Squad","finding":"short headline","evidence":"the numbers","action":"what to do this week"}]} with at most 10 findings, most important first.
+DATA: ${JSON.stringify(data)}`;
+  try{if(isDemo())throw 'demo';const r=await fetch('/api/claude',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+SESSION.access_token},body:JSON.stringify({prompt,maxTokens:4000})});const j=await r.json();const m=(j.text||'').match(/\{[\s\S]*\}/);GPS.ai=m?JSON.parse(m[0]):{summary:'Koach could not read the data this time. Try again.'}}
+  catch(e){const pt=gpsPatterns().slice(0,6);GPS.ai={summary:isDemo()?'Demo squad: this is the kind of read Koach gives on a real team.':'Koach could not be reached. Here is what Keel found on its own.',findings:pt.map(x=>({player:x.p.name,finding:x.t,evidence:x.s,action:/spike/i.test(x.t)?'Hold HSR flat this week; no extra running.':/speed down/i.test(x.t)?'Check in with physio before Saturday.':'Mention it at the next one-to-one.'}))}}
+  GPS.aiBusy=false;render()}
+// ---------- import ----------
+function gpsImportView(){const I=GPS.imp;const ps=allPlayers().sort((a,b)=>a.name.localeCompare(b.name));const opts=sel=>`<option value="">Not in the squad, skip</option>${ps.map(p=>`<option value="${esc(p.id)}" ${p.id===sel?'selected':''}>${esc(p.name)}</option>`).join('')}`;
+  const pre=I&&I.rows?`<section class="card"><header><div><h2>Check before saving</h2><p>${I.rows.length} rows from ${esc(I.file)}. ${I.rows.filter(r=>r.pid).length} matched to players. Fix any names Keel couldn't match.</p></div></header>
+     <div class="toolbar" style="flex-wrap:wrap"><label class="small">Date <input type="date" class="sel" id="gIDay" value="${esc(I.day||todayK())}"></label><label class="small">Session <input class="sel" id="gISess" value="${esc(I.session||'Training')}"></label>${seg('gIKind',[['training','Training'],['match','Match'],['other','Other']])}</div>
+     <div style="overflow-x:auto;max-height:420px"><table class="list"><tr><th>Name in file</th><th>Keel player</th><th>Distance</th><th>HSR</th><th>Sprint</th><th>Top speed</th><th>Min</th></tr>${I.rows.map((r,i)=>`<tr><td>${esc(r.name)}</td><td><select class="sel" data-gimap="${i}">${opts(r.pid)}</select></td><td class="num">${gfx(r.m.dist)}</td><td class="num">${gfx(r.m.hsr)}</td><td class="num">${gfx(r.m.sprint)}</td><td class="num">${gfx(r.m.vmax,1)}</td><td class="num">${gfx(r.m.dur)}</td></tr>`).join('')}</table></div>
+     <div class="toolbar" style="margin-top:10px"><button class="btn" id="gISave">Save ${I.rows.filter(r=>r.pid).length} players</button><button class="btn ghost" id="gICancel">Cancel</button></div></section>`:'';
+  return pre+`<section class="card"><header><div><h2>Import GPS</h2><p>Two kinds of file. Nothing is shared with players.</p></div></header>
+    <div class="grid g2"><div class="gimp"><h3>Session summary</h3><p class="small muted">From STATSports Apex: open the session, Export, choose the session summary CSV (one row per player). Other systems (Catapult, PlayerTek, GPEXE) work if the columns are named in a similar way: player, date, total distance, high speed running, sprint distance, accelerations, decelerations, max speed, duration.</p><label class="btn">Choose CSV<input type="file" id="gFileSum" accept=".csv,.txt" hidden></label></div>
+    <div class="gimp"><h3>Raw trace, one player</h3><p class="small muted">For heat maps and sprint lines: a 10 Hz export (CSV with time, latitude, longitude and speed) or a GPX from a watch. Keel works out the numbers, lines the session up on a pitch and stores the heat map, not the raw file.</p>
+      <div class="toolbar" style="flex-wrap:wrap"><select class="sel" id="gTPl">${opts('')}</select><input type="date" class="sel" id="gTDay" value="${todayK()}"><input class="sel" id="gTSess" placeholder="Session, e.g. Tuesday training" style="min-width:180px"><select class="sel" id="gTKind"><option value="training">Training</option><option value="match">Match</option><option value="other">Other</option></select></div>
+      <label class="btn" style="margin-top:8px">Choose CSV or GPX<input type="file" id="gFileTr" accept=".csv,.gpx,.txt" hidden></label></div></div>
+    <div class="small muted" style="margin-top:12px">High-speed running is above ${HSR_KMH} km/h and sprinting above ${SPR_KMH} km/h, the STATSports defaults. Saving the same player, day and session again replaces it.</div></section>`}
+document.addEventListener('change',async e=>{const t=e.target;if(!t)return;
+  if(t.id==='gSess'){GPS.sess=t.value;render();return}
+  if(t.id==='gPl'){GPS.pl=t.value;render();return}
+  if(t.id==='gHSess'){GPS.hm.sess=t.value;render();return}
+  if(t.id==='gWho'){GPS.hm.who=t.value;render();return}
+  if(t.dataset&&t.dataset.gimap!=null){GPS.imp.rows[+t.dataset.gimap].pid=t.value||null;return}
+  if(t.id==='gFileSum'&&t.files[0]){const f=t.files[0];const txt=await f.text();const r=parseSummary(txt);if(r.err){toast(r.err,5000);return}const d=r.rows.find(x=>x.day);const s=r.rows.find(x=>x.session);
+    GPS.imp={file:f.name,rows:r.rows,day:d&&d.day,session:(s&&s.session)||f.name.replace(/\.[a-z]+$/i,''),kind:/match|v\.? |vs /i.test((s&&s.session)||f.name)?'match':'training'};S.gIKind=GPS.imp.kind;render();return}
+  if(t.id==='gFileTr'&&t.files[0]){const pid=$('#gTPl').value;if(!pid){toast('Pick the player first');t.value='';return}const f=t.files[0];const txt=await f.text();const r=parseTrace(txt,f.name);if(r.err){toast(r.err,5000);return}
+    const row={player_id:pid,day:$('#gTDay').value||todayK(),session:($('#gTSess').value||'').trim()||'Session',kind:$('#gTKind').value,metrics:r.m,heat:r.heat,sprints:r.sprints,source:'trace'};
+    const old=GPS.rows.find(x=>x.player_id===pid&&x.day===row.day&&x.session===row.session);if(old&&old.m){row.metrics={...r.m,...Object.fromEntries(Object.entries(old.m).filter(([,v])=>v!=null))}}
+    if(await gpsSave([row])){toast(`Saved: ${gfx(r.m.dist)} m, ${gfx(r.m.hsr)} m HSR, top speed ${gfx(r.m.vmax,1)} km/h`,4000);GPS.hm.sess=row.day+'|'+row.session;GPS.hm.scope='session';GPS.hm.who=pid;location.hash='gps/heat';render()}t.value=''}});
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(c('#gAI')){gpsAI();return}
+  if(c('#gICancel')){GPS.imp=null;render();return}
+  if(c('#gISave')){const I=GPS.imp;const day=$('#gIDay').value||I.day||todayK(),session=($('#gISess').value||'').trim()||'Session',kind=S.gIKind||I.kind||'training';
+    const rows=I.rows.filter(r=>r.pid).map(r=>{const old=GPS.rows.find(z=>z.player_id===r.pid&&z.day===(r.day||day)&&z.session===session);return {player_id:r.pid,day:r.day||day,session,kind,metrics:r.m,heat:old&&old.heat||null,sprints:old&&old.sprints||null,source:'statsports-summary'}});
+    if(!rows.length){toast('No rows matched to players');return}if(await gpsSave(rows)){toast(`Saved ${rows.length} players`);GPS.imp=null;GPS.sess=rows[0].day+'|'+session;location.hash='gps/sessions';render()}return}
+  if(x=c('[data-set="gScope"]')){GPS.hm.scope=x.dataset.val;render();return}
+  if(x=c('[data-set="gWeeks"]')){GPS.hm.weeks=+x.dataset.val;render();return}
+  if(x=c('[data-set="gLayer"]')){GPS.hm.layer=x.dataset.val;render();return}},true);
+// seg() reads S[key] for the pressed state
+Object.defineProperty(S,'gScope',{get:()=>GPS.hm.scope,set:v=>GPS.hm.scope=v,configurable:true});Object.defineProperty(S,'gWeeks',{get:()=>GPS.hm.weeks,set:v=>GPS.hm.weeks=+v,configurable:true});Object.defineProperty(S,'gLayer',{get:()=>GPS.hm.layer,set:v=>GPS.hm.layer=v,configurable:true});
+// ---------- GPS on the player page, the S&C page and "Needs a word" ----------
+viewPlayer=(function(old){return function(id){const h=old(id);const p=SQUAD.find(x=>x.id===id);if(!p||!p.share||!GPS.rows.some(r=>r.player_id===id))return h;return h+`<h2 class="gsec">GPS</h2>`+gpsPlayerBlock(p,true)}})(viewPlayer);
+flagsFor=(function(old){return function(p,k){const out=old(p,k);if(!GPS.rows.length)return out;const a=gAcwr(p.id,k,'hsr');if(a!=null&&a>1.5)out.push({w:7,ic:'spike',col:'var(--alert)',t:'High-speed running spike',s:`GPS: ${Math.round(a*100)}% of their usual week`});return out.sort((a,b)=>b.w-a.w)}})(flagsFor);
+viewSC=(function(old){return function(){const h=old();if(!GPS.rows.length)return h;const k=todayK();const ps=sharing().map(p=>({p,a:gAcwr(p.id,k,'hsr'),h:gSum(gWeek(p.id,k),'hsr')})).filter(x=>x.a!=null).sort((a,b)=>b.a-a.a);if(!ps.length)return h;
+  return h+`<section class="card"><header><div><h2>GPS: high-speed running against usual</h2><p>Last 7 days of HSR against each player's 4-week average. Full detail, heat maps and patterns on the <a href="#gps">GPS</a> page.</p></div></header><div class="gpat">${ps.slice(0,10).map(x=>`<div class="gpi"><button data-player="${esc(x.p.id)}"><b>${esc(x.p.name)}</b></button><div>${gChip(x.a)} <span class="small muted">${gfx(x.h)} m this week</span></div></div>`).join('')}</div></section>`}})(viewSC);
+// ---------- demo GPS: two trainings and a match a week, by position ----------
+function buildDemoGPS(){const R=rng(9091);const T=todayK();const out=[];const zone={GK:[[2,18],[30,60]],DEF:[[10,70],[8,82]],MID:[[40,105],[10,80]],FWD:[[70,140],[10,80]]};
+  for(let i=84;i>=0;i--){const k=addK(T,-i),dow=(parse(k).getDay()+6)%7;const kind=dow===6?'match':(dow===1||dow===3)?'training':null;if(!kind)continue;const session=kind==='match'?'League match':dow===1?'Tuesday training':'Thursday training';
+    SQUAD.filter(p=>p.role==='member').forEach((p,ix)=>{if(R()<.08)return;const d=p.D[k];if(d&&d.sick)return;const line=posLine(p)||'MID';const z=zone[line];const n=kind==='match'?(ix<15?240:90):150;
+      const lowB=dayInfo(p,k).s;const fat=lowB!=null&&lowB<60?.85:1;const spike=(ix===10&&i<=6)?2.3:1;const slide=(ix===14&&i<=14)?.9:1;
+      const pts=[];let x=(z[0][0]+z[0][1])/2,y=(z[1][0]+z[1][1])/2,t=0;for(let j=0;j<n;j++){const tx=z[0][0]+R()*(z[0][1]-z[0][0]),ty=z[1][0]+R()*(z[1][1]-z[1][0]);x+=(tx-x)*.25+(R()-.5)*8;y+=(ty-y)*.25+(R()-.5)*8;x=Math.max(1,Math.min(PW-1,x));y=Math.max(1,Math.min(PH-1,y));
+        let v=Math.abs((R()*R())*7.5);if(R()<(kind==='match'?.05:.035)*spike)v=7+R()*2.2*slide;if(line==='GK')v*=.6;t+=kind==='match'?20:20;pts.push({t,px:x,py:y,v,vs:v})}
+      const res=(function(){const all=new Array(GW*GH).fill(0),hs=new Array(GW*GH).fill(0);let dist=0,hsr=0,spr=0,vm=0;const sprints=[];pts.forEach((q,j)=>{const g=Math.min(GH-1,Math.floor(q.py/GC))*GW+Math.min(GW-1,Math.floor(q.px/GC));all[g]+=20;const kmh=q.v*3.6;if(kmh>=HSR_KMH)hs[g]+=20;if(kmh>=SPR_KMH&&j){const a=pts[j-1];sprints.push([a.px,a.py,q.px,q.py,kmh].map(z=>Math.round(z*10)/10))}vm=Math.max(vm,kmh)});
+        const base=kind==='match'?(ix<15?7800:3200):5400;dist=Math.round(base*(.85+R()*.3)*fat*(line==='GK'?.5:1)*(kind==='training'?spike:1));hsr=Math.round(dist*(line==='GK'?.02:(.08+R()*.05))*fat*spike);spr=Math.round(hsr*(.15+R()*.15)*slide);
+        return {m:{dist,hsr,sprint:spr,acc:Math.round(dist/150*(.8+R()*.4)),dec:Math.round(dist/160*(.8+R()*.4)),vmax:Math.round(Math.min(34,(26.5+(ix%5)*1.1+R()*2.5)*slide*(lowB!=null&&lowB<60?.96:1))*10)/10,dur:kind==='match'?(ix<15?72:28):75,mpm:null},heat:{w:GW,h:GH,all,hsr:hs},sprints:sprints.slice(0,40)}})();
+      res.m.mpm=Math.round(res.m.dist/res.m.dur);out.push({id:'dg'+out.length,player_id:p.id,day:k,session,kind,m:res.m,heat:i<=28?res.heat:null,sprints:i<=28?res.sprints:null,source:'demo'})})}
+  return out}
+
+VIEWS.splice(VIEWS.findIndex(v=>v[0]==='trends'),0,['gps','GPS','trends','Tools']);
+
 // ================= start =================
 (async()=>{
   try{if(/[?&]demo\b/.test(location.search))throw 0;const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
-  catch(e){if(/[?&](preview|demo)\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());Object.assign(RH,buildDemoRehab());Object.assign(HUB,buildDemoHub());SQUAD.forEach(p=>p._di={});render();return}
+  catch(e){if(/[?&](preview|demo)\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());Object.assign(RH,buildDemoRehab());Object.assign(HUB,buildDemoHub());SQUAD.forEach(p=>p._di={});GPS.rows=buildDemoGPS();GPS.loaded=true;render();return}
     $('#root').innerHTML='<div class="gate"><div class="gcard"><h1>Not set up yet</h1><p class="muted">The dashboard can\'t reach the database settings.</p></div></div>';return}
   const {data:{session}}=await sb.auth.getSession();SESSION=session;if(!session){render();return}
   await joinPending();
