@@ -6035,7 +6035,8 @@ progSub=(function(old){return function(){return old.apply(this,arguments).replac
 
 // ================= P3 (23 Nov): Body map v2 — body first, cleaner figure, 2-week default, honest about short history =================
 bmS.wi=1;
-const BM_WINS=[[0,'1 wk'],[1,'2 wk'],[3,'1 mo'],[7,'3 mo']];
+BM_WK.push(26,52);Object.defineProperty(BM_WK,10,{get:()=>Math.max(1,Math.min(104,bmS.cw||12))});
+const BM_WINS=[[0,'1 wk'],[1,'2 wk'],[3,'1 mo'],[7,'3 mo'],[8,'6 mo'],[10,'Custom']];
 // how much of the window you've actually been logging, so a long window doesn't make everything look neglected
 function bmFirstLog(){const LL=L(),DD=D();let f=null;Object.keys(LL).forEach(k=>{if(LL[k]&&LL[k].status&&(!f||k<f))f=k});Object.keys(DD).forEach(k=>{if(((DD[k]||{}).extras||[]).length&&(!f||k<f))f=k});return f}
 bmCalc=(function(old){return function(){const r=old.apply(this,arguments);const now=sampleMode?SAMPLE.now:todayDate();const first=sampleMode?null:bmFirstLog();r.wksSel=r.wks;r.short=false;
@@ -6078,10 +6079,13 @@ function bmWl(w){return w===13?'3 months':w===1?'1 week':w===4?'1 month':w+' wee
 viewBody=function(){
   const now=sampleMode?SAMPLE.now:todayDate();
   if(!sampleMode&&MYP.list==null&&typeof mypLoad==='function')mypLoad();
-  const c=bmCalc();const goals=c.goals;const fmt=v=>v>=10?Math.round(v):v.toFixed(1);
+  const c=bmCalc();const goals=c.goals;const fmt=v=>v>=10?Math.round(v):v.toFixed(1);const MOB=bmS.lens==='mob';
+  const W0={...BM_W};if(MOB){BM_W.neg='Not stretched';BM_W.light='A little';BM_W.ok='Covered';c.rows.forEach(r=>{r.strR=r.r;r.r=r.mob/2;r.st=r.mob<.5?'neg':r.mob<1.5?'light':'ok'});
+    c.regs.forEach(g=>{const rs=c.rows.filter(x=>x.rg===g.k);g.r=rs.reduce((a,x)=>a+Math.min(x.r,1.3),0)/rs.length;g.st=g.r<.25?'neg':g.r<.75?'light':'ok';g.low=rs.filter(x=>x.st!=='ok').sort((a,b)=>a.r-b.r).map(x=>x.nm)})}
+  setTimeout(()=>Object.assign(BM_W,W0),0);
   const col={};c.rows.forEach(r=>{const reg=c.regs.find(x=>x.k===r.rg);col[r.k]=BM2_C[bmS.lvl===1?reg.st:r.st]});
-  const ctl=`<div class="bm2ctl"><div class="bm2win">${BM_WINS.map(([i,l])=>`<button type="button" data-bm2win="${i}" aria-pressed="${bmS.wi===i}">${l}</button>`).join('')}</div>
-    <div class="bm2lvl"><button type="button" data-bmlvl="2" aria-pressed="${bmS.lvl===2}">Muscles</button><button type="button" data-bmlvl="1" aria-pressed="${bmS.lvl===1}">Areas</button></div></div>`;
+  const ctl=`<div class="bm2ctl"><div class="bm2win">${BM_WINS.map(([i,l])=>`<button type="button" data-bm2win="${i}" aria-pressed="${bmS.wi===i}">${l}</button>`).join('')}</div>${bmS.wi===10?`<label class="bm2cw"><input type="number" min="1" max="104" inputmode="numeric" id="bm2cw" value="${bmS.cw||12}"> weeks back</label>`:''}</div>
+    <div class="bm2ctl"><div class="bm2lvl"><button type="button" data-bm2lens="str" aria-pressed="${!MOB}">Strength</button><button type="button" data-bm2lens="mob" aria-pressed="${MOB}">Mobility</button></div><div class="bm2lvl"><button type="button" data-bmlvl="2" aria-pressed="${bmS.lvl===2}">Muscles</button><button type="button" data-bmlvl="1" aria-pressed="${bmS.lvl===1}">Areas</button></div></div>`;
   const ex=sampleMode?`<div class="bm2ex"><span class="sample">Example data</span><button type="button" class="linkbtn" id="sampleBtn">Show my data</button></div>`:'';
   if(!c.sessions)return ctl+ex+`<div class="panel empty"><h3>Nothing logged in the last ${bmWl(c.wksSel)}</h3>Log a session, or look back further, and the map lights up.</div>`;
   const n=s=>c.rows.filter(r=>r.st===s).length;
@@ -6090,7 +6094,7 @@ viewBody=function(){
   const dim=selA?c.rows.filter(r=>r.rg===selA.k).map(r=>r.k):null;
   let card='';
   if(selR){card=`<div class="bm2card" style="--c:${BM2_C[selR.st]}"><div class="bm2ch"><b>${esc(selR.nm)}</b><em>${BM_W[selR.st]}</em><button type="button" class="x" data-bm2clear aria-label="Close">×</button></div>
-    <div class="bm2meter"><span style="width:${Math.min(100,selR.r*100)}%"></span></div><div class="bm2cs">${fmt(selR.pw)} a week · needs ${fmt(selR.t)}${selR.why!=='All-round'?` for ${esc(selR.why)}`:''}</div>
+    <div class="bm2meter"><span style="width:${Math.min(100,selR.r*100)}%"></span></div><div class="bm2cs">${MOB?`Stretched or mobilised about ${fmt(selR.mob)}× a week · aim for 2 or more`:`${fmt(selR.pw)} a week · needs ${fmt(selR.t)}${selR.why!=='All-round'?` for ${esc(selR.why)}`:''}`}</div>
     <div class="bm2cs">${selR.top.length?`Worked mostly by ${selR.top.map(esc).join(', ')}`:'Nothing you\'ve logged works this yet.'}${selR.mob>0?` · mobility about ${fmt(selR.mob)}× a week`:''}</div></div>`}
   else if(selA){card=`<div class="bm2card" style="--c:${BM2_C[selA.st]}"><div class="bm2ch"><b>${esc(selA.nm)}</b><em>${BM_W[selA.st]}</em><button type="button" class="x" data-bm2clear aria-label="Close">×</button></div>
     <div class="bm2meter"><span style="width:${Math.min(100,selA.r*100)}%"></span></div><div class="bm2cs">${selA.low.length?`Low: ${selA.low.map(esc).join(', ')}`:'Everything here is covered'}</div></div>`}
@@ -6105,7 +6109,7 @@ viewBody=function(){
   const untag=c.untag.length?`<div class="hint">Keel couldn't place ${c.untag.length} exercise${c.untag.length>1?'s':''}: ${c.untag.slice(0,5).map(esc).join(', ')}. They're left out for now.</div>`:'';
   const short=c.short?`<div class="bm2note">You've only logged ${c.short} day${c.short>1?'s':''} of training, so this is based on those, not the full ${bmWl(c.wksSel)}.</div>`:'';
   return ctl+ex+`<section class="bm2hero">
-    <div class="bm2sum"><span style="--c:${BM2_C.neg}">${n('neg')} neglected</span><span style="--c:${BM2_C.light}">${n('light')} light</span><span style="--c:${BM2_C.ok}">${n('ok')} covered</span></div>
+    <div class="bm2sum"><span style="--c:${BM2_C.neg}">${n('neg')} ${BM_W.neg.toLowerCase()}</span><span style="--c:${BM2_C.light}">${n('light')} ${BM_W.light.toLowerCase()}</span><span style="--c:${BM2_C.ok}">${n('ok')} ${BM_W.ok.toLowerCase()}</span></div>
     <div class="bm2figs">${bm2Fig(BM2_F,col,'Front',dim)}${bm2Fig(BM2_B,col,'Back',dim)}</div>${card}${short}</section>
     <details class="panel bm2list" ${bmS.listOpen?'open':''}><summary><h3>${bmS.lvl===1?'All areas':'All muscles'}</h3><small>weakest first</small></summary>${list}${untag}</details>
     <details class="panel bm2more"><summary><h3>Balance</h3><small>push, pull, front, back</small></summary>${bal}${single}</details>
@@ -6307,6 +6311,11 @@ viewReports=(function(old){return function(){const h=old.apply(this,arguments);c
   const bar=`<div class="p3rg"><span class="label">Charts show</span><div class="bm2win">${opts.map(([d,l])=>`<button type="button" data-p3rg="${d}" aria-pressed="${P3RG.d===d}">${l}</button>`).join('')}</div></div>`;
   return bar+h}})(viewReports);
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3rg]');if(!b)return;P3RG.d=+b.dataset.p3rg;const y=window.scrollY;render();window.scrollTo(0,y)});
+
+// body map: lens + custom weeks
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-bm2lens]');if(!b)return;bmS.lens=b.dataset.bm2lens;bmS.sel=null;bmS.area=null;render()});
+document.addEventListener('change',e=>{if(!e.target||e.target.id!=='bm2cw')return;const v=Math.round(+e.target.value);if(v>=1&&v<=104){bmS.cw=v;render()}});
+const _bmWl=bmWl;bmWl=function(w){return w===26?'6 months':w===52?'a year':_bmWl(w)};
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
