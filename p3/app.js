@@ -4055,7 +4055,7 @@ function p3LocalPlan(dlist){const L=p3Lib();const kit=kitchen().map(x=>String(x.
       if(sess&&s==='s'&&tm!=null&&tm>=600){slot='Pre-training snack';time=fmtT(Math.max(0,tm-120))}
       if(sess&&s==='b'&&tm!=null&&tm<600){slot='Post-training breakfast';time=fmtT(tm+75)}
       const k=best.scale;const r=v=>Math.round(v*k);
-      return {slot,time,where:'Home',name:m.name,items:p3Items(m.items).map(i=>({name:i.name,qty:k>1.12||k<.88?(i.qty?i.qty+(k>1?' (a bit more)':' (a bit less)'):''):i.qty})),prep:m.prep,servings:1,method:m.method,kcal:r(m.kcal),protein:r(m.protein),carbs:r(m.carbs),fat:r(m.fat),fibre:r(m.fibre),plants:[]}}).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+      return {slot,time,where:'Home',name:m.name,items:p3Items(m.items).map(i=>({name:i.name,qty:k>1.12||k<.88?p3ScaleQty(i.qty,k):i.qty})),prep:m.prep,servings:1,method:m.method,kcal:r(m.kcal),protein:r(m.protein),carbs:r(m.carbs),fat:r(m.fat),fibre:r(m.fibre),plants:[]}}).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
     days.push({date:dl.date,dayType:dl.dayType,session:sess?dl.session:'Rest',note:sess?`Training day: the ${meals.find(m=>/pre-training|lunch/i.test(m.slot))?.slot.toLowerCase()||'meal before'} fuels the session.`:'Rest day: a little lighter on carbs.',meals})});
   const need=new Map();const STAPLE=/oil|salt|pepper$|spice|powder|soy|honey|cinnamon|stock|water|ginger|garlic|lemon|chilli|curry paste|mayo|salsa|butter/;days.forEach(d=>d.meals.forEach(m=>m.items.forEach(i=>{const n=i.name.toLowerCase();if(STAPLE.test(n))return;if(!kit.length||!kit.some(k=>n.includes(k)||k.includes(n.split(' ')[0])))need.set(n,{name:i.name,qty:'',why:m.name})})));
   return {days,shopping:[...need.values()].slice(0,15)}}
@@ -5878,7 +5878,7 @@ function kuzRowHTML(dIso){const m=p3ShownMeal();const yk=iso(addD(parse(dIso),-1
 foodActionsHTML=(function(old){return function(dIso){const h=old(dIso);if(!h||sampleMode)return h;const i=h.indexOf('<div class="frow">');return i<0?h+kuzRowHTML(dIso):h.slice(0,i)+kuzRowHTML(dIso)+h.slice(i)}})(foodActionsHTML);
 // day switcher at the top of the food log, plus a copy card on past days
 function kuzDayBar(dIso){const t=kuzToday();const prev=iso(addD(parse(dIso),-1)),next=iso(addD(parse(dIso),1));
-  return `<div class="kuzday"><button type="button" data-goto="${prev}">‹ ${prev===iso(addD(todayDate(),-1))?'Yesterday':'Day before'}</button><b>${dIso===t?'Today':esc(kuzDayName(dIso)===fmtD(parse(dIso),{weekday:'long'})?fmtD(parse(dIso),{weekday:'short',day:'numeric',month:'short'}):kuzDayName(dIso).replace(/^./,c=>c.toUpperCase()))}</b>${dIso<t?`<button type="button" data-goto="${next===t?t:next}">${next===t?'Today':'Next day'} ›</button>`:'<span></span>'}</div>`}
+  return `<div class="kuzday"><button type="button" data-goto="${prev}">‹ ${prev===iso(addD(todayDate(),-1))?'Yesterday':'Day before'}</button><b>${dIso<iso(addD(todayDate(),-1))?`<button type="button" class="kuzjump" data-goto="${t}">Back to today</button>`:''}${dIso===t?'Today':esc(kuzDayName(dIso)===fmtD(parse(dIso),{weekday:'long'})?fmtD(parse(dIso),{weekday:'short',day:'numeric',month:'short'}):kuzDayName(dIso).replace(/^./,c=>c.toUpperCase()))}</b>${dIso<t?`<button type="button" data-goto="${next===t?t:next}">${next===t?'Today':'Next day'} ›</button>`:'<span></span>'}</div>`}
 function kuzCopyCard(dIso){if(dIso>=kuzToday())return '';const ms=MEALS.filter(m=>kuzMealItems(dIso,m).length);if(!ms.length)return '';
   return `<article class="card kuzcopy"><div class="chead"><div style="flex:1"><h2>Copy to today</h2><div class="sub">Adds the same foods to today, at the same times</div></div></div><div class="kuztags" style="padding:0 16px 14px">${ms.map(m=>`<button type="button" class="kuzcp" data-kuzcopy="${m}">${ico('repeat')}<span>${esc(m)}</span></button>`).join('')}${ms.length>1?`<button type="button" class="kuzcp" data-kuzcopy="*">${ico('repeat')}<span>Whole day</span></button>`:''}</div></article>`}
 foodTodayHTML=(function(old){return function(dIso){const h=old(dIso);return sampleMode?h:kuzDayBar(dIso)+kuzCopyCard(dIso)+h}})(foodTodayHTML);
@@ -5913,7 +5913,7 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
 window.addEventListener('change',e=>{const t=e.target;if(!t||!t.dataset||t.dataset.kuzname==null)return;const l=clone(kuzSaved());const u=l[+t.dataset.kuzname];const n=String(t.value||'').trim().slice(0,40);if(!u||!n)return;u.name=n;kuzSaveList(l).then(()=>toast('Renamed'))});
 // manage them under My food
 kitchenHTML=(function(old){return function(){const l=kuzSaved();const h=old.apply(this,arguments);if(sampleMode)return h;
-  return `<article class="card"><div class="chead"><div style="flex:1"><h2>Your favourite meals</h2><div class="sub">${l.length?'Tap a name to rename it.':'None yet. On the food log, open a meal and tap Save as favourite.'}</div></div></div>${l.length?`<div class="kuzlist">${l.map((u,i)=>`<div class="kuzrow"><input type="text" value="${esc(u.name)}" data-kuzname="${i}" aria-label="Name"><small class="ds">${esc(u.meal)} · ${u.items.map(x=>esc(x.name)).join(', ')} · ${Math.round(u.items.reduce((a,x)=>a+kcalOf(x),0))} kcal</small><button type="button" class="x" data-kuzdel="${i}" aria-label="Remove ${esc(u.name)}">${ico('x')}</button></div>`).join('')}</div>`:''}</article>`+h}})(kitchenHTML);
+  return h+`<details class="card p3favmy"><summary><h2>Your favourite dishes</h2><small>${l.length?`${l.length} saved · tap to manage`:'None yet'}</small></summary><div class="sub" style="padding:0 16px">${l.length?'Tap a name to rename it.':'Add one from the ★ on the food log.'}</div>${l.length?`<div class="kuzlist">${l.map((u,i)=>`<div class="kuzrow"><input type="text" value="${esc(u.name)}" data-kuzname="${i}" aria-label="Name"><small class="ds">${esc(u.meal)} · ${u.items.map(x=>esc(x.name)).join(', ')} · ${Math.round(u.items.reduce((a,x)=>a+kcalOf(x),0))} kcal</small><button type="button" class="x" data-kuzdel="${i}" aria-label="Remove ${esc(u.name)}">${ico('x')}</button></div>`).join('')}</div>`:''}</details>`}})(kitchenHTML);
 // ================= P3 (23 Nov): one story per day, and edit the plan by tapping =================
 // If you log your own session on a day the plan had a session you skipped or that got changed to rest,
 // the Day view shows one card ("Your session today, instead of Strength") rather than Extra + Adjusted + Rest.
@@ -6233,6 +6233,27 @@ function p3MonthHTML(){const now=todayDate();if(!P3MO.m)P3MO.m=new Date(now.getF
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
   if(x=c('[data-p3mnav]')){const m=P3MO.m;P3MO.m=new Date(m.getFullYear(),m.getMonth()+(+x.dataset.p3mnav),1);render();return}
   if(x=c('[data-p3mday]')){P3WK.sel=x.dataset.p3mday;const y=window.scrollY;render();window.scrollTo(0,y)}});
+
+// ================= P3 (24 Nov): food tiles (Supplements, Vitamins, Today so far, Patterns) =================
+function p3ScaleQty(q,k){if(!q)return '';let hit=false;const out=String(q).replace(/(\d+(?:\.\d+)?)(\s*\/\s*(\d+))?/g,(m,a,fr,b)=>{let v=fr?(+a)/(+b):+a;v*=k;hit=true;
+  if(v>=20)v=Math.round(v/5)*5;else if(v>=3)v=Math.round(v);else v=Math.round(v*4)/4;return String(v)});return hit?out:`${q} (×${Math.round(k*10)/10})`}
+const P3FT={open:null};
+viewFood=(function(old){return function(){const h=old.apply(this,arguments);if(fView!=='today')return h;const t=document.createElement('template');t.innerHTML=h;const R=t.content;
+  const tot=R.querySelector('article.p1ftot');if(!tot)return h;const vit=tot.querySelector('details.wu'),sup=tot.querySelector('details.p3supin'),head=tot.querySelector('.chead'),rings=tot.querySelector('.mrings');
+  const k=iso(sel),d=D()[k]||{};const kc=Math.round((d.food||[]).reduce((a,i)=>a+kcalOf(i),0));
+  const vs=vit?((vit.querySelector('summary')||{}).textContent||'').replace(/.*·\s*/,'').trim():'';const ss=sup?((sup.querySelector('summary')||{}).textContent||'').replace(/^\s*Supplements\s*/,'').trim():'';
+  const tile=(id,icon,name,sub)=>`<button type="button" class="p1tile p3tile${P3FT.open===id?' on':''}" data-p3ft="${id}"><span class="p1ti">${ico(icon)}</span><b>${name}</b><small>${esc(sub||' ')}</small></button>`;
+  const row=`<section class="p3tiles p3t4" aria-label="Nutrition">${tile('sup','pill','Supplements',ss.replace(/None added yet/i,'None yet').slice(0,16))}${tile('vit','sparkles','Vitamins',vs.replace(/ on target/,'').slice(0,16))}${tile('tot','flame2','Totals',kc+' kcal')}${tile('pat','sheet','Patterns','Trends')}</section>`;
+  const panel=document.createElement('article');panel.className='card p1ftot p3ftpanel';
+  if(P3FT.open==='sup'&&sup){sup.open=true;panel.appendChild(sup)}else if(P3FT.open==='vit'&&vit){vit.open=true;panel.appendChild(vit)}else if(P3FT.open==='tot'){if(head)panel.appendChild(head);if(rings)panel.appendChild(rings)}
+  tot.insertAdjacentHTML('beforebegin',row);if(panel.childNodes.length)tot.replaceWith(panel);else tot.remove();
+  return t.innerHTML}})(viewFood);
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3ft]');if(!x)return;const id=x.dataset.p3ft;
+  if(id==='pat'){pView='me';location.hash='reports';p3OpenSec('NUTRITION');return}
+  P3FT.open=P3FT.open===id?null:id;const y=window.scrollY;render();window.scrollTo(0,y)});
+// open one dropdown on Progress and scroll to it
+function p3OpenSec(word){let n=0;const go=()=>{const ds=[...document.querySelectorAll('details.ksec')];const t=ds.find(x=>((x.querySelector('summary')||{}).textContent||'').toUpperCase().includes(word));
+  if(!t){if(n++<15)setTimeout(go,100);return}ds.forEach(x=>{if(x!==t)x.open=false});t.open=true;t.scrollIntoView({block:'start',behavior:'smooth'})};setTimeout(go,120)}
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
