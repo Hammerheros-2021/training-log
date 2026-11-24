@@ -18,9 +18,20 @@ export default async function handler(req, res) {
   const profile = b.kind === 'cycle' ? 'cycling-regular' : 'foot-walking';
   const body = { coordinates: [[start[1], start[0]]], elevation: true, options: { round_trip: { length: m, points: 5, seed: Math.abs(+b.seed || 1) % 1000 } } };
   try {
-    const r = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
-      method: 'POST', headers: { Authorization: process.env.ORS_KEY, 'content-type': 'application/json', accept: 'application/geo+json' }, body: JSON.stringify(body),
-    });
+    // New HeiGIT address first; the old openrouteservice.org one only as a fallback until it's switched off.
+    const hosts = ['https://api.heigit.org/openrouteservice', 'https://api.openrouteservice.org'];
+    let r = null;
+    for (const h of hosts) {
+      const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 12000);
+      try {
+        r = await fetch(`${h}/v2/directions/${profile}/geojson`, {
+          method: 'POST', headers: { Authorization: process.env.ORS_KEY, 'content-type': 'application/json', accept: 'application/geo+json' }, body: JSON.stringify(body), signal: ac.signal,
+        });
+      } catch (e) { r = null; } finally { clearTimeout(t); }
+      if (r && r.ok) break;
+      if (r && r.status >= 400 && r.status < 500 && r.status !== 404 && r.status !== 403) break; // a real problem with the request, not the address
+    }
+    if (!r) return res.status(502).json({ error: 'Could not reach the route service' });
     if (!r.ok) return res.status(502).json({ error: 'Route service ' + r.status });
     const j = await r.json();
     const f = j.features && j.features[0];
