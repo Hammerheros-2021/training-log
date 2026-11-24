@@ -2564,7 +2564,7 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
 const _p1planMeals=planMealsHTML;planMealsHTML=function(k,compact){return _p1planMeals(k,compact).replace(/<button type="button" class="ghost" data-recipe="([^"]+)">Recipe<\/button>/g,'<button type="button" class="ghost" data-recipe="$1">Recipe and steps</button>')};
 
 // ---------- 9. Progress: patterns and export ----------
-function progSub(){return p1Nav('data-pview',pView,[['me','trending-up','Progress','Your trends','var(--k-blue)'],['patterns','link','Patterns','What links up','var(--k-pink)'],['export','download','Export','PDF or Excel','var(--k-green)'],['body','person-standing','Body map','What you miss','var(--k-violet)'],['learn','book-open','Learn','Short reads','var(--k-amber)']]).replace('class="p1nav"','class="p1nav p1nav5"')}
+function progSub(){return p1Nav('data-pview',pView,[['me','trending-up','Progress','Your trends','var(--k-blue)'],['patterns','link','Patterns','What links up','var(--k-pink)'],['body','person-standing','Body map','What you miss','var(--k-violet)'],['learn','book-open','Learn','Short reads','var(--k-amber)'],['export','download','Export','PDF or Excel','var(--k-green)']]).replace('class="p1nav"','class="p1nav p1nav5"')}
 function p1Series(n){const DD=D(),LL=L();const end=sampleMode?SAMPLE.now:todayDate();const out=[];
   for(let i=n-1;i>=0;i--){const k=iso(addD(end,-i)),d=DD[k]||{},l=LL[k];const nk=iso(addD(end,-i+1));const ft=foodTotals(d);const pt=nutTarget('protein',dayTypeFor(k));
     out.push({k,d,bal:readiness(d),next:readiness(DD[nk]),nextSore:isNum((DD[nk]||{}).sore)?+DD[nk].sore:null,sleep:sleepHours(d),nextSleep:sleepHours(DD[nk]),load:dayLoadAll(k),hard:p1Hard(k),
@@ -6031,7 +6031,7 @@ window.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('
     <div class="p3warnl">${rs.map(r=>{const n=NUTS.find(z=>z.k===r.k);return `<button type="button" class="p3warni" data-nutinfo="${r.k}"><span class="p3ulic">!</span><span><b>${esc(n.l)} high</b><small>${r.o7>=3?`${r.o7} of the last ${r.n7} days`:`${r.o14} of the last ${r.n14} days`}</small></span><span aria-hidden="true">›</span></button>`}).join('')||'<p class="ds">Nothing to flag right now.</p>'}</div>`)},true);
 
 // Progress: compact tab row (icon + name on one line, scrolls sideways)
-progSub=(function(old){return function(){return old.apply(this,arguments).replace(/<nav class="p1nav([^"]*)">/,'<nav class="p1nav$1 p3navc">')}})(progSub);
+progSub=(function(old){return function(){return old.apply(this,arguments).replace(/<nav class="p1nav([^"]*)">/,'<nav class="p1nav p1nav5 p3navc">')}})(progSub);
 
 // ================= P3 (23 Nov): Body map v2 — body first, cleaner figure, 2-week default, honest about short history =================
 bmS.wi=1;
@@ -6271,6 +6271,27 @@ document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.c
   const key=String(it.name).toLowerCase();let l=dFavs().slice();const had=l.some(f=>String(f.name).toLowerCase()===key);
   if(had)l=l.filter(f=>String(f.name).toLowerCase()!==key);else{const o=clone(it);delete o.at;delete o.meal;delete o.ix;delete o.planRef;l.push(o)}
   if(await persistMeta('drinkfavs',{list:l.slice(0,12),updatedAt:new Date().toISOString()}))toast(had?`${it.name} removed from favourites`:`${it.name} saved to favourites`);p1DrinksDraw()},true);
+
+// ================= P3 (24 Nov): Patterns order, balance folded =================
+p1PatternsView=(function(old){return function(){const h=old.apply(this,arguments);const t=document.createElement('template');t.innerHTML=h;const R=t.content;const q=s=>R.querySelector(s);
+  const wk=q('article.p3wk'),nig=q('article.p1streak'),bal=q('article.p2balc');const anchor=nig||q('article');
+  if(wk&&anchor&&anchor!==wk)anchor.before(wk);
+  if(bal){let sm='';try{const Ln=p2Learn();sm=Ln.n<6?`Learning from your sessions: ${Ln.n} of 6 rated`:`Matched how your sessions felt ${Ln.acc}% of the time`}catch(e){}
+    const d=document.createElement('details');d.className='card p3balf';const hd=bal.querySelector('.chead');if(hd)hd.remove();d.innerHTML=`<summary><span><b>How your balance is worked out</b><small>${esc(sm)}</small></span></summary>`;[...bal.childNodes].forEach(n=>d.appendChild(n));bal.replaceWith(d);R.appendChild(d)}
+  return t.innerHTML}})(p1PatternsView);
+
+// heart rate on Patterns: one clean card per kind of reading — latest, usual, and a tidy line with the usual marked
+p2HrTrends=function(){const DD=D();const end=sampleMode?SAMPLE.now:todayDate();const N=42;const rows=[];for(let i=N-1;i>=0;i--){const k=iso(addD(end,-i));rows.push((DD[k]||{}).hr||null)}
+  const W=300,H=64,P=6;
+  const cards=HRT.map(([v,l])=>{const pts=rows.map((h,i)=>h&&h.type===v&&isNum(+h.bpm)?{i,b:+h.bpm}:null).filter(Boolean);if(pts.length<2)return '';
+    const us=med(pts.map(p=>p.b)),last=pts[pts.length-1].b,diff=Math.round(last-us);const lo=Math.min(us-6,...pts.map(p=>p.b)),hi=Math.max(us+6,...pts.map(p=>p.b));
+    const i0=pts[0].i;const x=i=>P+(W-2*P)*(i-i0)/((N-1-i0)||1),y=b=>H-P-(H-2*P)*(b-lo)/(hi-lo||1);
+    const path=pts.map((p,j)=>`${j?'L':'M'}${x(p.i).toFixed(1)},${y(p.b).toFixed(1)}`).join('');
+    const tone=diff>=5?'var(--status-alert,#E5534B)':diff<=-3?'var(--accent,#3FB98A)':'var(--text)';
+    return `<div class="p3hr"><div class="p3hrh"><span><b>${l.replace(/ for 5 minutes|, still in bed/,'')}</b><small>usual ${Math.round(us)} bpm · ${pts.length} readings</small></span><span class="p3hrv" style="color:${tone}">${last}<small> bpm</small><em>${diff>0?'+':''}${diff} vs usual</em></span></div>
+      <svg viewBox="0 0 ${W} ${H}" class="p3hrsvg" preserveAspectRatio="none"><rect x="0" y="${Math.min(y(us+5),y(us-5)).toFixed(1)}" width="${W}" height="${Math.abs(y(us-5)-y(us+5)).toFixed(1)}" class="band"/><line x1="0" x2="${W}" y1="${y(us).toFixed(1)}" y2="${y(us).toFixed(1)}" class="us"/><path d="${path}" class="ln"/>${pts.map(p=>`<circle cx="${x(p.i).toFixed(1)}" cy="${y(p.b).toFixed(1)}" r="2.6" class="pt"/>`).join('')}</svg>
+      <div class="p3hrx"><span>${fmtD(addD(end,-(N-1-pts[0].i)),{day:"numeric",month:"short"})}</span><span>today</span></div></div>`}).join('');
+  return cards?`<article class="card"><div class="chead"><div style="flex:1"><h2>Heart rate</h2><div class="sub">Shaded band is your normal (usual ± 5). A reading above it, two days running, means take it easier.</div></div></div><div class="form" style="gap:14px">${cards}</div></article>`:''};
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
