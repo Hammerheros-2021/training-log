@@ -6151,25 +6151,32 @@ function fvRecent(){const seen=new Set((FV&&FV.items||[]).map(i=>String(i.name).
   return out}
 async function fvMigrate(){const f=favList();if(!f.length)return;const l=kuzSaved().slice();f.forEach(x=>{if(!l.some(u=>u.name.toLowerCase()===String(x.name).toLowerCase()))l.push({name:x.name,meal:x.meal||'Breakfast',items:[x]})});
   await kuzSaveList(l);await persistMeta('favs',{list:[],updatedAt:new Date().toISOString()})}
+async function fvParse(text,split){if(!FV||FV.busy)return;FV.busy=true;fvDraw();
+  try{const out=await sample.json(`${split?`Break this dish into its usual separate ingredients with typical home amounts: "${text}". Keep the total close to that dish.`:`List each ingredient of a dish separately: "${text}".`} Return {"items":[{"name","qty", and nutrition}]}.\n${foodRules()}`);
+    const its=cleanItems(out&&out.items,FV.meal,true,'text').map(i=>{const o=clone(i);delete o.at;delete o.ix;return o});
+    if(!its.length)toast('Could not work out the ingredients. Try listing them with amounts.');else{if(split)FV.items=its;else FV.items=FV.items.concat(its);FV.txt='';FV.adding=false;FV.dirty=true;if(!FV.name&&split)FV.name=text.replace(/\s*\(.*\)$/,'')}}
+  catch(e){toast(foodErr(e))}FV.busy=false;fvDraw()}
 function fvTot(its){return its.reduce((a,i)=>({k:a.k+kcalOf(i),p:a.p+(+i.protein||0)}),{k:0,p:0})}
 function fvDraw(){if(!FV){p1Sheet(null);return}const X=`<button type="button" class="x" data-fvx aria-label="Close">${ico('x')}</button>`;
   if(FV.view==='list'){const saved=kuzSaved();
     const sec=MEALS.map(m=>{const mine=saved.map((u,i)=>({u,i})).filter(o=>(o.u.meal||'Breakfast')===m);let sug=[];try{sug=kuzSuggest(m)}catch(e){}
-      const rows=mine.map(({u,i})=>{const t=fvTot(u.items);return `<button type="button" class="fvrow" data-fvopen="s${i}"><span><b>${esc(u.name)}</b><small>${u.items.map(x=>esc(x.name)).join(', ')}</small></span><em>${t.k} kcal</em></button>`}).join('')
+      const rows=mine.map(({u,i})=>{const t=fvTot(u.items);const arm=FV.armed===i;return `<div class="fvline"><button type="button" class="fvrow" data-fvopen="s${i}"><span><b>${esc(u.name)}</b><small>${u.items.length} ingredient${u.items.length>1?'s':''}: ${u.items.map(x=>esc(x.name)).join(', ')}</small></span><em>${t.k} kcal</em></button><button type="button" class="fvbin${arm?' armed':''}" data-fvbin="${i}" aria-label="${arm?'Tap again to delete':'Delete'} ${esc(u.name)}">${arm?'Delete?':ico('trash')}</button></div>`}).join('')
         +sug.map((u,j)=>{FV.sug[m+j]=u;const t=fvTot(u.items);return `<button type="button" class="fvrow sug" data-fvopen="g${m}${j}"><span><b>${esc(u.name)}</b><small>You often have this · tap to check and save</small></span><em>${t.k} kcal</em></button>`}).join('');
       return `<div class="fvsec${m===FV.meal?' cur':''}"><h4>${m}${m===FV.meal?' <small>adding here</small>':''}</h4>${rows||'<div class="ds fvnone">None yet</div>'}</div>`}).join('');
-    p1Sheet(`<div class="kshead"><div><h2>Favourites</h2><small class="ds">Tap one to check it, change portions, then add</small></div>${X}</div><div class="fvlist">${sec}</div>
-      <div class="ds" style="margin-top:12px;font-size:13px">To save a new one, log the meal once, open it on the log and tap <b>Save as favourite</b>.</div>`);return}
+    p1Sheet(`<div class="kshead"><div><h2>Favourites</h2><small class="ds">Your dishes. Tap one to adjust and add it</small></div>${X}</div>
+      <button type="button" class="primary fvnew" data-fvnew>${ico('plus')} New favourite dish</button><div class="fvlist">${sec}</div>`);return}
   const t=fvTot(FV.items);const allP=FV.all||100;
   const rec=FV.adding?fvRecent():[];
   p1Sheet(`<div class="kshead"><button type="button" class="linkbtn" data-fvback>‹ Favourites</button>${X}</div>
-    <div class="form" style="padding:0;gap:12px"><input id="fvname" type="text" class="fvname" value="${esc(FV.name)}" maxlength="40" aria-label="Name">
-    <div class="fvwhole"><span><b>${t.k} kcal</b> · ${Math.round(t.p)} g protein</span><div class="p1por" role="group" aria-label="Whole meal portion"><button type="button" data-fvall="-25" aria-label="Smaller">${ico('minus')}</button><span class="num">${allP}%</span><button type="button" data-fvall="25" aria-label="Bigger">${ico('plus')}</button></div></div>
-    <div class="fvitems">${FV.items.map((i,x)=>`<div class="fvit"><span><b>${esc(i.name)}</b><small>${esc(i.qty||'')}${i.qty?' · ':''}${kcalOf(i)} kcal</small></span><div class="p1por" role="group" aria-label="Portion of ${esc(i.name)}"><button type="button" data-fvpct="${x}:-25" aria-label="Less">${ico('minus')}</button><span class="num">${i.pct||100}%</span><button type="button" data-fvpct="${x}:25" aria-label="More">${ico('plus')}</button></div><button type="button" class="x" data-fvdel="${x}" aria-label="Remove ${esc(i.name)}">${ico('x')}</button></div>`).join('')||'<div class="ds">No ingredients. Add one below.</div>'}</div>
-    ${FV.adding?`<div class="fvadd"><span class="label">Add an ingredient you've logged lately</span><div class="kuztags">${rec.map((r,j)=>`<button type="button" class="kuzcp" data-fvrec="${j}">${ico('plus')}<span>${esc(r.name)}</span></button>`).join('')||'<span class="ds">Nothing logged lately.</span>'}</div></div>`:`<button type="button" class="linkbtn" data-fvaddopen style="align-self:flex-start">+ Add an ingredient</button>`}
+    <div class="form" style="padding:0;gap:12px"><input id="fvname" type="text" class="fvname" value="${esc(FV.name)}" maxlength="40" aria-label="Name of the dish" placeholder="Name it, e.g. Darren's porridge">
+    ${FV.items.length?'':'<!--'}<div class="fvwhole"><span><b>${t.k} kcal</b> · ${Math.round(t.p)} g protein</span><div class="p1por" role="group" aria-label="Whole meal portion"><button type="button" data-fvall="-25" aria-label="Smaller">${ico('minus')}</button><span class="num">${allP}%</span><button type="button" data-fvall="25" aria-label="Bigger">${ico('plus')}</button></div></div>${FV.items.length?'':'-->'}
+    <div class="fvitems">${FV.items.map((i,x)=>`<div class="fvit"><span><b>${esc(i.name)}</b><small>${esc(i.qty||'')}${i.qty?' · ':''}${kcalOf(i)} kcal</small></span><div class="p1por" role="group" aria-label="Portion of ${esc(i.name)}"><button type="button" data-fvpct="${x}:-25" aria-label="Less">${ico('minus')}</button><span class="num">${i.pct||100}%</span><button type="button" data-fvpct="${x}:25" aria-label="More">${ico('plus')}</button></div><button type="button" class="x" data-fvdel="${x}" aria-label="Remove ${esc(i.name)}">${ico('x')}</button></div>`).join('')||''}</div>
+    ${FV.items.length===1?`<button type="button" class="ghost" data-fvsplit>Split ${esc(FV.items[0].name)} into its ingredients</button>`:''}
+    ${FV.adding||!FV.items.length?`<div class="fvtxt"><span class="label">${FV.items.length?'Add ingredients':'What\'s in it?'}</span><textarea id="fvtext" rows="2" placeholder="e.g. 60g oats, 250ml milk, handful of blueberries, spoon of honey">${esc(FV.txt||'')}</textarea><button type="button" class="ghost" data-fvparse${FV.busy?' disabled':''}>${FV.busy?'Working it out…':'Add these ingredients'}</button></div>`:''}
+    ${FV.adding?`<div class="fvadd"><span class="label">Or tap one you've logged lately</span><div class="kuztags">${rec.map((r,j)=>`<button type="button" class="kuzcp" data-fvrec="${j}">${ico('plus')}<span>${esc(r.name)}</span></button>`).join('')||'<span class="ds">Nothing logged lately.</span>'}</div></div>`:`${FV.items.length?`<button type="button" class="linkbtn" data-fvaddopen style="align-self:flex-start">+ Add an ingredient</button>`:''}`}
     <div><span class="label">Add to</span><div class="p2mch">${MEALS.map(m=>`<button type="button" data-fvmeal="${m}" aria-pressed="${FV.meal===m}">${m}</button>`).join('')}</div></div>
     <button type="button" class="primary" data-fvgo>Add to ${esc(FV.meal.toLowerCase())}</button>
-    <div class="fvfoot">${FV.src!=null?`<button type="button" class="linkbtn" data-fvsave>${FV.dirty?'Save changes to favourite':'Favourite saved'}</button><button type="button" class="linkbtn danger" data-fvrm>Delete favourite</button>`:`<button type="button" class="linkbtn" data-fvsave>Save as favourite</button>`}</div></div>`);
+    <div class="fvfoot">${FV.src!=null?`<button type="button" class="linkbtn" data-fvsave>${FV.dirty?'Save changes to favourite':'Favourite saved'}</button><button type="button" class="linkbtn danger" data-fvrm>${FV.armRm?'Tap again to delete':'Delete favourite'}</button>`:`<button type="button" class="linkbtn" data-fvsave>Save as favourite</button>`}</div></div>`);
   FV.rec=rec}
 kuzRowHTML=function(){return ''};
 window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
@@ -6178,7 +6185,12 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
   if(!FV)return;
   if(c('[data-fvx]')){stop();FV=null;p1Sheet(null);return}
   if(c('[data-fvback]')){stop();FV={view:'list',meal:FV.meal,sug:{}};fvDraw();return}
-  const keepName=()=>{const v=(($('#fvname')||{}).value||'').trim();if(v&&v!==FV.name){FV.name=v.slice(0,40);FV.dirty=true}};
+  if(x=c('[data-fvbin]')){stop();const i=+x.dataset.fvbin;if(FV.armed!==i){FV.armed=i;fvDraw();return}const l=kuzSaved().slice();const u=l.splice(i,1)[0];await kuzSaveList(l);FV.armed=null;toast(`Deleted ${u?u.name:'favourite'}`);fvDraw();render();return}
+  if(c('[data-fvnew]')){stop();FV={view:'edit',src:null,meal:FV.meal,name:'',items:[],dirty:true,sug:{},adding:false,all:100};fvDraw();setTimeout(()=>{const n=$('#fvname');if(n)n.focus()},80);return}
+  if(c('[data-fvsplit]')){stop();keepName();const it=FV.items[0];await fvParse(`${it.name}${it.qty?' ('+it.qty+')':''}`,true);return}
+  if(c('[data-fvparse]')){stop();keepName();const t=(($('#fvtext')||{}).value||'').trim();if(!t){toast('Type the ingredients first');return}await fvParse(t,false);return}
+  const keepName=()=>{const v=(($('#fvname')||{}).value||'').trim();if(v&&v!==FV.name){FV.name=v.slice(0,40);FV.dirty=true}const tx=$('#fvtext');if(tx)FV.txt=tx.value};
+  if(FV.view==='list'&&FV.armed!=null&&!c('[data-fvbin]')){FV.armed=null}
   if(x=c('[data-fvopen]')){stop();const id=x.dataset.fvopen;let u,src=null;if(id[0]==='s'){src=+id.slice(1);u=kuzSaved()[src]}else u=FV.sug[id.slice(1)];if(!u)return;
     FV={view:'edit',src,meal:FV.meal,name:u.name,items:u.items.map(i=>{const o=clone(i);delete o.ix;delete o.at;return o}),dirty:false,sug:{}};fvDraw();return}
   if(x=c('[data-fvall]')){stop();keepName();const o=FV.all||100,n=Math.max(25,Math.min(300,o+(+x.dataset.fvall)));if(n===o)return;FV.all=n;FV.items.forEach(i=>fvScale(i,Math.round((i.pct||100)*n/o)));FV.dirty=true;fvDraw();return}
@@ -6187,8 +6199,9 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
   if(c('[data-fvaddopen]')){stop();keepName();FV.adding=true;fvDraw();return}
   if(x=c('[data-fvrec]')){stop();keepName();const r=(FV.rec||[])[+x.dataset.fvrec];if(r){FV.items.push(r);FV.dirty=true}FV.adding=false;fvDraw();return}
   if(x=c('[data-fvmeal]')){stop();keepName();FV.meal=x.dataset.fvmeal;fvDraw();return}
-  if(c('[data-fvsave]')){stop();keepName();if(!FV.items.length){toast('Add at least one ingredient');return}const l=kuzSaved().slice();const item={name:FV.name,meal:FV.src!=null?(l[FV.src]||{}).meal||FV.meal:FV.meal,items:FV.items.map(i=>{const o=clone(i);delete o.ix;delete o.at;return o})};
+  if(c('[data-fvsave]')){stop();keepName();if(!FV.items.length){toast('Add at least one ingredient');return}if(!FV.name){toast('Give it a name first');const n=$('#fvname');if(n)n.focus();return}const l=kuzSaved().slice();const item={name:FV.name,meal:FV.src!=null?(l[FV.src]||{}).meal||FV.meal:FV.meal,items:FV.items.map(i=>{const o=clone(i);delete o.ix;delete o.at;return o})};
     if(FV.src!=null)l[FV.src]=item;else{l.unshift(item);FV.src=0}if(await kuzSaveList(l)){FV.dirty=false;toast(`Saved "${FV.name}"`)}fvDraw();return}
+  if(c('[data-fvrm]')&&!FV.armRm){stop();FV.armRm=true;fvDraw();return}
   if(c('[data-fvrm]')){stop();const l=kuzSaved().slice();const u=l.splice(FV.src,1)[0];await kuzSaveList(l);toast(`Deleted ${u?u.name:'favourite'}`);FV={view:'list',meal:FV.meal,sug:{}};fvDraw();render();return}
   if(c('[data-fvgo]')){stop();keepName();if(!FV.items.length){toast('Nothing to add');return}const m=FV.meal,nm=FV.name,dirty=FV.dirty&&FV.src!=null;
     await addFood(kuzPaste(FV.items,m,p3AtFor(m)));try{P2OPEN.add(m)}catch(z){}FV=null;p1Sheet(null);
