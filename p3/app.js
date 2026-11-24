@@ -6244,20 +6244,38 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
 // ================= P3 (24 Nov): food tiles (Supplements, Vitamins, Today so far, Patterns) =================
 function p3ScaleQty(q,k){if(!q)return '';let hit=false;const out=String(q).replace(/(\d+(?:\.\d+)?)(\s*\/\s*(\d+))?/g,(m,a,fr,b)=>{let v=fr?(+a)/(+b):+a;v*=k;hit=true;
   if(v>=20)v=Math.round(v/5)*5;else if(v>=3)v=Math.round(v);else v=Math.round(v*4)/4;return String(v)});return hit?out:`${q} (×${Math.round(k*10)/10})`}
-const P3FT={open:null};
+const P3FT={open:'tot'};
+// tiles row: Totals, Vitamins, Supplements, Patterns. The page only shows what the open tile is about.
 viewFood=(function(old){return function(){const h=old.apply(this,arguments);if(fView!=='today')return h;const t=document.createElement('template');t.innerHTML=h;const R=t.content;
-  const tot=R.querySelector('article.p1ftot');if(!tot)return h;const vit=tot.querySelector('details.wu'),sup=tot.querySelector('details.p3supin'),head=tot.querySelector('.chead'),rings=tot.querySelector('.mrings');
-  const k=iso(sel),d=D()[k]||{};const kc=Math.round((d.food||[]).reduce((a,i)=>a+kcalOf(i),0));
-  const vs=vit?((vit.querySelector('summary')||{}).textContent||'').replace(/.*·\s*/,'').trim():'';const ss=sup?((sup.querySelector('summary')||{}).textContent||'').replace(/^\s*Supplements\s*/,'').trim():'';
-  const tile=(id,icon,name,sub)=>`<button type="button" class="p1tile p3tile${P3FT.open===id?' on':''}" data-p3ft="${id}"><span class="p1ti">${ico(icon)}</span><b>${name}</b><small>${esc(sub||' ')}</small></button>`;
-  const row=`<section class="p3tiles p3t4" aria-label="Nutrition">${tile('sup','pill','Supplements',ss.replace(/None added yet/i,'None yet').slice(0,16))}${tile('vit','sparkles','Vitamins',vs.replace(/ on target/,'').slice(0,16))}${tile('tot','flame2','Totals',kc+' kcal')}${tile('pat','sheet','Patterns','Trends')}</section>`;
-  const panel=document.createElement('article');panel.className='card p1ftot p3ftpanel';
-  if(P3FT.open==='sup'&&sup){sup.open=true;panel.appendChild(sup)}else if(P3FT.open==='vit'&&vit){vit.open=true;panel.appendChild(vit)}else if(P3FT.open==='tot'){if(head)panel.appendChild(head);if(rings)panel.appendChild(rings)}
-  tot.insertAdjacentHTML('beforebegin',row);if(panel.childNodes.length)tot.replaceWith(panel);else tot.remove();
+  const tot=R.querySelector('article.p1ftot');if(!tot)return h;const k=iso(sel),d=D()[k]||{};const kc=Math.round((d.food||[]).reduce((a,i)=>a+kcalOf(i),0));
+  const vit=tot.querySelector('details.wu');const vs=vit?((vit.querySelector('summary')||{}).textContent||'').replace(/.*·\s*/,'').replace(/ on target/,'').trim():'';
+  const l=supps();const tk=l.filter(x=>p3Took(d,x)).length;
+  const tile=(id,icon,name,sub)=>`<button type="button" class="p3ftile${P3FT.open===id?' on':''}" data-p3ft="${id}">${ico(icon)}<span><b>${name}</b><small>${esc(sub||'')}</small></span></button>`;
+  tot.insertAdjacentHTML('beforebegin',`<section class="p3ftiles" aria-label="Nutrition">${tile('tot','flame2','Totals',kc+' kcal')}${tile('vit','sparkles','Vitamins',vs)}${tile('sup','pill','Supps',l.length?`${tk} of ${l.length}`:'Add')}${tile('pat','sheet','Patterns','')}</section>`);
   return t.innerHTML}})(viewFood);
+function p3FoodMode(){if(tab()!=='food'||fView!=='today')return;const app=document.getElementById('app');if(!app)return;const mode=P3FT.open||'tot';
+  const tot=app.querySelector('article.p1ftot');const vit=app.querySelector('details.wu');const sup=app.querySelector('details[data-ms="p1supp"]');
+  const keep=new Set([app.querySelector('nav.p1nav'),app.querySelector('.kuzday'),app.querySelector('.p3ftiles'),app.querySelector('a.backlink')].filter(Boolean));
+  if(mode==='tot'){if(vit)vit.classList.add('p3hide');if(sup)sup.classList.add('p3hide');return}
+  [...app.children].forEach(c=>{if(!keep.has(c))c.classList.add('p3hide')});
+  if(mode==='vit'&&vit){const host=document.createElement('article');host.className='card p3ftpanel';vit.parentNode.removeChild(vit);vit.style.display='';vit.open=true;host.appendChild(vit);app.appendChild(host)}
+  if(mode==='sup'&&sup){sup.parentNode.removeChild(sup);sup.style.display='';sup.open=true;app.appendChild(sup)}}
+render=(function(old){return function(){old.apply(this,arguments);try{p3FoodMode()}catch(e){}}})(render);
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3ft]');if(!x)return;const id=x.dataset.p3ft;
   if(id==='pat'){pView='me';location.hash='reports';p3OpenSec('NUTRITION');return}
-  P3FT.open=P3FT.open===id?null:id;const y=window.scrollY;render();window.scrollTo(0,y)});
+  P3FT.open=id;render();const tl=document.querySelector('.p3ftiles');if(tl){const y=tl.getBoundingClientRect().top+window.scrollY-70;if(window.scrollY>y)window.scrollTo({top:Math.max(0,y)})}});
+// supplements: tidy rows with a short name you can change
+function suppShort(s){if(s.short)return s.short;let n=String(s.name||'').replace(/\([^)]*\)/g,' ').replace(/\b(effervescent|hydration|electrolytes?|tablets?|capsules?|caps|softgels?|flavou?r(ed)?|powder|supplement|drink|mix|pack|tubs?)\b/gi,' ').replace(/[,–-].*$/,'').replace(/\s+/g,' ').trim();
+  const w=n.split(' ');return (w.length>4?w.slice(0,4).join(' '):n)||s.name}
+const P3SE={on:false};
+suppHTML=(function(old){return function(k){let h=old(k);const l=supps();if(!l.length)return h;const t=document.createElement('template');t.innerHTML=h;
+  t.content.querySelectorAll('[data-supp]').forEach(b=>{const s=l.find(x=>x.id===b.dataset.supp);if(!s)return;const on=b.classList.contains('on');
+    b.classList.add('p3srow');b.innerHTML=`<span class="p3schk">${on?'✓':''}</span><span class="p3st"><b>${esc(suppShort(s))}</b><small>${esc([s.dose,suppShort(s)!==s.name?s.name:''].filter(Boolean).join(' · '))}</small></span>`});
+  const ed=P3SE.on?`<div class="p3sedit">${l.map(s=>`<label><span class="ds">${esc(s.name)}</span><input type="text" data-suprn="${s.id}" value="${esc(suppShort(s))}" maxlength="30"></label>`).join('')}<button type="button" class="ghost" data-supedit>Done</button></div>`:`<button type="button" class="linkbtn" data-supedit style="align-self:flex-start">Rename</button>`;
+  const host=t.content.querySelector('.schips');if(host)host.insertAdjacentHTML('afterend',ed);return t.innerHTML}})(suppHTML);
+document.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-supedit]')))return;P3SE.on=!P3SE.on;render()});
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset||t.dataset.suprn==null)return;const l=clone(supps());const s=l.find(x=>x.id===t.dataset.suprn);const v=String(t.value||'').trim().slice(0,30);if(!s||!v)return;s.short=v;
+  if(await persistMeta('supps',{...(meta.supps||{}),list:l}))toast('Renamed to '+v)});
 // open one dropdown on Progress and scroll to it
 function p3OpenSec(word){let n=0;const go=()=>{const ds=[...document.querySelectorAll('details.ksec')];const t=ds.find(x=>((x.querySelector('summary')||{}).textContent||'').toUpperCase().includes(word));
   if(!t){if(n++<15)setTimeout(go,100);return}ds.forEach(x=>{if(x!==t)x.open=false});t.open=true;t.scrollIntoView({block:'start',behavior:'smooth'})};setTimeout(go,120)}
