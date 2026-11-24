@@ -1912,6 +1912,130 @@ function buildDemoGPS(){const R=rng(9091);const T=todayK();const out=[];const zo
 
 VIEWS.splice(VIEWS.findIndex(v=>v[0]==='trends'),0,['gps','GPS','trends','Tools']);
 
+
+// ================= Player review deck: 10 slides, downloaded as PowerPoint =================
+async function loadPptx(){if(window.PptxGenJS)return;await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';s.onload=ok;s.onerror=()=>no(new Error('Could not load the slide maker'));document.head.appendChild(s)})}
+const ageBand=a=>!isNum(a)?null:a<18?'Under 18':a<21?'18 to 20':a<25?'21 to 24':a<30?'25 to 29':'30 and over';
+function deckStats(p,k,n){const ks=lastN(k,n);const dI=kk=>dayInfo(p,kk);
+  const bal=avgOf(ks.map(kk=>dI(kk).s)),sl=avgOf(ks.map(kk=>sleepHours(p.D[kk])));const load=avgOf([0,1,2,3].map(w=>p.E.load7(addK(k,-7*w))));
+  let done=0,tot=0;ks.forEach(kk=>sessionsOn(p,kk).forEach(s=>{tot++;if(s.st!=='missed')done++}));
+  const prot=avgOf(ks.map(kk=>{const f=foodOn(p,kk);return f?f.protein:null}));
+  const g=typeof GPS!=='undefined'?GPS.rows.filter(r=>r.player_id===p.id&&r.day>ks[0]&&r.day<=k):[];const hsr=g.length?gSum(g,'hsr')/(n/7):null;const vmax=g.length?Math.max(...g.map(r=>+r.m.vmax||0)):null;
+  const rec=ks.reduce((a,kk)=>a+recMin(p,kk),0)/(n/7);const mob=mobMin(p,k,n)/(n/7);
+  return {bal,sl,load,done:tot?done/tot:null,prot,hsr,vmax,rec,mob,debt:p.E.debt(k),sd:sdBed(p,k,Math.min(n,28))}}
+function deckGroup(ps,k,n){const all=ps.map(p=>deckStats(p,k,n));const o={};['bal','sl','load','done','prot','hsr','vmax','rec','mob'].forEach(f=>o[f]=avgOf(all.map(x=>x[f])));return o}
+function deckPatterns(p,k){const out=[];const ks=lastN(k,56);
+  const split=(xf,yf,o)=>{const pr=ks.map(kk=>({x:xf(kk),y:yf(kk)})).filter(v=>v.x!=null&&v.y!=null&&!isNaN(v.x)&&!isNaN(v.y));if(pr.length<9)return;pr.sort((a,b)=>a.x-b.x);const n=Math.max(3,Math.floor(pr.length/3));
+    const lo=pr.slice(0,n),hi=pr.slice(-n);const xl=avg(lo.map(v=>v.x)),xh=avg(hi.map(v=>v.x));if(xh-xl<(o.minX||0))return;const yl=avg(lo.map(v=>v.y)),yh=avg(hi.map(v=>v.y));const d=yh-yl;if(Math.abs(d)<o.minY)return;
+    const helps=(d>0)===o.higherBetter;out.push({good:helps,t:helps?o.good:o.bad,txt:o.txt(xh,xl,yh,yl),nA:hi.length,nB:lo.length,unit:o.unit,w:Math.abs(d)/o.minY})};
+  const sl=kk=>sleepHours(p.D[kk]),bal=kk=>dayInfo(p,kk).s,nxt=f=>kk=>f(addK(kk,1)),num=(kk,f)=>{const d=p.D[kk];return d&&isNum(d[f])?+d[f]:null};
+  split(sl,bal,{minX:.5,minY:3,higherBetter:true,unit:'balance',good:'More sleep, better mornings',bad:'Longer nights aren\'t helping balance',txt:(xh,xl,yh,yl)=>`Balance ${Math.round(yh)} after ~${xh.toFixed(1)} h nights, ${Math.round(yl)} after ~${xl.toFixed(1)} h`});
+  split(kk=>{const f=foodOn(p,kk);return f?f.protein:null},nxt(bal),{minX:15,minY:3,higherBetter:true,unit:'balance',good:'Good protein days set up the next morning',bad:'Protein isn\'t showing in next-day balance',txt:(xh,xl,yh,yl)=>`Next-day balance ${Math.round(yh)} after ~${Math.round(xh)} g protein days, ${Math.round(yl)} after ~${Math.round(xl)} g`});
+  split(kk=>{const f=foodOn(p,kk);return f?f.carbs:null},nxt(bal),{minX:40,minY:3,higherBetter:true,unit:'balance',good:'Fuelling with carbs pays off the next day',bad:'Big carb days followed by flatter mornings',txt:(xh,xl,yh,yl)=>`Next-day balance ${Math.round(yh)} after ~${Math.round(xh)} g carbs, ${Math.round(yl)} after ~${Math.round(xl)} g`});
+  split(kk=>recMin(p,kk),nxt(kk=>num(kk,'sore')),{minX:8,minY:.3,higherBetter:false,unit:'soreness',good:'Recovery work takes the edge off soreness',bad:'Soreness stays up even after recovery work',txt:(xh,xl,yh,yl)=>`Next-day soreness ${yh.toFixed(1)}/5 after ~${Math.round(xh)} min recovery, ${yl.toFixed(1)}/5 after ~${Math.round(xl)} min`});
+  split(kk=>p.E.load7(kk),bal,{minX:150,minY:3,higherBetter:true,unit:'balance',good:'Handles a heavy week well',bad:'Heavy weeks drag balance down',txt:(xh,xl,yh,yl)=>`Balance ${Math.round(yh)} in the heaviest weeks, ${Math.round(yl)} in the lightest`});
+  split(kk=>num(kk,'stress'),bal,{minX:1,minY:3,higherBetter:false,unit:'balance',good:'Stress isn\'t knocking balance',bad:'Stressful days cost balance',txt:(xh,xl,yh,yl)=>`Balance ${Math.round(yh)} on high-stress days, ${Math.round(yl)} on calm ones`});
+  split(kk=>{const c=p.D[kk]&&p.D[kk].lastCaf;return c?tmin(c)/60:null},nxt(sl),{minX:2,minY:.25,higherBetter:false,unit:'sleep',good:'Coffee timing isn\'t costing sleep',bad:'Late coffee costs sleep',txt:(xh,xl,yh,yl)=>`${yh.toFixed(1)} h sleep after a last coffee ~${Math.round(xh)}:00, ${yl.toFixed(1)} h after ~${Math.round(xl)}:00`});
+  if(typeof GPS!=='undefined'){const g=GPS.rows.filter(r=>r.player_id===p.id&&r.day>=ks[0]);const by=f=>kk=>{const r=g.find(x=>x.day===kk);return r&&isNum(r.m[f])?+r.m[f]:null};
+    split(sl,by('vmax'),{minX:.5,minY:.4,higherBetter:true,unit:'speed',good:'Faster on the pitch after a good night',bad:'Sleep isn\'t showing in top speed',txt:(xh,xl,yh,yl)=>`Top speed ${yh.toFixed(1)} km/h after ~${xh.toFixed(1)} h sleep, ${yl.toFixed(1)} after ~${xl.toFixed(1)} h`});
+    split(bal,by('hsr'),{minX:5,minY:60,higherBetter:true,unit:'hsr',good:'Better balance, more high-speed running',bad:'High balance mornings aren\'t turning into running',txt:(xh,xl,yh,yl)=>`${Math.round(yh)} m HSR on ~${Math.round(xh)} balance days, ${Math.round(yl)} m on ~${Math.round(xl)}`});
+    split(kk=>{const f=foodOn(p,addK(kk,-1));return f?f.carbs:null},by('dist'),{minX:40,minY:250,higherBetter:true,unit:'dist',good:'Carbs the day before, more ground covered',bad:'Pre-session carbs not showing in distance',txt:(xh,xl,yh,yl)=>`${Math.round(yh).toLocaleString('en-IE')} m covered after ~${Math.round(xh)} g carbs the day before, ${Math.round(yl).toLocaleString('en-IE')} m after ~${Math.round(xl)} g`})}
+  return out.sort((a,b)=>b.w-a.w)}
+function deckActions(p,k,me,sq,pats){const a=[];
+  if(me.sl!=null&&me.sl<7)a.push(['Sleep',`Aim for 7.5 h: currently ${me.sl.toFixed(1)} h. Same bed time every night${me.sd!=null&&me.sd>45?` (it varies by about ±${me.sd} min now)`:''}.`]);
+  if(me.prot!=null){const t=(tgtOf(p.id)?tgtOf(p.id).targets:APP_DEF).training.protein;if(me.prot<t*.85)a.push(['Nutrition',`Protein averaging ${Math.round(me.prot)} g against a ${t} g target. Add a protein snack after training.`])}
+  if(me.rec!=null&&sq.rec!=null&&me.rec<sq.rec*.6)a.push(['Recovery',`${Math.round(me.rec)} min of recovery work a week against a squad average of ${Math.round(sq.rec)}. Two 10-minute sessions after hard days.`]);
+  if(me.mob!=null&&me.mob<20&&!(sq.mob!=null&&me.mob>sq.mob*1.2))a.push(['Mobility',`Only ${Math.round(me.mob)} min of mobility a week. 10 minutes on hips and hamstrings three times a week.`]);
+  const ac=p.E.acwr(addK(k,-1));if(ac!=null&&ac>1.3)a.push(['Load',`This week is ${Math.round(ac*100)}% of their usual. Keep the next week level before building again.`]);
+  pats.filter(x=>!x.good).slice(0,2).forEach(b=>{if(a.length<4)a.push(['Watch',`${b.t}. ${b.txt}.`])});const gd=pats.find(x=>x.good);if(gd&&a.length<4)a.push(['Keep doing',`${gd.t}. ${gd.txt}.`]);if(me.sl!=null&&me.sl>=7&&a.length<4)a.push(['Sleep',`Sleep is solid at ${me.sl.toFixed(1)} h. Protect it on match weeks and travel days.`]);
+  if(!a.length)a.push(['Keep going','Everything is on track. Keep the routines that are working: sleep, food and recovery.']);return a.slice(0,4)}
+async function buildPlayerDeck(id){const p=SQUAD.find(x=>x.id===id);if(!p)return;const btn=$('#deckBtn');if(btn){btn.disabled=true;btn.textContent='Building the slides…'}
+  try{await loadPptx();const k=S.k,N=42;const ps=sharing();const line=posLine(p);const band=ageBand(p.about&&p.about.age);
+    const me=deckStats(p,k,N),sq=deckGroup(ps,k,N),pos=line?deckGroup(ps.filter(x=>posLine(x)===line),k,N):null,age=band?deckGroup(ps.filter(x=>ageBand(x.about&&x.about.age)===band),k,N):null;
+    const pats=deckPatterns(p,k);const acts=deckActions(p,k,me,sq,pats);const keys=lastN(k,N);
+    const C={bg:'F7F5F0',ink:'1B1F1C',mut:'6B716C',acc:'1F7A55',acc2:'5B6CFF',bad:'D64541',warn:'D9902F',line:'E2DED5',card:'FFFFFF',dark:'0E1A14'};const F='Arial',FD='Georgia';
+    const pp=new PptxGenJS();pp.layout='LAYOUT_WIDE';pp.author='Keel Staff';pp.title=`${p.name} review`;
+    const fmt=(v,d,u)=>v==null||isNaN(v)?'–':(d?(+v).toFixed(d):Math.round(+v).toLocaleString('en-IE'))+(u||'');
+    const head=(s,title,sub,n)=>{s.background={color:C.bg};s.addText(title,{x:.6,y:.35,w:11.5,h:.7,fontFace:FD,fontSize:28,color:C.ink});if(sub)s.addText(sub,{x:.6,y:1.0,w:11.5,h:.4,fontFace:F,fontSize:13,color:C.mut});
+      s.addText(`${p.name} · ${n}/10`,{x:9.2,y:7.0,w:3.6,h:.3,fontFace:F,fontSize:9,color:C.mut,align:'right'});s.addText('keel',{x:.6,y:6.95,w:1.2,h:.35,fontFace:FD,fontSize:14,color:C.acc,bold:true})};
+    const card=(s,x,y,w,h,fill)=>s.addShape(pp.ShapeType.roundRect,{x,y,w,h,fill:{color:fill||C.card},line:{color:C.line,width:.75},rectRadius:.12});
+    const stat=(s,x,y,w,label,val,cmp)=>{card(s,x,y,w,1.55);s.addText(label,{x:x+.2,y:y+.12,w:w-.4,h:.3,fontFace:F,fontSize:11,color:C.mut});s.addText(val,{x:x+.2,y:y+.42,w:w-.4,h:.6,fontFace:FD,fontSize:28,color:C.ink});if(cmp)s.addText(cmp,{x:x+.2,y:y+1.05,w:w-.4,h:.35,fontFace:F,fontSize:10,color:C.mut})};
+    const cmpTxt=(f,d,u,hi)=>{const parts=[['Squad',sq],[line?GLINES[line]:null,pos],[band,age]].filter(x=>x[0]&&x[1]&&x[1][f]!=null).map(([l,o])=>`${l} ${fmt(o[f],d,u)}`);return parts.join(' · ')};
+    const lab=keys.map(kk=>fmtK(kk,{day:'numeric',month:'short'}));const every=(arr,n)=>arr.map((v,i)=>i%n===n-1||i===arr.length-1?v:'');
+    const line7=arr=>arr.map((_,i)=>{const w=arr.slice(Math.max(0,i-6),i+1).filter(v=>v!=null);return w.length?Math.round(avg(w)*10)/10:null});
+    const chartOpts=(extra)=>Object.assign({x:.6,y:1.6,w:8.1,h:4.9,fontFace:F,catAxisLabelFontSize:9,valAxisLabelFontSize:9,catAxisLabelColor:C.mut,valAxisLabelColor:C.mut,valGridLine:{color:C.line,size:.5},catGridLine:{style:'none'},showLegend:true,legendPos:'b',legendFontSize:10,legendColor:C.mut,lineDataSymbol:'none',lineSize:2.5,chartColors:[C.acc,'A9B0AA',C.acc2]},extra||{});
+    const side=(s,title,lines)=>{card(s,9.0,1.6,3.7,4.9);s.addText(title,{x:9.2,y:1.75,w:3.3,h:.35,fontFace:F,fontSize:13,bold:true,color:C.ink});s.addText(lines.map(t=>({text:t,options:{bullet:true,breakLine:true}})),{x:9.2,y:2.15,w:3.35,h:4.2,fontFace:F,fontSize:12,color:C.ink,valign:'top',paraSpaceAfter:6})};
+    // 1 title
+    let s=pp.addSlide();s.background={color:C.dark};s.addText('keel',{x:.7,y:.5,w:3,h:.6,fontFace:FD,fontSize:22,bold:true,color:'7FE0B0'});
+    s.addText(p.name,{x:.7,y:2.3,w:11.5,h:1.1,fontFace:FD,fontSize:48,color:'FFFFFF'});s.addText([p.pos,band,(TEAM&&TEAM.name)].filter(Boolean).join(' · '),{x:.7,y:3.4,w:11.5,h:.5,fontFace:F,fontSize:18,color:'B9C7BF'});
+    s.addText(`Player review · last 6 weeks to ${fmtK(k,{day:'numeric',month:'long',year:'numeric'})}`,{x:.7,y:4.1,w:11.5,h:.4,fontFace:F,fontSize:14,color:'B9C7BF'});
+    s.addText('How looking after yourself through the week shows up in your balance and on the pitch.',{x:.7,y:6.2,w:11,h:.5,fontFace:F,fontSize:13,italic:true,color:'8FA39A'});
+    // 2 snapshot
+    s=pp.addSlide();head(s,'Six weeks at a glance','Your averages, with the squad'+(line?`, ${GLINES[line].toLowerCase()}`:'')+(band?` and the ${band} group`:'')+' beside them',2);
+    const T=[['Balance',fmt(me.bal),cmpTxt('bal')],['Sleep a night',fmt(me.sl,1,' h'),cmpTxt('sl',1,' h')],['Training load a week',fmt(me.load),cmpTxt('load')],['Sessions done',me.done!=null?Math.round(me.done*100)+'%':'–',sq.done!=null?`Squad ${Math.round(sq.done*100)}%`:''],
+      ['Protein a day',fmt(me.prot,0,' g'),cmpTxt('prot',0,' g')],['High-speed running a week',fmt(me.hsr,0,' m'),cmpTxt('hsr',0,' m')],['Best top speed',fmt(me.vmax,1,' km/h'),cmpTxt('vmax',1,'')],['Recovery a week',fmt(me.rec,0,' min'),cmpTxt('rec',0,' min')]];
+    T.forEach(([l,v,c],i)=>stat(s,.6+(i%4)*3.08,1.65+Math.floor(i/4)*2.0,2.9,l,v,c));
+    const ups=[['Balance','bal'],['Sleep','sl'],['Protein','prot'],['High-speed running','hsr'],['Recovery','rec'],['Mobility','mob']].filter(([l,f])=>me[f]!=null&&sq[f]).map(([l,f])=>[l,me[f]/sq[f]-1]);const above=ups.filter(x=>x[1]>=.05).map(x=>x[0].toLowerCase()),below=ups.filter(x=>x[1]<=-.05).map(x=>x[0].toLowerCase());
+    s.addText([above.length?{text:'Ahead of the squad: ',options:{bold:true,color:C.acc}}:null,above.length?{text:above.join(', ')+'.   ',options:{}}:null,below.length?{text:'Behind: ',options:{bold:true,color:C.bad}}:null,below.length?{text:below.join(', ')+'.',options:{}}:null].filter(Boolean).concat(above.length||below.length?[]:[{text:'Right in line with the squad across the board.'}]),{x:.6,y:5.85,w:12,h:.4,fontFace:F,fontSize:14,color:C.ink});
+    // 3 balance
+    const bser=keys.map(kk=>dayInfo(p,kk).s);const sqb=keys.map(kk=>avgOf(ps.map(x=>dayInfo(x,kk).s)));
+    s=pp.addSlide();head(s,'Balance: how ready you are each morning','Daily balance from the check-in, 7-day average, against the squad',3);
+    s.addChart(pp.charts.LINE,[{name:p.name,labels:every(lab,7),values:line7(bser)},{name:'Squad',labels:every(lab,7),values:line7(sqb)}],chartOpts({valAxisMinVal:30,valAxisMaxVal:100}));
+    const best=Math.max(...bser.filter(v=>v!=null)),worst=Math.min(...bser.filter(v=>v!=null));const lowD=keys.filter((kk,i)=>bser[i]!=null&&bser[i]<55).length;
+    side(s,'What stands out',[`Best ${isFinite(best)?best:'–'}, lowest ${isFinite(worst)?worst:'–'}`,`${lowD} morning${lowD===1?'':'s'} under 55 (back-off zone)`,`${keys.filter(kk=>checkedIn(p.D[kk])).length} of ${N} days checked in`].concat(pats.filter(x=>x.unit==='balance').slice(0,2).map(x=>x.txt)));
+    // 4 sleep
+    const sser=keys.map(kk=>sleepHours(p.D[kk]));s=pp.addSlide();head(s,'Sleep','Hours each night, with the 7.5 h most players need',4);
+    s.addChart(pp.charts.BAR,[{name:'Hours',labels:every(lab,7),values:sser.map(v=>v==null?0:v)}],chartOpts({chartColors:['7DB89A'],showLegend:false,valAxisMinVal:0,valAxisMaxVal:10,barGapWidthPct:40}));
+    s.addShape(pp.ShapeType.line,{x:.95,y:1.6+4.9*(1-7.5/10)-.05,w:7.6,h:0,line:{color:C.bad,width:1.25,dashType:'dash'}});
+    side(s,'The numbers',[`Average ${fmt(me.sl,1,' h')} (squad ${fmt(sq.sl,1,' h')})`,`Sleep debt this week ${fmt(me.debt,1,' h')}`,me.sd!=null?`Bed time varies by about ±${me.sd} min`:'Not enough nights for bed-time consistency',`${sser.filter(v=>v!=null&&v<6.5).length} nights under 6.5 h`].concat(pats.filter(x=>/sleep|coffee|night/i.test(x.t)).slice(0,2).map(x=>x.txt)));
+    // 5 training load
+    const wl=[],wlab=[],sqw=[];for(let w=5;w>=0;w--){const end=addK(k,-7*w);wl.push(Math.round(p.E.load7(end)));sqw.push(Math.round(avgOf(ps.map(x=>x.E.load7(end)))||0));wlab.push(fmtK(addK(end,-6),{day:'numeric',month:'short'}))}
+    s=pp.addSlide();head(s,'Training load and S&C','Weekly load (minutes × effort) from Keel sessions, club training, matches and the gym',5);
+    s.addChart(pp.charts.BAR,[{name:p.name,labels:wlab,values:wl},{name:'Squad',labels:wlab,values:sqw}],chartOpts({chartColors:[C.acc,'C9CEC8'],barGapWidthPct:60}));
+    const ac=p.E.acwr(addK(k,-1));const as=(SC.assigns||[]).filter(a=>a.player_id===p.id);const ad=as.map(a=>adherence(a,k)).reduce((o,x)=>({due:o.due+x.due,done:o.done+x.done}),{due:0,done:0});
+    side(s,'Load',[ac!=null?`Last 7 days are ${Math.round(ac*100)}% of the usual week${ac>1.5?' (spike)':ac<.8?' (light)':' (steady)'}`:'Building up history',me.done!=null?`${Math.round(me.done*100)}% of sessions done`:'',as.length?`S&C programme: ${ad.done} of ${ad.due} sessions done`:'No S&C programme assigned'].filter(Boolean));
+    // 6 on the pitch
+    s=pp.addSlide();head(s,'On the pitch','GPS: high-speed running each week and top speed each session',6);
+    const g=typeof GPS!=='undefined'?gRowsOf(p.id).filter(r=>r.day>keys[0]):[];
+    if(g.length){const hw=[];for(let w=5;w>=0;w--){const end=addK(k,-7*w);hw.push(Math.round(gSum(gWeek(p.id,end),'hsr')))}
+      s.addChart(pp.charts.BAR,[{name:'HSR m a week',labels:wlab,values:hw}],chartOpts({w:5.9,chartColors:[C.warn],showLegend:false,barGapWidthPct:50}));
+      const vm=g.filter(r=>isNum(r.m.vmax));s.addChart(pp.charts.LINE,[{name:'Top speed km/h',labels:vm.map(r=>fmtK(r.day,{day:'numeric',month:'short'})),values:vm.map(r=>+r.m.vmax)}],chartOpts({x:6.75,w:5.95,chartColors:[C.acc2],showLegend:false,lineDataSymbol:'circle',lineDataSymbolSize:5}));
+      s.addText(`HSR ${fmt(me.hsr,0,' m')} a week (${line?GLINES[line].toLowerCase()+' '+fmt(pos&&pos.hsr,0,' m'):'squad '+fmt(sq.hsr,0,' m')}) · best top speed ${fmt(me.vmax,1,' km/h')} (squad ${fmt(sq.vmax,1)})`,{x:.6,y:6.55,w:12,h:.35,fontFace:F,fontSize:12,color:C.ink})}
+    else s.addText('No GPS for this player in the last 6 weeks. Import STATSports sessions on the GPS page.',{x:.6,y:3,w:12,h:.6,fontFace:F,fontSize:16,color:C.mut});
+    // 7 patterns
+    s=pp.addSlide();head(s,'Your patterns: what helps and what hurts','Found in your own last 8 weeks. Patterns, not proof, but worth knowing',7);
+    const good=pats.filter(x=>x.good).slice(0,3),bad=pats.filter(x=>!x.good).slice(0,3);
+    const col=(x,title,items,clr)=>{card(s,x,1.6,5.95,4.9);s.addShape(pp.ShapeType.rect,{x,y:1.6,w:.12,h:4.9,fill:{color:clr},line:{color:clr}});s.addText(title,{x:x+.35,y:1.75,w:5.4,h:.4,fontFace:F,fontSize:15,bold:true,color:clr});
+      s.addText(items.length?items.flatMap(it=>[{text:it.t,options:{bold:true,breakLine:true,fontSize:13}},{text:it.txt+(it.nA?` (${it.nA} v ${it.nB} days)`:''),options:{breakLine:true,fontSize:11,color:C.mut}},{text:' ',options:{breakLine:true,fontSize:6}}]):[{text:'Nothing clear yet. More days logged will show it.',options:{fontSize:12,color:C.mut}}],{x:x+.35,y:2.2,w:5.4,h:4.1,fontFace:F,color:C.ink,valign:'top'})};
+    col(.6,'Working for you',good,C.acc);col(6.75,'Costing you',bad,C.bad);
+    // 8 nutrition
+    s=pp.addSlide();head(s,'Nutrition','Daily protein against the target for that kind of day',8);
+    const pser=keys.map(kk=>{const f=foodOn(p,kk);return f?f.protein:null});const tgs=keys.map(kk=>((tgtOf(p.id)?tgtOf(p.id).targets:APP_DEF)[dayTypeGuess(p,kk)]||APP_DEF.training).protein);
+    if(pser.some(v=>v!=null)){s.addChart(pp.charts.BAR,[{name:'Protein g',labels:every(lab,7),values:pser.map(v=>v||0)}],chartOpts({chartColors:['8FBFA6'],showLegend:false,barGapWidthPct:35}));
+      const hit=pser.filter((v,i)=>v!=null&&v>=tgs[i]*.9).length,logd=pser.filter(v=>v!=null).length;const sup={};keys.forEach(kk=>((p.D[kk]&&p.D[kk].supps)||[]).forEach(x=>sup[x.name]=(sup[x.name]||0)+(+x.n||1)));
+      side(s,'Food',[`Logged food on ${logd} of ${N} days`,`Hit protein on ${hit} of ${logd} logged days`,`Average ${fmt(me.prot,0,' g')} a day (squad ${fmt(sq.prot,0,' g')})`,Object.keys(sup).length?`Supplements: ${Object.keys(sup).join(', ')}`:''].filter(Boolean).concat(pats.filter(x=>/protein/i.test(x.t)).map(x=>x.txt)))}
+    else s.addText(p.food?'No food logged in the last 6 weeks.':`${first(p.name)} doesn't share food with the team. They can turn it on in Keel under You › Your team.`,{x:.6,y:3,w:12,h:.6,fontFace:F,fontSize:16,color:C.mut});
+    // 9 recovery and body
+    s=pp.addSlide();head(s,'Recovery and the body','Recovery work, mobility, niggles and the muscles getting least work',9);
+    const nig={};keys.forEach(kk=>((p.D[kk]&&p.D[kk].niggles)||[]).forEach(n=>{if(+n.pain>=2){const a=n.area;nig[a]=nig[a]||{days:0,max:0};nig[a].days++;nig[a].max=Math.max(nig[a].max,+n.pain)}}));
+    const bm=bmPlayer(p,k,4).sort((a,b)=>a.r-b.r);const low=bm.filter(x=>x.r<.4).slice(0,5).map(x=>x.nm);const tools={};keys.forEach(kk=>recOn(p,kk).forEach(x=>{const w=x.what.split(':')[0];tools[w]=(tools[w]||0)+1}));
+    stat(s,.6,1.6,2.9,'Recovery a week',fmt(me.rec,0,' min'),`Squad ${fmt(sq.rec,0,' min')}`);stat(s,3.68,1.6,2.9,'Mobility a week',fmt(me.mob,0,' min'),`Squad ${fmt(sq.mob,0,' min')}`);
+    stat(s,6.76,1.6,2.9,'Niggle days',String(Object.values(nig).reduce((a,x)=>a+x.days,0)),Object.keys(nig).length?Object.keys(nig).join(', '):'None in 6 weeks');stat(s,9.84,1.6,2.9,'Unwell days',String(keys.filter(kk=>p.D[kk]&&p.D[kk].sick).length),'Logged in the check-in');
+    card(s,.6,3.4,5.95,3.1);s.addText('Most used',{x:.8,y:3.5,w:5.5,h:.35,fontFace:F,fontSize:13,bold:true,color:C.ink});s.addText((Object.keys(tools).length?Object.entries(tools).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([t,n])=>({text:`${t}: ${n} times`,options:{bullet:true,breakLine:true}})):[{text:'Nothing logged'}]),{x:.8,y:3.9,w:5.5,h:2.5,fontFace:F,fontSize:12,color:C.ink,valign:'top'});
+    card(s,6.75,3.4,5.95,3.1);s.addText('Muscles getting least work (last 4 weeks)',{x:6.95,y:3.5,w:5.5,h:.35,fontFace:F,fontSize:13,bold:true,color:C.ink});s.addText(low.length?low.map(t=>({text:t,options:{bullet:true,breakLine:true}})):[{text:'Everything is getting some work.'}],{x:6.95,y:3.9,w:5.5,h:2.5,fontFace:F,fontSize:12,color:C.ink,valign:'top'});
+    // 10 focus
+    s=pp.addSlide();head(s,'Focus for the next two weeks','Three or four things that would move your balance and your game the most',10);
+    acts.forEach(([t,x],i)=>{const y=1.65+i*1.2;card(s,.6,y,12.1,1.05);s.addShape(pp.ShapeType.ellipse,{x:.85,y:y+.25,w:.55,h:.55,fill:{color:C.acc},line:{color:C.acc}});s.addText(String(i+1),{x:.85,y:y+.25,w:.55,h:.55,align:'center',valign:'middle',fontFace:F,fontSize:16,bold:true,color:'FFFFFF'});
+      s.addText([{text:t+'  ',options:{bold:true,color:C.acc}},{text:x}],{x:1.65,y:y+.12,w:10.8,h:.8,fontFace:F,fontSize:14,color:C.ink,valign:'middle'})});
+    s.addText('Check in each morning so Keel can keep tracking these.',{x:.6,y:6.55,w:12,h:.35,fontFace:F,fontSize:12,italic:true,color:C.mut});
+    await pp.writeFile({fileName:`${p.name.replace(/[^\w\s-]/g,'')} review ${k}.pptx`});toast('Slides downloaded')}
+  catch(e){toast('Could not build the slides: '+(e.message||e),5000)}
+  if(btn){btn.disabled=false;btn.textContent='Download review slides'}}
+viewPlayer=(function(old){return function(id){const h=old(id);const p=SQUAD.find(x=>x.id===id);if(!p||!p.share)return h;
+  const bar=`<section class="card deckbar"><div><h2>Player review slides</h2><p>Ten slides for a quick call with ${esc(first(p.name))}: balance, sleep, load, GPS, nutrition, recovery and their own patterns, set against the squad${posLine(p)?', their line':''} and age group. Downloads as PowerPoint, opens in Google Slides or Keynote too.</p></div><button class="btn" id="deckBtn" data-deck="${esc(p.id)}">Download review slides</button></section>`;
+  const i=h.indexOf('</a>');return i>0&&h.slice(0,i).includes('class="back"')?h.slice(0,i+4)+bar+h.slice(i+4):bar+h}})(viewPlayer);
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-deck]');if(b)buildPlayerDeck(b.dataset.deck)});
+
 // ================= start =================
 (async()=>{
   try{if(/[?&]demo\b/.test(location.search))throw 0;const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
