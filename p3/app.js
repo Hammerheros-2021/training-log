@@ -687,7 +687,7 @@ function viewTraining(){
   return pre+(key===iso(todayDate())?injuryBanner():'')+adjBanner(pl)+intentNudge(key)+moveHTML(pl)+(pl?sessionHTML(sel,pl):none)+restExtraHTML(key,pl)+(((!pl||pl.type==='R'||pl.pre)&&((D()[key]||{}).extras||[]).length&&tView==='today'&&!sampleMode)?'':extrasCardHTML(key))+patternHTML()+pill;
 }
 function trainSub(cur){return `<div class="subtabs" style="grid-template-columns:1fr 1fr">${[['today','Day'],['plan','Overview']].map(([v,l])=>`<button type="button" data-tview="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`}
-function viewTrainingTab(){if(tView==='route')return planNav(tView)+routeHTML();return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?viewPlan():viewTraining())}
+function viewTrainingTab(){if(tView==='route')return planNav(tView)+routeHTML();if(tView==='month')return planNav(tView)+p3MonthHTML();return planNav(tView)+(tView==='today'?dayHeader()+sessChip(iso(sel)):'')+(tView==='plan'?viewPlan():viewTraining())}
 function viewCheckin(){ensureDrafts();return dayHeader()+ciChip(iso(sel))+checkinHTML(iso(sel))}
 function viewFood(){return dayHeader()+foodHTML(iso(sel))}
 function viewPlan(){
@@ -6206,6 +6206,33 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
   if(c('[data-fvgo]')){stop();keepName();if(!FV.items.length){toast('Nothing to add');return}const m=FV.meal,nm=FV.name,dirty=FV.dirty&&FV.src!=null;
     await addFood(kuzPaste(FV.items,m,p3AtFor(m)));try{P2OPEN.add(m)}catch(z){}FV=null;p1Sheet(null);
     toast(`Added ${nm} to ${m.toLowerCase()}${dirty?'. Changes not saved to the favourite':''}`,3000);render();return}},true);
+
+// ================= P3 (24 Nov): Plan = Week / Month / Routes; short labels on days; skipping is respected =================
+ICO['calendar-days']='<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>';
+const TSHORT={S:'Str',E:'Easy',H:'Class',T:'Thr',X:'Long',R:'Rest',O:'Own'};
+planNav=function(cur){return p1Nav('data-pnav',cur==='today'?'':cur,[['plan','calendar','Week','',''],['month','calendar-days','Month','',''],['route','map','Routes','','']])};
+// bottom Plan button opens the week
+document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[data-tab="training"]');if(!a)return;tView='plan';P3WK.sel=iso(todayDate());if(tab()==='training'){render();window.scrollTo({top:0})}});
+// skipping today: the advice says so instead of "do your session"
+rVerdict=(function(old){return function(s,d){const k=d&&d.date;if(k&&d.trainIntent==='no'&&!(d.extras||[]).length&&!(L()[k]&&L()[k].status)&&!(d.sick&&d.sick.types&&d.sick.types.length)&&maxPain(d)<3){const p=planFor(parse(k));
+    if(p&&p.type!=='R'&&!p.pre)return ['var(--ok)','Skipping today, as you said.',`No ${TNAME[p.type].toLowerCase()} today. Easy walk if you feel like it, eat well and get to bed on time. The plan picks up tomorrow.`]}
+  return old.apply(this,arguments)}})(rVerdict);
+function p3Tag(f){if(f.own)return ['Own','--o'];if(!f.lg&&(D()[f.k]||{}).trainIntent==='no'&&f.ty!=='R')return ['Skip','--line'];return [TSHORT[f.ty]||'',TVAR[f.ty]||'--line']}
+// week strip: a short word under each date instead of a colour bar only
+p3WeekSec=(function(old){return function(){let h=old();return h.replace(/<button type="button" class="p3wk1([^"]*)" data-goto="([^"]+)"([^>]*)>([\s\S]*?)<i style="--c:var\(([^)]+)\)"><\/i>/g,(m,cls,k,rest,inner,cv)=>{const f=p3DayBits(k);const [t,c]=p3Tag(f);return `<button type="button" class="p3wk1${cls}" data-goto="${k}"${rest}>${inner}<i class="p3tag" style="--c:var(${c})">${t}</i>`})}})(p3WeekSec);
+// no "Open day" on the plan
+p3DayPeek=(function(old){return function(k){return old(k).replace(/<button type="button" class="linkbtn p3pko" data-p3open="[^"]*">Open day ›<\/button>/,'')}})(p3DayPeek);
+// Month view
+const P3MO={m:null};
+function p3MonthHTML(){const now=todayDate();if(!P3MO.m)P3MO.m=new Date(now.getFullYear(),now.getMonth(),1);if(!P3WK.sel)P3WK.sel=iso(now);const m0=P3MO.m;const first=new Date(m0);const lead=(first.getDay()+6)%7;const start=addD(first,-lead);
+  const days=[];for(let i=0;i<42;i++){const d=addD(start,i);if(i>=35&&d.getMonth()!==m0.getMonth())break;days.push(d)}
+  const td=iso(now);const cells=days.map(d=>{const k=iso(d);const f=p3DayBits(k);const out=d.getMonth()!==m0.getMonth();const [t,c]=f.pl&&!f.pl.pre||f.own?p3Tag(f):['',''];const team=(()=>{try{return (MYP.list||[]).some(x=>{const z=mypAt(x,k);return z.started&&!z.finished&&z.days.length})}catch(e){return false}})();
+    return `<button type="button" class="p3mc${out?' out':''}${k===td?' today':''}${k===P3WK.sel?' sel':''}${f.st==='done'?' done':''}" data-p3mday="${k}"><b>${d.getDate()}</b>${t?`<i class="p3tag" style="--c:var(${c})">${t}</i>`:''}${team?'<span class="p3mteam">S&amp;C</span>':''}${f.st==='done'?'<em>✓</em>':''}</button>`}).join('');
+  return `<section class="card p3month"><div class="p3mh"><button type="button" class="x" data-p3mnav="-1" aria-label="Previous month">‹</button><h2>${fmtD(m0,{month:'long',year:'numeric'})}</h2><button type="button" class="x" data-p3mnav="1" aria-label="Next month">›</button></div>
+    <div class="p3mgrid">${['M','T','W','T','F','S','S'].map(x=>`<small>${x}</small>`).join('')}${cells}</div>${p3DayPeek(P3WK.sel)}</section>`}
+document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p3mnav]')){const m=P3MO.m;P3MO.m=new Date(m.getFullYear(),m.getMonth()+(+x.dataset.p3mnav),1);render();return}
+  if(x=c('[data-p3mday]')){P3WK.sel=x.dataset.p3mday;const y=window.scrollY;render();window.scrollTo(0,y)}});
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
