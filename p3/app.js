@@ -6293,6 +6293,14 @@ p2HrTrends=function(){const DD=D();const end=sampleMode?SAMPLE.now:todayDate();c
       <div class="p3hrx"><span>${fmtD(addD(end,-(N-1-pts[0].i)),{day:"numeric",month:"short"})}</span><span>today</span></div></div>`}).join('');
   return cards?`<article class="card"><div class="chead"><div style="flex:1"><h2>Heart rate</h2><div class="sub">Shaded band is your normal (usual ± 5). A reading above it, two days running, means take it easier.</div></div></div><div class="form" style="gap:14px">${cards}</div></article>`:''};
 
+// Sleep from Today: open straight away, with wind-down and trends one tap away
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3ring="sleep"]');if(!b)return;e.stopImmediatePropagation();const k=iso(todayDate());
+  const card=p2SleepCard(k).replace(/<details([^>]*)>/,'<details$1 open>');
+  p1Sheet(`<div class="kshead"><div><h2>Sleep</h2><small class="ds">Last night and your week</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>${card}
+    <div class="p3sllinks"><span class="label">Tonight</span><div class="p3slrow"><button type="button" data-prog="478">${ico('moon')}<span><b>4-7-8 wind-down</b><small>4 min breathing before bed</small></span></button><button type="button" data-prog="scan">${ico('waves')}<span><b>Body scan</b><small>Let the day go</small></span></button></div>
+    <button type="button" class="p3pagebtn" data-p3sltr>${ico('trending-up')}<span>Sleep and recovery trends</span><span aria-hidden="true">›</span></button></div>`)},true);
+document.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-p3sltr]')))return;p1Sheet(null);pView='me';location.hash='reports';p3OpenSec('SLEEP')});
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
