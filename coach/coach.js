@@ -2036,6 +2036,37 @@ viewPlayer=(function(old){return function(id){const h=old(id);const p=SQUAD.find
   const i=h.indexOf('</a>');return i>0&&h.slice(0,i).includes('class="back"')?h.slice(0,i+4)+bar+h.slice(i+4):bar+h}})(viewPlayer);
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-deck]');if(b)buildPlayerDeck(b.dataset.deck)});
 
+
+// ================= Lift progress: every set players log, from team programmes and their own Keel plan =================
+const e1rm=(kg,reps)=>+kg>0&&+reps>0?Math.round(+kg*(1+Math.min(12,+reps)/30)*2)/2:0;
+function liftData(p){const by={};const exName=id=>{const e=(SC.ex||[]).find(x=>x.id===id);return e?e.name:null};
+  const add=(name,day,arr,src)=>{if(!name||!arr||!arr.length)return;const ok=arr.filter(s=>+s.kg>0&&+s.reps>0);if(!ok.length)return;const top=ok.reduce((a,s)=>e1rm(s.kg,s.reps)>e1rm(a.kg,a.reps)?s:a,ok[0]);
+    const key=name.toLowerCase();(by[key]=by[key]||{name,pts:[],src:new Set()}).pts.push({day,kg:+top.kg,reps:+top.reps,e1:e1rm(top.kg,top.reps),sets:ok.length,vol:ok.reduce((a,s)=>a+s.kg*s.reps,0)});by[key].src.add(src)};
+  (SC.logs||[]).filter(l=>l.player_id===p.id&&l.done&&Array.isArray(l.sets)).forEach(l=>l.sets.forEach(r=>add(r.name||exName(r.ex),l.day,r.done,'Team programme')));
+  Object.values(p.L||{}).forEach(l=>{if(l&&Array.isArray(l.sets))l.sets.forEach(r=>add(r.name,l.date,r.done,'Own plan'))});
+  return Object.values(by).map(x=>{x.pts.sort((a,b)=>a.day.localeCompare(b.day));return x}).sort((a,b)=>b.pts[b.pts.length-1].day.localeCompare(a.pts[a.pts.length-1].day))}
+function liftSpark(pts){if(pts.length<2)return '';const v=pts.map(p=>p.e1);const lo=Math.min(...v),hi=Math.max(...v);const W=120,H=30;const xs=i=>Math.round(i/(pts.length-1)*(W-6))+3,ys=x=>hi===lo?H/2:Math.round(H-3-(x-lo)/(hi-lo)*(H-6));
+  return `<svg class="lspark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true"><polyline fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="${pts.map((p,i)=>xs(i)+','+ys(p.e1)).join(' ')}"/><circle cx="${xs(pts.length-1)}" cy="${ys(v[v.length-1])}" r="3" fill="currentColor"/></svg>`}
+function liftsCard(p,full){const L=liftData(p);if(!L.length)return full?`<section class="card"><header><div><h2>Lifts</h2><p>No weights logged yet. Sets appear here as ${esc(first(p.name))} logs workouts in Keel.</p></div></header></section>`:'';const T=S.k||todayK();
+  const rows=L.slice(0,full?20:6).map(x=>{const last=x.pts[x.pts.length-1];const old=x.pts.filter(q=>q.day<=addK(T,-28));const base=old.length?old[old.length-1]:x.pts[0];const ch=last.e1&&base.e1&&base!==last?Math.round((last.e1/base.e1-1)*100):null;
+    const best=Math.max(...x.pts.map(q=>q.e1));return `<tr><td><b>${esc(x.name)}</b><div class="muted" style="font-size:12px">${fmtK(last.day,{day:'numeric',month:'short'})} · ${[...x.src].join(', ')}</div></td><td class="num">${last.kg} kg × ${last.reps}</td><td class="num">${last.e1} kg${last.e1>=best&&x.pts.length>2?' <span class="lbest">best</span>':''}</td>
+      <td class="num">${ch==null?'–':`<span class="${ch>0?'good-t':ch<0?'bad-t':''}">${ch>0?'+':''}${ch}%</span>`}</td><td class="lsp">${liftSpark(x.pts)}</td></tr>`}).join('');
+  return `<section class="card lifts"><header><div><h2>Lifts</h2><p>Top set each session and estimated 1-rep max (Epley), from every set ${esc(first(p.name))} logs in Keel.</p></div></header>
+    <table class="list"><thead><tr><th>Exercise</th><th>Last top set</th><th>Est. max</th><th>vs 4 wks</th><th>Trend</th></tr></thead><tbody>${rows}</tbody></table></section>`}
+viewPlayer=(function(old){return function(id){const h=old(id);const p=SQUAD.find(x=>x.id===id);if(!p||!p.share)return h;const c=liftsCard(p,false);if(!c)return h;
+  const i=h.indexOf('<section class="card gsec');return i>0?h.slice(0,i)+c+h.slice(i):h+c}})(viewPlayer);
+// S&C page: a lifts table across the squad (best estimated max per main lift)
+viewSC=(function(old){return function(){const h=old.apply(this,arguments);try{const ps=sharing();const main=['Trap bar deadlift','Back squat','Bench press','Rear-foot elevated split squat','Chin-up'];
+  const rows=ps.map(p=>{const L=liftData(p);if(!L.length)return null;return {p,v:main.map(m=>{const x=L.find(y=>y.name.toLowerCase()===m.toLowerCase());return x?x.pts[x.pts.length-1]:null})}}).filter(Boolean);if(!rows.length)return h;
+  const used=main.filter((m,j)=>rows.some(r=>r.v[j]));const card=`<section class="card lifts"><header><div><h2>Squad lifts</h2><p>Latest estimated max per lift, from logged sets. Tap a player for their trend.</p></div></header>
+    <table class="list"><thead><tr><th>Player</th>${used.map(m=>`<th>${esc(m)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><td><a href="#player/${esc(r.p.id)}">${esc(r.p.name)}</a></td>${used.map(m=>{const v=r.v[main.indexOf(m)];return `<td class="num">${v?v.e1+' kg':'–'}</td>`}).join('')}</tr>`).join('')}</tbody></table></section>`;
+  return h+card}catch(e){return h}}})(viewSC);
+// demo: logged sets with steady progress, so the tables have something to show
+buildDemoSC=(function(old){return function(){const r=old.apply(this,arguments);const R=rng(55);const base={e1:110,e3:22,e4:70,e6:28,e2:95};
+  r.logs.forEach(l=>{if(!l.done)return;const pr=r.progs[0];const day=pr.plan.weeks[l.week-1]&&pr.plan.weeks[l.week-1].days.find(x=>x.dow===l.dow);if(!day)return;const ix=+String(l.player_id).replace(/\D/g,'')||0;
+    l.sets=day.items.filter(it=>base[it.ex]).map(it=>{const b=base[it.ex]*(0.8+(ix%7)*0.06);const kg=Math.round((b+l.week*2.5+(R()*5-2.5))/2.5)*2.5;const reps=parseInt(it.reps)||6;const n=+it.sets||3;const e=r.ex.find(x=>x.id===it.ex);
+      return {ex:it.ex,name:e?e.name:'',target:{sets:it.sets,reps:it.reps,load:it.load},done:Array.from({length:n},(_,j)=>({kg:j===n-1?kg:Math.max(2.5,kg-2.5*(n-1-j)),reps}))}})});return r}})(buildDemoSC);
+
 // ================= start =================
 (async()=>{
   try{if(/[?&]demo\b/.test(location.search))throw 0;const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}

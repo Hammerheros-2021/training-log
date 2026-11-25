@@ -6429,8 +6429,154 @@ function p3FoodDrinksHTML(k){const d=D()[k]||{};const its=(d.food||[]).map((x,ix
 p3FoodMode=(function(old){return function(){old();try{if(tab()!=='food'||fView!=='today'||(P3FT.open||'tot')!=='tot')return;const app=document.getElementById('app');if(!app||app.querySelector('.p3fdr'))return;
   const h=p3FoodDrinksHTML(iso(sel));if(!h)return;const meals=app.querySelector('article.p1meals')||app.querySelector('.p1plants');if(meals)meals.insertAdjacentHTML(meals.classList.contains('p1plants')?'beforebegin':'afterend',h)}catch(e){}}})(p3FoodMode);
 
+// ================= P3 (25 Nov): fewer taps, no keyboard. Wheels, quick check-in, sets for plan strength, last time from the account, wearables =================
+// ---- scroll wheel: one column you flick, snaps to a value. Writes to a hidden input or calls back ----
+const P3WH={};
+function p3WheelHTML(id,vals,cur,fmt,opt){opt=opt||{};fmt=fmt||(v=>String(v));let i=vals.findIndex(v=>String(v)===String(cur));const unset=i<0;if(unset)i=Math.max(0,vals.findIndex(v=>String(v)===String(opt.def)));if(i<0)i=Math.floor(vals.length/2);
+  P3WH[id]={vals,i,unset,cb:opt.cb||null,input:opt.input||null};
+  return `<div class="kwh${unset?' unset':''}${opt.cls?' '+opt.cls:''}" data-wh="${esc(id)}" role="listbox" aria-label="${esc(opt.label||id)}" tabindex="0"><div class="kwhsel" aria-hidden="true"></div><div class="kwhs">${vals.map((v,j)=>`<div class="kwhi" data-whi="${j}" role="option">${esc(fmt(v))}</div>`).join('')}</div>${opt.unit?`<span class="kwhu">${esc(opt.unit)}</span>`:''}</div>`}
+const P3WH_H=40;
+function p3WheelInit(root){(root||document).querySelectorAll('.kwh').forEach(w=>{const s=w.querySelector('.kwhs');const st=P3WH[w.dataset.wh];if(!s||!st||s.dataset.init)return;s.dataset.init='1';s.scrollTop=st.i*P3WH_H;let t=null,user=false;
+  const pick=j=>{j=Math.max(0,Math.min(st.vals.length-1,j));const ch=j!==st.i||st.unset;st.i=j;st.unset=false;w.classList.remove('unset');s.querySelectorAll('.kwhi').forEach((x,ix)=>x.classList.toggle('on',ix===j));
+    if(ch){const v=st.vals[j];if(st.input){const inp=document.getElementById(st.input);if(inp){inp.value=v;inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}))}}if(st.cb)try{st.cb(v)}catch(e){}}};
+  s.querySelectorAll('.kwhi').forEach((x,ix)=>x.classList.toggle('on',ix===st.i&&!st.unset));
+  s.addEventListener('pointerdown',()=>{user=true},{passive:true});s.addEventListener('touchstart',()=>{user=true},{passive:true});s.addEventListener('wheel',()=>{user=true},{passive:true});
+  s.addEventListener('scroll',()=>{if(!user)return;clearTimeout(t);t=setTimeout(()=>pick(Math.round(s.scrollTop/P3WH_H)),110)},{passive:true});
+  s.addEventListener('click',e=>{const it=e.target.closest('.kwhi');if(!it)return;const j=+it.dataset.whi;user=true;s.scrollTo({top:j*P3WH_H,behavior:'smooth'});pick(j)});
+  w.addEventListener('keydown',e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();const j=st.i+(e.key==='ArrowDown'?1:-1);s.scrollTop=Math.max(0,j)*P3WH_H;pick(j)}})})}
+const p3Range=(a,b,st)=>{const o=[];for(let v=a;v<=b+1e-9;v=Math.round((v+st)*100)/100)o.push(v);return o};
+const p3Times=(fromMin,toMin,step)=>{const o=[];for(let m=fromMin;m<=toMin;m+=step)o.push(fmtT(((m%1440)+1440)%1440));return o};
+const p3MS=(a,b,st)=>{const o=[];for(let s=a;s<=b;s+=st)o.push(`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`);return o};
+function p3SnapT(t,step){const m=tmin(t);if(m==null)return t;const r=Math.round(m/step)*step;return fmtT(((r%1440)+1440)%1440)}
+// any keyboard box in the session log becomes a wheel (the box stays, hidden, so saving works as before)
+const P3WHIN={'f-dur':{vals:p3Range(5,240,5),unit:'min',def:45,label:'How long, minutes'},'f-tb':{vals:p3Range(0,300,2.5),unit:'kg',def:60,label:'Top set, kg'},'f-ss':{vals:p3Range(0,250,2.5),unit:'kg',def:40,label:'Second lift, kg'},
+  'f-pace':{vals:p3MS(150,540,5),unit:'/km',def:'4:45',label:'Pace per km'},'f-5k':{vals:p3MS(840,2700,5),unit:'',def:'22:00',label:'5 km time'}};
+function p3Wheelify(root){root=root||document;Object.keys(P3WHIN).forEach(id=>{const inp=root.querySelector('#'+id);if(!inp||inp.dataset.wh)return;const c=P3WHIN[id];inp.dataset.wh='1';inp.classList.add('p3hidin');inp.setAttribute('tabindex','-1');
+  let cur=inp.value;if(id==='f-pace'||id==='f-5k'){const s=toSec(cur);cur=s?`${Math.floor(s/60)}:${String(Math.round(s%60/5)*5%60).padStart(2,'0')}`:''}else if(cur!=='')cur=Math.round(+cur/(id==='f-dur'?5:2.5))*(id==='f-dur'?5:2.5);
+  inp.insertAdjacentHTML('afterend',p3WheelHTML('in-'+id,c.vals,cur,null,{input:id,unit:c.unit,def:c.def,label:c.label,cls:'kwhin'}));
+  if(id==='f-dur'){const ch=root.querySelector('.p3dur');if(ch)ch.querySelectorAll('button[data-p3dur]').forEach(b=>b.remove())}});p3WheelInit(root)}
+render=(function(old){return function(){old.apply(this,arguments);try{p3Wheelify(document.getElementById('app'))}catch(e){}}})(render);window.__p3wf=p3Wheelify;
+
+// ---- quick morning check-in: sleep times, how you feel, anything off. Full version one tap away ----
+const P3FEEL=[[1,'Rough'],[2,'Flat'],[3,'OK'],[4,'Good'],[5,'Great']];
+const P3OFF=[['tired','Tired'],['badsleep','Slept badly'],['stressed','Stressed'],['lowmood','Low mood'],['sore','Sore'],['unwell','Unwell']];
+const _p3CiOpen=p1CiOpen;
+p1CiOpen=function(){_p3CiOpen.apply(this,arguments);const c=P1.ci;if(!c)return;const d=D()[c.k]||{};c.had=new Set(['sleepQ','energy','mood','stress','sore'].filter(x=>d[x]!=null));c.touched=new Set();
+  let qm=true;try{qm=localStorage.getItem('p3cifull')!=='1'}catch(e){}c.quick=qm;c.off=new Set(d.ciOff||[]);c.feel=d.feel||null;
+  const prev=Object.values(D()).filter(x=>x&&x.bed&&x.wake&&x.date!==c.k).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];c.prevBW=prev?{bed:prev.bed,wake:prev.wake}:null;c.sleepSet=!!(d.bed&&d.wake);
+  c.bed=p3SnapT(c.bed,5);c.wake=p3SnapT(c.wake,5);p1CiDraw()};
+function p3QuickCiHTML(c){const h=p1SleepCalc(c);const p=planFor(parse(c.k));const planned=!!(p&&p.type!=='R'&&!p.pre);const same=c.prevBW&&c.prevBW.bed===c.bed&&c.prevBW.wake===c.wake;const s=c.sick||{types:[]};
+  const sickOn=c.off.has('unwell');
+  return `<div class="kshead"><div><h2>Morning check-in</h2><small class="ds">${fmtD(parse(c.k),{weekday:'long',day:'numeric',month:'short'})}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  <section class="p1blk p3qci"><div class="p3qh"><h3>Last night</h3><b class="num p3qsl">${h!=null&&c.sleepSet?h+' h':'–'}</b></div>
+    ${c.prevBW?`<button type="button" class="p3same${same&&c.sleepSet?' on':''}" data-p3same aria-pressed="${!!(same&&c.sleepSet)}">${ico('check')} Same as last night <small class="num">${esc(c.prevBW.bed)} to ${esc(c.prevBW.wake)}</small></button>`:''}
+    <div class="p3bw"><div><span class="label">Into bed</span>${p3WheelHTML('ci-bed',p3Times(19*60,27*60,5),c.sleepSet?c.bed:'',null,{def:c.bed,label:'Into bed',cb:v=>{c.bed=v;c.sleepSet=true;p3QciSleep()}})}</div>
+      <div><span class="label">Woke for good</span>${p3WheelHTML('ci-wake',p3Times(4*60,12*60,5),c.sleepSet?c.wake:'',null,{def:c.wake,label:'Woke for good',cb:v=>{c.wake=v;c.sleepSet=true;p3QciSleep()}})}</div></div></section>
+  <section class="p1blk p3qci"><h3>How do you feel?</h3><div class="p3feel">${P3FEEL.map(([v,l])=>`<button type="button" data-p3feel="${v}" aria-pressed="${+c.feel===v}"><i class="p3fd p3fd${v}"></i><span>${l}</span></button>`).join('')}</div></section>
+  <section class="p1blk p3qci"><h3>Anything off? <small class="ds">Skip if not</small></h3><div class="p3off">${P3OFF.map(([v,l])=>`<button type="button" data-p3off="${v}" aria-pressed="${c.off.has(v)}">${l}</button>`).join('')}<a class="p3offn" href="#checkin" id="p1Hurt">${ico('heart-pulse')} Niggle or injury</a></div>
+    ${sickOn?`<div class="p1cof p3sickq">${SICK.map(x=>`<button type="button" data-p1sick="${x}" aria-pressed="${(s.types||[]).includes(x)}">${x}</button>`).join('')}</div>`:''}</section>
+  ${planned?`<section class="p1blk p3qci"><h3>Today: ${esc(TNAME[p.type])}</h3>${p1Seg('trainIntent',[['yes','Yes, doing it'],['no','Not today']],c.trainIntent)}</section>`:''}
+  <button type="button" class="primary p1save" id="p1CiSave" ${c.busy||!c.feel||!c.sleepSet?'disabled':''}>${c.busy?'Saving…':!c.sleepSet?'Set your sleep times':!c.feel?'Pick how you feel':'Done'}</button>
+  <button type="button" class="linkbtn p3full" data-p3cifull="1">Full check-in: sleep detail and sliders ›</button>`}
+function p3QciSleep(){const c=P1.ci;if(!c)return;const h=p1SleepCalc(c);const b=document.querySelector('.p3qsl');if(b)b.textContent=h!=null?h+' h':'–';const sm=document.querySelector('[data-p3same]');if(sm){const on=c.prevBW&&c.prevBW.bed===c.bed&&c.prevBW.wake===c.wake;sm.classList.toggle('on',!!on);sm.setAttribute('aria-pressed',!!on)}
+  const sv=document.getElementById('p1CiSave');if(sv){sv.disabled=!c.feel||!c.sleepSet;sv.textContent=!c.sleepSet?'Set your sleep times':!c.feel?'Pick how you feel':'Done'}setTimeout(p1Queue,0)}
+p1CiDraw=(function(old){return function(){const c=P1.ci;if(c&&c.quick){p1Sheet(p3QuickCiHTML(c));p3WheelInit(document.getElementById('p1Host'));return}old.apply(this,arguments);
+  if(c&&!c.quick){const host=document.querySelector('#p1Host .ksheet');if(host&&!host.querySelector('[data-p3cifull]')){const sv=host.querySelector('#p1CiSave');if(sv)sv.insertAdjacentHTML('afterend','<button type="button" class="linkbtn p3full" data-p3cifull="0">Quick check-in ›</button>')}
+    // bed and wake become wheels here too
+    ['bed','wake'].forEach(k=>{const inp=host&&host.querySelector('#p1'+k);if(!inp||inp.dataset.wh)return;inp.dataset.wh='1';inp.classList.add('p3hidin');const vals=k==='bed'?p3Times(19*60,27*60,5):p3Times(4*60,12*60,5);
+      inp.insertAdjacentHTML('afterend',p3WheelHTML('cif-'+k,vals,p3SnapT(c[k],5),null,{label:k==='bed'?'Into bed':'Woke for good',cb:v=>{c[k]=v;inp.value=v;const h=p1SleepCalc(c);const b=document.querySelector('.p1sleep b');if(b)b.textContent=(h!=null?h:'–')+' h';setTimeout(p1Queue,0)}}))});
+    const scr=host&&host.querySelector('#p1scr');if(scr&&!scr.dataset.wh){scr.dataset.wh='1';scr.classList.add('p3hidin');scr.insertAdjacentHTML('afterend',p3WheelHTML('cif-scr',['']. concat(p3Times(19*60,27*60,15)),c.screenOff?p3SnapT(c.screenOff,15):'',v=>v||'Not set',{label:'Phone away at',cb:v=>{c.screenOff=v;setTimeout(p1Queue,0)}}))}
+    p3WheelInit(host)}}})(p1CiDraw);
+document.addEventListener('click',e=>{const c=P1.ci;if(!c)return;const q=s=>e.target.closest&&e.target.closest(s);let x;
+  if(x=q('[data-p3cifull]')){e.stopImmediatePropagation();c.quick=x.dataset.p3cifull!=='1';try{localStorage.setItem('p3cifull',c.quick?'0':'1')}catch(z){}p1CiDraw();return}
+  if(!c.quick)return;
+  if(q('[data-p3same]')){e.stopImmediatePropagation();if(c.prevBW){c.bed=p3SnapT(c.prevBW.bed,5);c.wake=p3SnapT(c.prevBW.wake,5);c.sleepSet=true}p1CiDraw();setTimeout(p1Queue,0);return}
+  if(x=q('[data-p3feel]')){e.stopImmediatePropagation();c.feel=+x.dataset.p3feel;p1CiDraw();setTimeout(p1Queue,0);return}
+  if(x=q('[data-p3off]')){e.stopImmediatePropagation();const v=x.dataset.p3off;if(c.off.has(v))c.off.delete(v);else c.off.add(v);if(v==='unwell'&&!c.off.has(v))c.sick={types:[],sev:null,meds:[]};p1CiDraw();setTimeout(p1Queue,0);return}},true);
+// slider touched in the full check-in; untouched sliders save nothing
+document.addEventListener('input',e=>{const el=e.target;if(el.dataset&&el.dataset.p1sl&&P1.ci&&P1.ci.touched)P1.ci.touched.add(el.dataset.p1sl)},true);
+p1CiFields=(function(old){return function(c){const f=old(c);
+  if(c.quick){['latency','wakes','awakeMin'].forEach(k=>delete f[k]);if(!c.sleepSet){delete f.bed;delete f.wake;delete f.sleepH}
+    if(!c.feel){['sleepQ','energy','mood','stress','sore'].forEach(k=>delete f[k]);return f}
+    const v=+c.feel,o=c.off;f.feel=v;f.ciOff=[...o];f.ciQuick=true;
+    f.energy=o.has('tired')?Math.min(v,2):v;f.mood=o.has('lowmood')?Math.min(v,2):v;f.sleepQ=o.has('badsleep')?Math.min(v,2):Math.max(2,Math.min(5,v));f.stress=o.has('stressed')?4:Math.max(1,3-Math.max(0,v-3));f.sore=o.has('sore')?4:2;
+    if(!o.has('unwell'))f.sick=null;return f}
+  if(c.touched){['sleepQ','energy','mood','stress','sore'].forEach(k=>{if(!c.touched.has(k)&&!(c.had&&c.had.has(k)))delete f[k]})}return f}})(p1CiFields);
+p1CiSave=(function(old){return async function(){const c=P1.ci;if(c&&c.quick&&(!c.feel||!c.sleepSet)){toast(!c.sleepSet?'Set your sleep times first':'Pick how you feel first');return}return old.apply(this,arguments)}})(p1CiSave);
+
+// ---- session log: one tap "Done as planned", and one feedback question at a time ----
+function p3PlanMin(pl){if(!pl)return 45;const wi=pl.wk-1;const t=pl.type;if(t==='E')return (+EASY[wi]||30)+15;if(t==='S')return 60;if(t==='T')return 50;if(t==='X')return 70;if(t==='H')return 60;return 45}
+render=(function(old){return function(){old.apply(this,arguments);try{const f=document.getElementById('logForm');if(!f||f.querySelector('.p3dap'))return;const st=f.querySelector('[data-bind="s.status"],.seg');
+  const k=sOpenK||iso(sel);const pl=planFor(parse(k));if(!pl||pl.type==='R')return;const h3=f.querySelector('h3');if(!h3)return;
+  h3.parentElement.insertAdjacentHTML('afterend',`<button type="button" class="p3dap" data-p3dap="${p3PlanMin(pl)}">${ico('check')} Done as planned <small>${p3PlanMin(pl)} min · then just say how hard</small></button>`)}catch(e){}}})(render);
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3dap]');if(!b)return;e.preventDefault();const f=document.getElementById('logForm');if(!f)return;
+  const done=f.querySelector('[data-k="status"][data-v="done"],[data-v="done"]');if(done)done.click();setTimeout(()=>{const inp=document.getElementById('f-dur');if(inp){inp.value=b.dataset.p3dap;inp.dispatchEvent(new Event('input',{bubbles:true}))}
+    const w=document.querySelector('[data-wh="in-f-dur"]');if(w&&P3WH['in-f-dur']){const st=P3WH['in-f-dur'];const j=st.vals.findIndex(v=>+v===+b.dataset.p3dap);if(j>=0){st.i=j;st.unset=false;w.classList.remove('unset');const s=w.querySelector('.kwhs');s.scrollTop=j*P3WH_H;s.querySelectorAll('.kwhi').forEach((x,ix)=>x.classList.toggle('on',ix===j))}}
+    const r=document.getElementById('f-rpe');if(r)r.scrollIntoView({block:'center',behavior:'smooth'});toast('Marked done. Now slide how hard it was.')},60)});
+// feedback: overall plus one question, rotating, with the rest one tap away
+p2FbDraw=(function(old){return function(){old.apply(this,arguments);const f=P2FB&&P2FB.f;if(!f||f.all)return;const host=document.querySelector('#p1Host .ksheet');if(!host)return;
+  const fs=[...host.querySelectorAll('.field')].filter(x=>x.querySelector('[data-p2fq]')&&!x.querySelector('[data-p2fq="feel"]'));if(fs.length<2)return;
+  const n=Math.floor(Date.now()/864e5);const keep=fs.find(x=>x.querySelector('[data-p2fq]')&&FB_Q.findIndex(q=>q[0]===x.querySelector('[data-p2fq]').dataset.p2fq)===n%FB_Q.length)||fs[0];
+  fs.forEach(x=>{if(x!==keep&&!x.querySelector('[aria-pressed="true"]'))x.classList.add('p3hide')});const note=host.querySelector('#p2FbNote');const nf=note&&note.closest('.field');if(nf&&!note.value)nf.classList.add('p3hide');
+  if(!host.querySelector('[data-p3fball]'))keep.insertAdjacentHTML('afterend','<button type="button" class="linkbtn" data-p3fball>More questions ›</button>')}})(p2FbDraw);
+document.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-p3fball]')))return;if(P2FB&&P2FB.f){P2FB.f.all=true;p2FbDraw()}});
+
+// ---- strength in your own plan: a workout that logs every set, like a coach's programme ----
+const p3Slug=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+function p3ParseDose(dose){const s=String(dose||'');const m=s.match(/^\s*(\d+)\s*[×x]\s*([^·@]+?)\s*(?:[·@]\s*(.+))?$/);if(!m)return {sets:3,reps:s,load:''};return {sets:+m[1],reps:m[2].trim(),load:(m[3]||'').trim()}}
+function p3PlanWorkout(k){const pl=planFor(parse(k));if(!pl||pl.type!=='S')return null;const p=pl.p;
+  const ex=[],items=[];STRENGTH.forEach(e=>{const nm=Array.isArray(e.nm)?e.nm[p]:e.nm;if(!nm)return;const id='p:'+p3Slug(nm);const d=p3ParseDose(e.d[p]);const dist=/\d\s*m\b/.test(d.reps);
+    ex.push({id,name:nm,cues:e.cue||''});items.push({ex:id,sets:DELOAD[pl.wk]?Math.min(2,d.sets):d.sets,reps:d.reps,load:dist?'':d.load,note:dist&&d.load?'@ '+d.load:'',rest:/rest\s*([\d\-–]+\s*min)/i.test(e.cue||'')?(e.cue.match(/rest\s*([\d\-–]+\s*min)/i)[1]):''})});
+  return {assignment:'plan:'+k,plan:true,team_id:null,team:'',start:k,load:100,note:'',programme:{name:'Your Keel plan',plan:{weeks:[{days:[{dow:0,title:TNAME.S,min:60,rpe:7,items}]}]}},exercises:ex,logs:[]}}
+function p3PWOpen(k){const a=p3PlanWorkout(k);if(!a)return;let saved=null;try{saved=JSON.parse(localStorage.getItem(p3WKey(a.assignment,k))||'null')}catch(e){}
+  const d=a.programme.plan.weeks[0].days[0];const lg=L()[k];
+  const sets=saved&&saved.sets||d.items.map(it=>{const prev=lg&&lg.sets&&lg.sets.find(r=>r.ex===it.ex);if(prev&&prev.done&&prev.done.length)return prev.done.map(s=>({kg:s.kg,reps:s.reps,done:true}));const n=+it.sets||3;const kg=p3WKg(it.load,it.ex);const reps=p3WReps(it.reps);return Array.from({length:n},()=>({kg,reps,done:false}))});
+  Object.assign(P3W,{on:true,aid:a.assignment,k,a,d,t:{wk:planFor(parse(k)).wk,dow:0,days:[d]},items:d.items,sets,i:saved?saved.i:0,t0:saved&&saved.t0||Date.now(),fin:false,rpe:(lg&&lg.rpe)||7,note:''});p3WDraw();try{p3Wake(true)}catch(e){}}
+window.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-p3pw]');if(b){e.preventDefault();e.stopImmediatePropagation();p3PWOpen(b.dataset.p3pw);return}
+  if(!(e.target.closest&&e.target.closest('#p3wSave'))||!P3W.on||!P3W.a||!P3W.a.plan)return;e.stopImmediatePropagation();
+  const {a,k,items,sets}=P3W;const n=document.getElementById('p3wNote');const note=n?n.value.trim():'';const dur=Math.max(5,Math.min(240,Math.round((Date.now()-P3W.t0)/60000)));
+  const rows=items.map((it,i)=>{const e2=(a.exercises||[]).find(z=>z.id===it.ex)||{};return {ex:it.ex,name:e2.name||'',target:{sets:it.sets,reps:it.reps,load:it.load},done:sets[i].filter(s=>s.done).map(s=>({kg:+s.kg,reps:+s.reps}))}});
+  const pl=planFor(parse(k));const doc={...(L()[k]||{}),date:k,status:'done',dur,rpe:P3W.rpe,notes:note||(L()[k]||{}).notes||'',sets:rows,wk:pl.wk,slot:'S',type:'S',savedAt:new Date().toISOString()};
+  const tb=rows.find(r=>/deadlift|squat/i.test(r.name)&&r.done.length);if(tb)doc.tb=Math.max(...tb.done.map(s=>s.kg));
+  logs[k]=doc;if(logsCol){try{await logsCol.doc(k).set(doc)}catch(z){toast('Could not save. Try again.');return}}
+  try{localStorage.removeItem(p3WKey(a.assignment,k))}catch(z){}P3W.on=false;try{p3Wake(false)}catch(z){}p1Sheet(null);p3LastBuild();toast('Saved. Every set is in your log.',3500);render()},true);
+sessionHTML=(function(old){return function(d,pl){let h=old(d,pl);try{if(pl&&pl.type==='S'){const k=iso(d);const lg=L()[k];const n=lg&&lg.sets?lg.sets.reduce((a,r)=>a+(r.done||[]).length,0):0;
+  const btn=`<button type="button" class="primary p3pwbtn" data-p3pw="${k}">${ico('play')} ${n?`Workout logged · ${n} sets. Open it`:'Start workout · log your sets'}</button>`;
+  const i=h.indexOf('<div class="ex">');h=i>0?h.slice(0,i)+btn+h.slice(i):h+btn}}catch(e){}return h}})(sessionHTML);
+// one tick per exercise: all the sets, as shown
+p3WDraw=(function(old){return function(){old.apply(this,arguments);if(!P3W.on||P3W.fin)return;const host=document.querySelector('#p1Host .ksheet');if(!host)return;const ss=P3W.sets[P3W.i]||[];const left=ss.filter(s=>!s.done).length;
+  if(left>=2&&!host.querySelector('[data-p3wall]')){const s0=ss.find(z=>!z.done);const it0=P3W.items[P3W.i];if(p3WKind(it0,(P3W.a.exercises||[]).find(z=>z.id===it0.ex))==='weight'&&!(+s0.kg>0))return;const sec=host.querySelector('.p3wex');const s=ss.find(z=>!z.done);const it=P3W.items[P3W.i];const kind=p3WKind(it,(P3W.a.exercises||[]).find(z=>z.id===it.ex));
+    if(sec)sec.insertAdjacentHTML('beforeend',`<button type="button" class="ghost p3wallb" data-p3wall>${ico('check')} All ${left} sets done${kind==='weight'&&s?` at ${s.kg} kg × ${s.reps}`:''}</button>`)}}})(p3WDraw);
+window.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-p3wall]'))||!P3W.on)return;e.stopImmediatePropagation();const ss=P3W.sets[P3W.i];const f=ss.find(z=>!z.done);ss.forEach(s=>{if(!s.done){s.kg=f.kg;s.reps=f.reps;s.done=true}});
+  try{clearInterval(P3T.t);P3T.end=0}catch(z){}p3WSave();if(P3W.i<P3W.items.length-1)P3W.i++;else P3W.fin=true;p3WSave();p3WDraw()},true);
+// "last time" comes from your saved sessions (own plan and team programmes), not just this phone
+let P3LAST={};
+function p3LastBuild(){const m={};const add=(ex,day,arr)=>{if(!ex||!arr||!arr.length)return;const top=arr.reduce((a,s)=>(+s.kg>+a.kg||(+s.kg===+a.kg&&+s.reps>+a.reps))?s:a,arr[0]);if(!m[ex]||m[ex].day<day)m[ex]={kg:+top.kg,reps:+top.reps,day}};
+  Object.values(L()).forEach(l=>{if(l&&l.sets)l.sets.forEach(r=>add(r.ex,l.date,r.done))});(P3LAST._sc||[]).forEach(r=>(r.sets||[]).forEach(x=>add(x.ex,r.day,x.done)));m._sc=P3LAST._sc;P3LAST=m}
+async function p3LastLoad(){if(!sb||!UID)return;try{const {data}=await sb.from('sc_logs').select('day,sets').eq('player_id',UID).gte('day',iso(addD(todayDate(),-180)));P3LAST._sc=data||[]}catch(e){}p3LastBuild()}
+p3WLast=(function(old){return function(id){if(!P3LAST._b){P3LAST._b=1;p3LastBuild()}const s=P3LAST[id];if(s)return {kg:s.kg,reps:s.reps};return old(id)}})(p3WLast);
+mypLoad=(function(old){return async function(){await old.apply(this,arguments);p3LastLoad()}})(mypLoad);
+
+// ---- wearables: pair a device. Saved to your account so staff know who wears what; live data switches on when the connection is set up ----
+const P3WEAR=[['garmin','Garmin','cloud'],['whoop','WHOOP','cloud'],['oura','Oura Ring','cloud'],['polar','Polar','cloud'],['fitbit','Fitbit','cloud'],['coros','COROS','cloud'],['suunto','Suunto','cloud'],['apple','Apple Watch','phone'],['samsung','Samsung Galaxy Watch','phone'],['keel','Keel band','keel'],['none','I don\'t wear one','none']];
+const p3Wear=()=>(meta.wearable&&meta.wearable.device)?meta.wearable:null;
+function p3WearCardHTML(){const w=p3Wear();const d=w&&P3WEAR.find(x=>x[0]===w.device);const live=!!(window.P3CFG&&P3CFG.wearables);
+  return `<article class="card p3wear"><div class="p3wearh"><span class="p3weari">${ico('activity')}</span><div><b>Wearable</b><small class="ds">${d?(d[0]==='none'?'None paired':`${esc(d[1])} · ${w.status==='live'?'syncing':'paired, waiting to connect'}`):'Pair a watch or ring so sleep, heart rate and sessions fill in themselves'}</small></div>
+    <button type="button" class="${d&&d[0]!=='none'?'ghost':'primary'} p3wearb" data-p3wear>${d&&d[0]!=='none'?'Change':'Pair'}</button></div></article>`}
+function p3WearSheet(){const w=p3Wear();const live=!!(window.P3CFG&&P3CFG.wearables);
+  p1Sheet(`<div class="kshead"><div><h2>Pair a wearable</h2><small class="ds">Sleep, heart rate, HRV and sessions come in by themselves</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+    <div class="p3wl">${P3WEAR.map(([id,nm,kind])=>`<button type="button" class="p3wli" data-p3wpick="${id}" aria-pressed="${w&&w.device===id}"><b>${esc(nm)}</b><small>${kind==='cloud'?(live?'Sign in to connect':'Connection being tested'):kind==='phone'?'Needs the Keel phone app (coming)':kind==='keel'?'Ask your coach or club':''}</small></button>`).join('')}</div>
+    <section class="p1blk"><h3>What it fills in</h3><ul class="p3wlist"><li>Bed and wake times, sleep and waking in the night</li><li>Resting heart rate and HRV, an early warning when you're run down</li><li>Sessions: start, length and heart-rate effort</li></ul><p class="ds">You'd still tell Keel how you feel, anything sore, and how hard a session felt.</p></section>`)}
+document.addEventListener('click',async e=>{const q=s=>e.target.closest&&e.target.closest(s);let x;
+  if(q('[data-p3wear]')){p3WearSheet();return}
+  if(x=q('[data-p3wpick]')){const id=x.dataset.p3wpick;const live=!!(window.P3CFG&&P3CFG.wearables);const kind=(P3WEAR.find(z=>z[0]===id)||[])[2];
+    if(live&&kind==='cloud'){try{const r=await fetch('/api/wearable?device='+encodeURIComponent(id)+'&uid='+encodeURIComponent(UID||''));const j=await r.json();if(j&&j.url){await persistMeta('wearable',{device:id,status:'pending',at:new Date().toISOString()});location.href=j.url;return}}catch(z){}}
+    if(await persistMeta('wearable',{device:id,status:id==='none'?'none':'paired',at:new Date().toISOString()}))toast(id==='none'?'Noted. You can pair one any time.':`${(P3WEAR.find(z=>z[0]===id)||[])[1]} saved. We'll switch on the live connection when it's ready.`,4500);p1Sheet(null);render()}});
+// card on the You page, under the team card
+render=(function(old){return function(){old.apply(this,arguments);try{if(tab()!=='profile')return;const app=document.getElementById('app');if(!app||app.querySelector('.p3wear'))return;const anchor=app.querySelector('.p3team,article.card');if(anchor)anchor.insertAdjacentHTML('afterend',p3WearCardHTML());else app.insertAdjacentHTML('beforeend',p3WearCardHTML())}catch(e){}}})(render);
+
 (async()=>{
-  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
+  try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
   sb.auth.onAuthStateChange((ev,s)=>{SESSION=s;if(ev==='PASSWORD_RECOVERY'){showGate(`<div class="gcard"><h1>Set a new password</h1><form id="pwForm" class="form" style="padding:0"><div class="field"><label class="label" for="np">New password</label><input id="np" type="password" minlength="8" required></div><button class="primary" type="submit">Save password</button></form></div>`)}});
   document.addEventListener('submit',async e=>{if(e.target.id==='pwForm'){e.preventDefault();const {error}=await sb.auth.updateUser({password:$('#np').value});if(error)toast(error.message,4000);else{toast('Password saved');location.hash='';location.reload()}}},true);
