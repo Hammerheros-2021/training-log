@@ -6577,6 +6577,83 @@ document.addEventListener('click',async e=>{const q=s=>e.target.closest&&e.targe
 // card on the You page, under the team card
 render=(function(old){return function(){old.apply(this,arguments);try{if(tab()!=='profile')return;const app=document.getElementById('app');if(!app||app.querySelector('.p3wear'))return;const anchor=app.querySelector('.p3team,article.card');if(anchor)anchor.insertAdjacentHTML('afterend',p3WearCardHTML());else app.insertAdjacentHTML('beforeend',p3WearCardHTML())}catch(e){}}})(render);
 
+// ================= P3 (25 Nov pm): tidier Drinks, Food rows for drinks and plants, header down to 3, session tidy =================
+// drinks total counts the water you mix shakes and electrolytes with (assumed: 300 ml a protein scoop, 500 ml an electrolyte tablet)
+function p3SuppMl(d){let ml=0;try{supps().forEach(s=>{if(!p3Took(d,s))return;const t=`${s.name||''} ${s.dose||''}`.toLowerCase();const q=p3SQ(d,s.id);
+  if(/electrolyte|hydro|hydration|rehydrat|oral rehydration|nuun|dioralyte/.test(t))ml+=500*q;else if(/protein|whey|shake|mass gainer|recovery drink|casein/.test(t))ml+=300*q})}catch(e){}return ml}
+p3Fluid=(function(old){return function(d){const r=old(d);const s=p3SuppMl(d||{})/1000;r.s=Math.round(s*100)/100;r.t=Math.round((r.t+s)*100)/100;return r}})(p3Fluid);
+const p3Bar=(pct,col)=>`<div class="p3bar"><i style="width:${Math.max(0,Math.min(100,pct))}%;background:${col}"></i></div>`;
+const p3Chev=()=>'<svg class="p3chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+// ---- the Drinks sheet, rebuilt tight: water always open, coffee/tea and alcohol fold with a summary ----
+const P3DS={cof:null,alc:false,fav:false,other:false};
+p1DrinksDraw=function(){const k=iso(todayDate());const d=D()[k]||{};const f=p3Fluid(d);const tg=p1WaterTarget();const pct=Math.round(f.t/tg.lo*100);
+  const cf=p1CafToday(k);const it=p1CofItem();const c=COFFEE.find(x=>x[0]===P1C.type);const noMilk=c&&/energy|espresso|herbal|green/.test(c[0]);
+  const fv=dFavs();const us=fv.length?fv:p3Usuals();P3US=us;const n=cf.its.length;const cofOpen=P3DS.cof!=null?P3DS.cof:!!P1C.type;const showB=P3DS.other||!!P1C.type;
+  const alcT=(d.food||[]).filter(p3IsAlc);const sdT=Math.round(alcT.reduce((a,x)=>a+(+x.sd||0),0)*10)/10;let wk=0,lim=0;try{wk=alcWeek(k);lim=alcLimit()}catch(e){}
+  const keys=new Set(fv.map(x=>String(x.name).toLowerCase()));const ago=P1C.at?Math.round((p1Min(p1Now())-p1Min(P1C.at))/30)*30:0;
+  const when=`<div class="p3dwhen"><span>Had it</span>${[[0,'Now'],[30,'30m'],[60,'1h'],[120,'2h'],[180,'3h']].map(([m,l])=>`<button type="button" data-p3when="${m}" aria-pressed="${ago===m}">${l}</button>`).join('')}</div>`;
+  p1Sheet(`<div class="kshead"><div><h2>Drinks</h2><small class="ds">Today</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  <section class="p1blk p3dw"><div class="p3dwh"><span class="p3dwt">${ico('droplet')} Water</span><b class="num">${f.t}<small> of ${tg.lo} L</small></b><b class="num p3dwp">${pct}%</b></div>
+    ${p3Bar(pct,'var(--k-sky,#4ea3d9)')}
+    <div class="p3dws">Water ${Math.round(f.w*100)/100} L · tea, coffee and other drinks ${f.o} L${f.s?` · shakes ${f.s} L`:''}${tg.why.length?` · more today: ${esc(tg.why.join(', '))}`:''}</div>
+    <div class="p3dwb">${f.w>0?`<button type="button" class="p3dwm" data-p1w="-0.25" aria-label="Take off 250 ml">−</button>`:''}${[[.25,'250 ml','Glass'],[.5,'500 ml','Small bottle'],[.75,'750 ml','Bottle'],[1,'1 L','Litre']].map(([v,ml,l])=>`<button type="button" data-p1w="${v}"><b>+${ml}</b><small>${l}</small></button>`).join('')}</div></section>
+  <section class="p1blk p3dsec${cofOpen?' open':''}"><button type="button" class="p3dsh" data-p3dsec="cof" aria-expanded="${cofOpen}">${ico('coffee')}<b>Coffee and tea</b><small class="num">${n?`${n} today · ${cf.tot} mg${cf.last?` · last ${esc(cf.last)}`:''}`:'None today'}</small>${p3Chev()}</button>
+    ${cofOpen?`<div class="p3dbody">
+      ${n?`<div class="p3dlist">${cf.its.map(x=>`<div class="p1cafi p3dli"><span class="num">${esc(x.at||'')}</span><b>${esc(x.name)}</b><button type="button" class="p3dstar${keys.has(String(x.name).toLowerCase())?' on':''}" data-p3dfav="${x.ix}" aria-label="Favourite">${ico('star')}</button><button type="button" class="x" data-del-food="${x.ix}" data-p1redraw aria-label="Remove">${ico('x')}</button></div>`).join('')}
+        ${cf.last&&p1Min(cf.last)>=840?'<p class="p3dnote">Caffeine after 2 pm can still be working at bedtime.</p>':''}</div>`:''}
+      ${when}
+      <div class="p3dbtns">${us.length?`<button type="button" class="${P3DS.fav?'on':''}" data-p3dfavs aria-expanded="${P3DS.fav}">${ico('star')} ${fv.length?'Favourites':'Your usual'} <small>${us.length}</small></button>`:''}<button type="button" class="${showB?'on':''}" data-p3dother aria-expanded="${showB}">+ Other coffee or tea</button></div>
+      ${P3DS.fav&&us.length?`<div class="p3dfl">${us.map((x,i)=>`<button type="button" data-p3us="${i}"><span>${p3Pic(x.name,22)}</span><b>${esc(x.name)}</b><i>+</i></button>`).join('')}</div>`:''}
+      ${showB?`<div class="p3dbuild"><div class="p1cof">${COFFEE.map(x=>`<button type="button" data-cof="${x[0]}" aria-pressed="${P1C.type===x[0]}">${esc(x[1])}</button>`).join('')}</div>
+        ${c?`<div class="field"><span class="label">Size</span>${p1Seg('cofsize',Object.entries(CSIZE).map(([v,s])=>[v,s[0]]),P1C.size)}</div>
+          ${noMilk?'':`<div class="field"><span class="label">Milk</span><div class="p1cof p1cofm">${Object.entries(MILK).map(([v,m])=>`<button type="button" data-cofmilk="${v}" aria-pressed="${(P1C.milk||(c[3]?'semi':'none'))===v}">${m[0]}</button>`).join('')}</div></div>`}
+          ${/energy/.test(c[0])?'':`<div class="field"><span class="label">Sugar</span>${p1Seg('cofsugar',[['0','None'],['1','1 tsp'],['2','2 tsp']],String(P1C.sugar))}</div>`}
+          <div class="p1cofsum num">${it.kcal} kcal · ${it.caffeine} mg caffeine</div><button type="button" class="primary" id="cofLog" style="width:100%">Log ${esc(it.name.toLowerCase())}</button>`:''}</div>`:''}
+      <p class="p3dnote">${ico('check')} In your Food log too. Counted once.</p></div>`:''}</section>
+  ${alcOn()?`<section class="p1blk p3dsec${P3DS.alc?' open':''}"><button type="button" class="p3dsh" data-p3dsec="alc" aria-expanded="${P3DS.alc}">${ico('wine')}<b>Alcohol</b><small class="num">${sdT?`${sdT} standard today`:'None today'} · ${wk} this week${lim?` of ${lim}`:''}</small>${p3Chev()}</button>
+    ${P3DS.alc?`<div class="p3dbody">${alcT.length?`<div class="p3dlist">${(d.food||[]).map((x,ix)=>p3IsAlc(x)?`<div class="p1cafi p3dli"><span class="num">${esc(x.at||'')}</span><b>${esc(x.name)}</b><button type="button" class="x" data-del-food="${ix}" data-p1redraw aria-label="Remove">${ico('x')}</button></div>`:'').join('')}</div>`:''}<div class="p1cof">${ALC.map((a,i)=>`<button type="button" data-alc="${i}" data-p1redraw>${esc(a[0])}</button>`).join('')}</div></div>`:''}</section>`:''}`)};
+document.addEventListener('click',e=>{const q=s=>e.target.closest&&e.target.closest(s);let x;if(!q('#p1Host'))return;
+  if(x=q('[data-p3dsec]')){e.stopImmediatePropagation();const s=x.dataset.p3dsec;if(s==='cof')P3DS.cof=!(P3DS.cof!=null?P3DS.cof:!!P1C.type);else P3DS.alc=!P3DS.alc;p1DrinksDraw();return}
+  if(q('[data-p3dfavs]')){e.stopImmediatePropagation();P3DS.fav=!P3DS.fav;if(P3DS.fav){P3DS.other=false;P1C.type=null}p1DrinksDraw();return}
+  if(q('[data-p3dother]')){e.stopImmediatePropagation();P3DS.other=!(P3DS.other||!!P1C.type);if(!P3DS.other)P1C.type=null;else P3DS.fav=false;p1DrinksDraw();return}
+  if(x=q('[data-p3when]')){e.stopImmediatePropagation();const m=+x.dataset.p3when;P1C.at=m?fmtT(((p1Min(p1Now())-m)%1440+1440)%1440):null;p1DrinksDraw();return}},true);
+
+// ---- Food log: Drinks and Plants as tidy rows that open, like the meals ----
+p3FoodDrinksHTML=function(k){const d=D()[k]||{};const its=(d.food||[]).map((x,ix)=>({...x,ix})).filter(p3IsDrink);const f=p3Fluid(d);let tg=3;try{tg=p1WaterTarget().lo}catch(e){}const pct=Math.round(f.t/tg*100);
+  const caf=its.reduce((a,x)=>a+(+x.caffeine||0),0);
+  return `<details class="card p3frow p3fdr"><summary><span class="p3fri" style="--ic:#4ea3d9">${ico('droplet')}</span><b>Drinks</b><span class="p3frv num">${f.t} of ${tg} L</span><span class="p3frp num">${pct}%</span>${p3Chev()}${p3Bar(pct,'#4ea3d9')}</summary>
+    <div class="p3frb"><div class="p3fdrs num">Water ${Math.round(f.w*100)/100} L · other drinks ${f.o} L${f.s?` · shakes ${f.s} L`:''}${caf?` · ${Math.round(caf)} mg caffeine`:''}</div>
+    ${its.length?`<div class="p3fdrl">${its.sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))).map(x=>`<div class="p3fdri"><span class="num">${esc(x.at||x.meal||'')}</span><b>${esc(x.name)}</b><small class="num">${p3IsAlc(x)?`${+x.sd||''} std`:`${p3DrinkMl(x)} ml`}</small></div>`).join('')}</div>`:'<p class="ds" style="margin:6px 0">No drinks logged yet.</p>'}
+    <button type="button" class="ghost p3fopen" data-p3ring="drinks">Add a drink</button></div></details>`};
+function p3PlantsRowHTML(k){const pw=plantsWeek(k),pt=plantsOn(D()[k]||{});const goal=typeof PLANTS_WEEK!=='undefined'?PLANTS_WEEK:30;const pct=Math.round(pw.size/goal*100);const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+  return `<details class="card p3frow p3fpl"><summary><span class="p3fri" style="--ic:#3e8a56">${ico('leaf')}</span><b>Plants</b><span class="p3frv num">${pw.size} of ${goal} this week</span><span class="p3frp num">${pt.size} today</span>${p3Chev()}${p3Bar(pct,'#3e8a56')}</summary>
+    <div class="p3frb">${pt.size?`<span class="label">Today</span><div class="p3pch">${[...pt].map(p=>`<span>${esc(cap(p))}</span>`).join('')}</div>`:''}
+    ${pw.size?`<span class="label">Last 7 days</span><div class="p3pch dim">${[...pw].filter(p=>!pt.has(p)).map(p=>`<span>${esc(cap(p))}</span>`).join('')}</div>`:'<p class="ds" style="margin:6px 0">Every different fruit, veg, bean, nut, seed, grain, herb and spice counts once a week.</p>'}
+    <p class="ds" style="font-size:12px;margin:8px 0 0">30 different plants a week is linked with a healthier gut.</p></div></details>`}
+p3FoodMode=(function(old){return function(){old();try{if(tab()!=='food'||fView!=='today')return;const app=document.getElementById('app');if(!app)return;const k=iso(sel);
+  const pm=app.querySelector('details.p1pm');if(pm)pm.remove();
+  const nav=app.querySelector('nav.p1nav');if(nav)nav.classList.add('p3even');
+  if((P3FT.open||'tot')!=='tot')return;
+  const pl=app.querySelector('.p1plants');if(pl&&!app.querySelector('.p3fpl')){pl.insertAdjacentHTML('afterend',p3PlantsRowHTML(k));pl.remove()}
+  const dr=app.querySelector('.p3fdr');if(dr&&!dr.classList.contains('p3frow')){dr.insertAdjacentHTML('afterend',p3FoodDrinksHTML(k));dr.remove()}}catch(e){}}})(p3FoodMode);
+
+// ---- header: date, messages, you. Goals live on the You page, food sign-off on the Food page ----
+// ---- Plan page: Week / Month / Routes spread evenly; no "Session done" line above the session; moved/adjusted note under it ----
+render=(function(old){return function(){old.apply(this,arguments);try{const app=document.getElementById('app');if(!app)return;
+  const pn=app.querySelector('[data-pnav]');if(pn&&pn.parentElement)pn.parentElement.classList.add('p3even');
+  if(tab()==='training'){const card=app.querySelector('article.card[style*="--c:"]');
+    if(card){app.querySelectorAll('.stline.done').forEach(r=>{if(/Session done/.test(r.textContent))r.remove()});const adj=app.querySelector('.adjb');if(adj&&adj.compareDocumentPosition(card)&Node.DOCUMENT_POSITION_FOLLOWING)card.insertAdjacentElement('afterend',adj)}}
+  // heart button leaves the Today row; it lives in the check-in now
+  app.querySelectorAll('.p3act.p3heart').forEach(b=>b.remove())}catch(e){}}})(render);
+// ---- Log a session: if today's plan is already done, just say so with a tick ----
+p1MoveOpen=(function(old){return function(){old.apply(this,arguments);try{const k=iso(todayDate());const l=L()[k];const p=planFor(todayDate());let own=p&&p.adj&&(p.adj.type==='O'||p.adj.src==='own');try{if(!own&&p3Replaced(k))own=true}catch(z){}
+  const b=document.querySelector('#p1Host [data-p1go="planned"]');if(!b)return;
+  if(l&&(l.status==='done'||l.status==='partial')||own){b.classList.add('p3pdone');const sm=b.querySelector('small');if(sm)sm.innerHTML=`<span class="p3tick">${ico('check')}</span> ${own?'Done, your own session':l.status==='partial'?'Partly done':'Done'}`}}catch(e){}}})(p1MoveOpen);
+// ---- morning pulse: a small optional line in the quick check-in instead of a button on Today ----
+p1CiDraw=(function(old){return function(){old.apply(this,arguments);const c=P1.ci;if(!c||!c.quick)return;const host=document.querySelector('#p1Host .ksheet');if(!host||host.querySelector('.p3pulse'))return;
+  const w=p3Wear();if(w&&w.status==='live')return;const h=(D()[c.k]||{}).hr;const sv=host.querySelector('#p1CiSave');if(!sv)return;
+  sv.insertAdjacentHTML('beforebegin',`<button type="button" class="p3pulse" data-p2hropen="${c.k}">${ico('heart-pulse')}<span>Morning pulse <small>optional</small></span><b class="num">${h&&h.bpm?h.bpm+' bpm':'Add ›'}</b></button>`)}})(p1CiDraw);
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
