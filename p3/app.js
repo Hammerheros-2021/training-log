@@ -6763,15 +6763,20 @@ document.addEventListener('click',async e=>{const q=s=>e.target.closest&&e.targe
 
 // ================= P3 (25 Nov late): one way to pick things — up-and-down wheels — for drinks, alcohol and times; neater nutrient warnings; plants learn links; daily five =================
 // ---- Food "Today so far": high and low as neat rows, tap a nutrient for what to do ----
+let P3NWS=null;
 microsHTML=(function(old){return function(t,dt,k){try{try{gapOpen=false}catch(e){}let h=old(t,dt,k);h=h.replace(/<button type="button" class="gapbar"[\s\S]*?<\/button>/,'');
   let hi=[];try{hi=p3ULrisks().map(r=>r.k)}catch(e){}NUTS.filter(n=>!n.macro&&n.hi).forEach(n=>{try{if(t[n.k]>nutTarget(n.k,dt).hi*1.0&&!hi.includes(n.k))hi.push(n.k)}catch(e){}});
   const micros=NUTS.filter(n=>!n.macro&&n.lo);let lo=t.microN>=2?micros.map(n=>{const tg=nutTarget(n.k,dt);return {k:n.k,pct:tg.lo?t[n.k]/tg.lo:1}}).filter(x=>x.pct<.6&&!hi.includes(x.k)&&!(x.k==='vitD'&&(p1Sun(k)||0)>=3)).sort((a,b)=>a.pct-b.pct).slice(0,4):[];
   const fib=nutTarget('fibre',dt);if(t.microN>=2&&fib.lo&&t.fibre<fib.lo*.6&&lo.length<4)lo.push({k:'fibre',pct:t.fibre/fib.lo});
   const late=k<iso(todayDate())||new Date().getHours()>=18;const nm=x=>esc((NUTS.find(n=>n.k===x)||{}).l||x);
   if(!hi.length&&!lo.length)return h;
-  const blk=`<div class="p3nw">${hi.length?`<div class="p3nwr hi"><span class="p3nwl">${ico('triangle-alert')} Too high lately</span><div class="p3nwc">${hi.map(x=>`<button type="button" data-nutinfo="${x}">${nm(x)}</button>`).join('')}</div></div>`:''}
-    ${lo.length?`<div class="p3nwr lo"><span class="p3nwl">${ico('trending-down')} ${late?'Worth topping up':'Low so far'}</span><div class="p3nwc">${lo.map(x=>`<button type="button" data-nutinfo="${x.k}">${nm(x.k)} <small class="num">${Math.round(x.pct*100)}%</small></button>`).join('')}</div></div>`:''}</div>`;
+  P3NWS={hi,lo,late};
+  const blk=`<div class="p3nwi">${hi.length?`<button type="button" class="p3nwb hi" data-p3nw aria-label="${hi.length} too high lately">${ico('triangle-alert')}<b class="num">${hi.length}</b><span>high</span></button>`:''}${lo.length?`<button type="button" class="p3nwb lo" data-p3nw aria-label="${lo.length} low so far">${ico('trending-down')}<b class="num">${lo.length}</b><span>low</span></button>`:''}</div>`;
   return blk+h}catch(e){return old(t,dt,k)}}})(microsHTML);
+document.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-p3nw]'))||!P3NWS)return;e.preventDefault();const {hi,lo,late}=P3NWS;const nm=x=>esc((NUTS.find(n=>n.k===x)||{}).l||x);
+  p1Sheet(`<div class="kshead"><div><h2>Worth a look</h2><small class="ds">Tap one for what it does and where to find it</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  ${hi.length?`<section class="p1blk p3nwr hi"><span class="p3nwl">${ico('triangle-alert')} Too high lately</span><div class="p3nwc">${hi.map(x=>`<button type="button" data-nutinfo="${x}">${nm(x)}</button>`).join('')}</div></section>`:''}
+  ${lo.length?`<section class="p1blk p3nwr lo"><span class="p3nwl">${ico('trending-down')} ${late?'Worth topping up':'Low so far today'}</span><div class="p3nwc">${lo.map(x=>`<button type="button" data-nutinfo="${x.k}">${nm(x.k)} <small class="num">${Math.round(x.pct*100)}%</small></button>`).join('')}</div></section>`:''}`)});
 // ---- Plants: links to the learning pages ----
 p3PlantsRowHTML=(function(old){return function(k){return old(k).replace(/<\/div><\/details>$/,`<div class="p3plk"><button type="button" class="linkbtn" data-p3learn="gut">${ico('book-open')} Your gut microbiome ›</button><button type="button" class="linkbtn" data-p3learn="carbs">${ico('book-open')} Carbs are more than bread and pasta ›</button></div></div></details>`)}})(p3PlantsRowHTML);
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3learn]');if(!x)return;e.preventDefault();pView='learn';lv={topic:x.dataset.p3learn,i:0,ans:null};p1Sheet(null);location.hash='reports';render();window.scrollTo({top:0})});
@@ -6820,7 +6825,7 @@ p3L5Sheet=function(){const cur=p3L5Ids();const extra=cur.filter(x=>!P3L5FIX.incl
   <div class="p3l5pick">${P3L5POOL.map(([id,l,ic])=>{const fx=P3L5FIX.includes(id);const on=cur.includes(id);return `<button type="button" ${fx?'disabled':`data-p3l5p="${id}"`} aria-pressed="${on}"><span class="p3l5i">${ico(ic)}</span><b>${esc(l)}</b>${fx?'<small class="ds">Always on</small>':''}<span class="p3l5c">${on?ico('check'):''}</span></button>`}).join('')}</div>
   <p class="ds" style="font-size:12px">${extra.length} of 3 picked. Most tick themselves from what you log; tap the others on Today.</p>`)};
 window.addEventListener('click',async e=>{const x=e.target.closest&&e.target.closest('[data-p3l5p]');if(!x)return;e.stopImmediatePropagation();const id=x.dataset.p3l5p;let ex=p3L5Ids().filter(z=>!P3L5FIX.includes(z));
-  if(ex.includes(id))ex=ex.filter(z=>z!==id);else{if(ex.length>=3){toast('3 is the most. Untick one first.');return}ex.push(id)}
+  if(ex.includes(id))ex=ex.filter(z=>z!==id);else{if(ex.length>=3){const out=ex.shift();const P=z=>(P3L5POOL.find(p=>p[0]===z)||[z,z])[1];toast(`Swapped ${P(out)} for ${P(id)}`)}ex.push(id)}
   await persistMeta('log5',{ids:ex,updatedAt:new Date().toISOString()});p3L5Sheet();render()},true);
 
 (async()=>{
