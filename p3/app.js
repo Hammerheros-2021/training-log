@@ -6270,7 +6270,7 @@ function suppShort(s){if(s.short)return s.short;let n=String(s.name||'').replace
 const P3SE={on:false};
 suppHTML=(function(old){return function(k){let h=old(k);const l=supps();if(!l.length)return h;const t=document.createElement('template');t.innerHTML=h;
   t.content.querySelectorAll('[data-supp]').forEach(b=>{const s=l.find(x=>x.id===b.dataset.supp);if(!s)return;const on=b.classList.contains('on');
-    const q=p3SQ(D()[k]||{},s.id);b.classList.add('p3srow');b.innerHTML=`<span class="p3schk">${on?'✓':''}</span><span class="p3st"><b>${esc(suppShort(s))}</b><small>${esc([s.dose,suppShort(s)!==s.name?s.name:''].filter(Boolean).join(' · '))}</small></span>${on?`<span class="p3sq" data-supqty="${s.id}" role="button" aria-label="How many today: ${q}. Tap to change">×${q}</span>`:''}`});
+    const q=p3SQ(D()[k]||{},s.id);b.classList.add('p3srow');b.innerHTML=`<span class="p3schk">${on?'✓':''}</span><span class="p3st"><b>${esc(suppShort(s))}</b><small>${esc([s.dose,suppShort(s)!==s.name?s.name:''].filter(Boolean).join(' · '))}</small></span>${on?`<span class="p3sqs"><span class="p3sqb" data-supq="${s.id}:-1" role="button" aria-label="Less">−</span><b class="num">×${q}</b><span class="p3sqb" data-supq="${s.id}:1" role="button" aria-label="More">+</span></span>`:''}`});
   const ed=P3SE.on?`<div class="p3sedit">${l.map(s=>`<div class="p3serow"><label><span class="ds">${esc(s.name)}</span><input type="text" data-suprn="${s.id}" value="${esc(suppShort(s))}" maxlength="30"></label><button type="button" class="p3sbin" data-supdel="${s.id}" aria-label="Delete ${esc(suppShort(s))}">${ico('trash')}</button></div>`).join('')}<button type="button" class="ghost" data-supedit>Done</button></div>`:`<button type="button" class="linkbtn" data-supedit style="align-self:flex-start">Edit or delete</button>`;
   const host=t.content.querySelector('.schips');if(host)host.insertAdjacentHTML('afterend',ed);return t.innerHTML}})(suppHTML);
 document.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-supedit]')))return;P3SE.on=!P3SE.on;render()});
@@ -6346,10 +6346,12 @@ mytPlanCard=(function(old){return function(){if(tView==='route')return '';return
 
 if(!ICO.trash)ICO.trash='<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>';
 // supplements: how many today (×1, ×2, ×3), and delete from Edit
-function p3SQ(d,id){const q=d&&d.suppQty&&d.suppQty[id];return q>=1?+q:1}
+function p3SQ(d,id){const q=d&&d.suppQty&&d.suppQty[id];return q>=0.5?+q:1}
+function p3SStep(s){const t=`${s&&s.name||''} ${s&&s.dose||''}`.toLowerCase();if(/capsule|caps\b|tablet|tab\b|softgel|pill|gummy|gummies/.test(t))return 1;return 0.5}
 suppItems=(function(old){return function(d){const out=old.apply(this,arguments);if(!d||!d.suppQty)return out;const l=supps().filter(s=>d.date<=iso(todayDate())&&p3Took(d,s));
   return out.map((it,i)=>{const s=l[i];const q=s?p3SQ(d,s.id):1;if(q===1)return it;const o={...it,name:`${it.name} ×${q}`};Object.keys(o).forEach(k=>{if(k!=='name'&&isNum(o[k]))o[k]=+o[k]*q});return o})}})(suppItems);
 document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-supq]')){e.preventDefault();e.stopImmediatePropagation();const k=iso(sel);const d=D()[k]||{};const [id,dir]=x.dataset.supq.split(':');const sp=supps().find(z=>z.id===id);const st=p3SStep(sp);const q=Math.max(st,Math.min(6,Math.round((p3SQ(d,id)+st*(+dir))*2)/2));const sq={...(d.suppQty||{}),[id]:q};if(q===1)delete sq[id];await persistDay(k,{suppQty:sq});render();return}
   if(x=c('[data-supqty]')){e.preventDefault();e.stopImmediatePropagation();const k=iso(sel);const d=D()[k]||{};const id=x.dataset.supqty;const q=p3SQ(d,id)%3+1;const sq={...(d.suppQty||{}),[id]:q};if(q===1)delete sq[id];await persistDay(k,{suppQty:sq});render();return}
   if(x=c('[data-supdel]')){e.preventDefault();e.stopImmediatePropagation();const id=x.dataset.supdel;if(x.dataset.sure!=='1'){x.dataset.sure='1';x.classList.add('armed');x.innerHTML='Delete?';return}
     const l=supps().filter(s=>String(s.id)!==String(id));if(await persistMeta('supps',{...(meta.supps||{}),list:l}))toast('Supplement deleted');render()}},true);
