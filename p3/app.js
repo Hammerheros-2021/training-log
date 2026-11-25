@@ -1169,7 +1169,7 @@ function microsHTML(t,dt,k){
   <details class="wu" style="margin:0 16px 12px"><summary>All vitamins &amp; minerals · ${t.n||suppItems(d).length?`${ok} of ${all.length} on target`:'none logged'}</summary><div class="macs" style="padding:4px 0 12px">${all.map(n=>nutBar(n,t[n.k],nutTarget(n.k,dt))).join('')}${t.n&&t.microN<t.n?`<div class="hint" style="font-size:12px;color:var(--muted)">${t.n-t.microN} item${t.n-t.microN>1?'s have':' has'} calories and macros only, so these may read low.</div>`:''}</div></details>`;
 }
 function drinksHTML(k){
-  const d=D()[k]||{};const w=+d.water||0;const tgt=WATER[1]||3;const pct=Math.min(100,w/tgt*100);const today=k===iso(todayDate());const can=!sampleMode&&k<=iso(todayDate());
+  const d=D()[k]||{};const w=p3Fluid(d).t;const tgt=WATER[1]||3;const pct=Math.min(100,w/tgt*100);const today=k===iso(todayDate());const can=!sampleMode&&k<=iso(todayDate());
   const wk=alcWeek(k),lim=alcLimit();const alcToday=(d.food||[]).filter(x=>stdDrinks(x)>0);
   const water=`<div class="wrow"><span class="wico" aria-hidden="true">💧</span><div class="wbar"><div class="wh"><b>Water</b><span class="num">${Math.round(w*100)/100} of ${WATER[0]}-${WATER[1]} L</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:var(--h)"></div></div></div></div>
     ${can?`<div class="wbtns">${[[.25,'+ Glass'],[.5,'+ 500 ml'],[.75,'+ Bottle']].map(([v,l])=>`<button type="button" class="ghost" data-water="${v}">${l}</button>`).join('')}${w>0?`<button type="button" class="ghost" data-water="-0.25" aria-label="Take off a glass">−</button>`:''}</div>`:''}`;
@@ -1247,7 +1247,7 @@ document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.clos
 });
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='spPhoto'&&e.target.files&&e.target.files[0])addSupp('',e.target.files[0])});
 
-function waterHTML(k){const d=D()[k]||{};const w=+d.water||0;const tgt=WATER[1]||3;const pct=Math.min(100,w/tgt*100);const can=!sampleMode&&k<=iso(todayDate());
+function waterHTML(k){const d=D()[k]||{};const w=p3Fluid(d).t;const tgt=WATER[1]||3;const pct=Math.min(100,w/tgt*100);const can=!sampleMode&&k<=iso(todayDate());
   return `<div class="wline"><span class="wico" aria-hidden="true">💧</span><div class="wbar"><div class="wh"><b>Water</b><span class="num">${Math.round(w*100)/100} of ${WATER[0]}-${WATER[1]} L</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:var(--h)"></div></div></div>${can?`<div class="wbtns">${[[.25,'Glass'],[.5,'500 ml'],[.75,'Bottle']].map(([v,l])=>`<button type="button" data-water="${v}">+ ${l}</button>`).join('')}${w>0?`<button type="button" data-water="-0.25" aria-label="Take off a glass">−</button>`:''}</div>`:''}</div>`}
 let gapOpen=false;
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);if(c('#stripTog')){stripOpen=!stripOpen;render();return}if(c('#gapTog')){gapOpen=!gapOpen;render();return}});
@@ -1315,7 +1315,7 @@ function sessChip(k){if(sampleMode||tView!=='today')return '';const p=planFor(pa
 let signOpen=false;
 function signSheetHTML(){const k=iso(sel),d=D()[k]||{};const food=d.food||[];const t=foodTotals(d);const dt=dayTypeFor(k);const kt=nutTarget('kcal',dt),pt=nutTarget('protein',dt);
   const meals=MEALS.map(m=>{const its=food.filter(i=>i.meal===m);return its.length?`<li><b>${m}</b> ${its.length} item${its.length>1?'s':''} · ${its.reduce((a,i)=>a+kcalOf(i),0)} kcal</li>`:`<li class="miss"><b>${m}</b> nothing logged</li>`}).join('');
-  const w=+d.water||0;const sup=supps().filter(s=>p3Took(d,s)).length;
+  const w=p3Fluid(d).t;const sup=supps().filter(s=>p3Took(d,s)).length;
   const flags=[];if(!food.length)flags.push('No food logged yet.');if(w<WATER[0])flags.push(`Water is ${w} L, under ${WATER[0]} L.`);if(!ciDone(d))flags.push('No check-in today.');
   return `<div class="cfwrap" id="signWrap"><div class="cfsheet" role="dialog" aria-label="Sign off the day"><h2>Sign off ${k===iso(todayDate())?'today':fmtD(parse(k))}?</h2><p class="ds">Check it over. You can still change things after.</p>
     <ul class="cfl">${meals}<li><b>Total</b> ${Math.round(t.kcal)} of ${Math.round(kt.t||kt.lo||0)} kcal · ${Math.round(t.protein)} of ${Math.round(pt.t||pt.lo||0)} g protein</li><li><b>Water</b> ${w} L</li>${supps().length?`<li><b>Supplements</b> ${sup} of ${supps().length} taken</li>`:''}</ul>
@@ -2213,7 +2213,7 @@ function p1WaterTarget(){const k=iso(todayDate()),d=D()[k]||{};let lo=WATER[0];c
   if((d.blocks||[]).some(b=>b.phys==='hard')){lo+=.5;why.push('hard physical work')}
   const p=planFor(parse(k));if((p&&p.type!=='R'&&!p.pre)||(d.extras||[]).length){lo+=.5;why.push('training')}
   return {lo:Math.min(lo,5),why}}
-function p1WaterOpen(){const k=iso(todayDate());const d=D()[k]||{};const w=+d.water||0;const tg=p1WaterTarget();
+function p1WaterOpen(){const k=iso(todayDate());const d=D()[k]||{};const w=p3Fluid(d).t;const tg=p1WaterTarget();
   p1Sheet(`<div class="kshead"><div><h2>Hydration</h2><small class="ds">Today</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
     <div class="p1wbig"><b class="num">${Math.round(w*100)/100}</b><span>of about ${tg.lo} L</span></div>${p1Bar('hyd',w/tg.lo*100,'var(--k-sky)')}
     <div class="p1wbtns">${[[.25,'Glass','glass-water'],[.5,'500 ml','cup-soda'],[.75,'Bottle','milk'],[1,'1 litre','droplets']].map(([v,l,ic])=>`<button type="button" data-p1w="${v}">${ico(ic)}<b>+ ${l}</b></button>`).join('')}</div>
@@ -2224,7 +2224,7 @@ document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.targe
   if(x=c('[data-p1w]')){const k=iso(todayDate());const d=D()[k]||{};const w=Math.max(0,Math.round(((+d.water||0)+(+x.dataset.p1w))*100)/100);days[k]={...(days[k]||{date:k}),water:w};p1WaterOpen();render();persistDay(k,{water:w});return}
 },true);
 function p1Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);const yd=D()[iso(addD(todayDate(),-1))]||{};const dayDone=!!((yd.blocks||[]).length||(d.blocks||[]).length);
-  const w=+d.water||0,tg=p1WaterTarget();const fd=(d.food||[]).length;
+  const w=p3Fluid(d).t,tg=p1WaterTarget();const fd=(d.food||[]).length;
   const t=(id,icon,name,sub,done)=>`<button type="button" class="p1tile${done?' done':''}" data-p1tile="${id}"><span class="p1ti">${ico(done?'check':icon)}</span><b>${name}</b><small>${sub}</small></button>`;
   return `<section class="p1tiles"><h3 class="p1th">Add something</h3><div class="p1grid">
     ${t('ci','sun','Check in',ci?'Done today':'Sleep and how you feel',ci)}${t('food','utensils','Log food',fd?`${fd} item${fd>1?'s':''} so far`:'Snap, say or type',false)}
@@ -2400,7 +2400,7 @@ function p1CofItem(){const c=COFFEE.find(x=>x[0]===P1C.type);if(!c)return null;c
   const it={name:`${sz[0]} ${c[1].toLowerCase()}${milk!=='none'?` with ${mm[0].toLowerCase()}`:''}${P1C.sugar?`, ${P1C.sugar} sugar`:''}`,qty:'1 cup',src:'coffee',est:true,micros:false,plants:[]};
   NK.forEach(k=>it[k]=0);it.kcal=Math.round(c[4]+mm[1]*ml/100+16*P1C.sugar);it.protein=Math.round(mm[2]*ml/10)/10;it.carbs=Math.round((c[5]+mm[3]*ml/100+4*P1C.sugar)*10)/10;it.fat=Math.round(mm[4]*ml/10)/10;it.calcium=Math.round(mm[5]*ml/100);it.caffeine=Math.round(c[2]*(/espresso|tea|green|instant|americano|decaf|herbal/.test(c[0])&&P1C.size==='l'?1.3:sz[2]));return it}
 function p1CafToday(k){const d=D()[k]||{};const its=(d.food||[]).map((x,ix)=>({...x,ix})).filter(x=>(+x.caffeine||0)>0||x.src==='coffee');const tot=its.reduce((a,x)=>a+(+x.caffeine||0),0);const last=its.filter(x=>x.at&&(+x.caffeine||0)>=20).map(x=>x.at).sort().pop()||null;return {its,tot,last}}
-function p1DrinksDraw(){const k=iso(todayDate());const d=D()[k]||{};const w=+d.water||0;const tg=p1WaterTarget();const cf=p1CafToday(k);const it=p1CofItem();
+function p1DrinksDraw(){const k=iso(todayDate());const d=D()[k]||{};const w=p3Fluid(d).t;const tg=p1WaterTarget();const cf=p1CafToday(k);const it=p1CofItem();
   const c=COFFEE.find(x=>x[0]===P1C.type);const noMilk=c&&/energy|espresso|herbal|green/.test(c[0]);const wk=alcWeek(k),lim=alcLimit();
   p1Sheet(`<div class="kshead"><div><h2>Drinks</h2><small class="ds">Today</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
     <section class="p1blk"><h3>${ico('droplet')} Water</h3><div class="p1wbig"><b class="num">${Math.round(w*100)/100}</b><span>of about ${tg.lo} L</span></div>${p1Bar('hyd',w/tg.lo*100,'var(--k-sky)')}
@@ -2992,7 +2992,7 @@ function p2SleepCard(k){if(sampleMode)return '';const S=p2Sleep(k);const cw=S.co
       <p class="p2tip"><b>Tonight:</b> start winding down at ${S.wind}, lights out by ${S.bed}${S.why.length?`, a bit earlier because ${S.why.join(' and ')}`:''}. ${tip}</p></div></details>`}
 
 // ---------- habits and streaks ----------
-const P2HABITS=[['checkin','Check in','circle-check',k=>!!readiness(D()[k])],['water','Water target','droplet',k=>(+(D()[k]||{}).water||0)>=p1WaterTarget().lo],['bed','Bed on time','moon',k=>{const d=D()[k]||{};const b=bedMin(d.bed);const t=bedMin(p2Sleep(iso(addD(parse(k),-1))).bed);return b!=null&&t!=null&&b<=t+15}],['phone','Phone away early','moon',k=>{const g=screenGap(D()[k]);return g!=null&&g>=45}],
+const P2HABITS=[['checkin','Check in','circle-check',k=>!!readiness(D()[k])],['water','Water target','droplet',k=>p3Fluid(D()[k]).t>=p1WaterTarget().lo],['bed','Bed on time','moon',k=>{const d=D()[k]||{};const b=bedMin(d.bed);const t=bedMin(p2Sleep(iso(addD(parse(k),-1))).bed);return b!=null&&t!=null&&b<=t+15}],['phone','Phone away early','moon',k=>{const g=screenGap(D()[k]);return g!=null&&g>=45}],
   ['veg','5 portions of veg and fruit','leaf',null],['walk','A walk outside','footprints',null],['stretch','Stretch or loosen-out','person-standing',null],['steps','10,000 steps','footprints',null],['read','Read before bed','book-open',null],['nodrink','Alcohol-free day','glass-water',k=>!(D()[k]||{}).food||!(D()[k].food||[]).some(x=>stdDrinks(x)>0)]];
 const myHabits=()=>((meta.habits&&meta.habits.list)||['checkin','water','bed','walk']).filter(id=>P2HABITS.some(h=>h[0]===id));
 function habDone(id,k){const h=P2HABITS.find(x=>x[0]===id);if(!h)return false;const d=D()[k]||{};if((d.hab||[]).includes(id))return true;return h[3]?!!h[3](k):false}
@@ -3550,7 +3550,7 @@ p3ApplyLook();
 p3LookHTML=function(){const v=p3LookPref();return `<section class="card p3look"><h3>Appearance</h3><div class="p3lk">${P3LOOKS.map(([id,n,d])=>`<button type="button" data-p3look="${id}" aria-pressed="${v===id}"><span class="p3sw p3sw-${id}" aria-hidden="true"></span><b>${n}</b><small>${d}</small></button>`).join('')}</div></section>`};
 // Today: compact tiles in one row; My day lives in the check-in
 p3Today=function(k,s){return p1Top()+p3Koach(k)+injuryBanner()+p3Rings(k,s)+p3Tiles()+p2Habits(k)};
-function p3Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);const w=+d.water||0;let lo=2.5;try{lo=p1WaterTarget().lo}catch(e){}const fd=(d.food||[]).length;
+function p3Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);const w=p3Fluid(d).t;let lo=2.5;try{lo=p1WaterTarget().lo}catch(e){}const fd=(d.food||[]).length;
   const t=(id,icon,name,done,sub)=>`<button type="button" class="p1tile p3tile${done?' done':''}" data-p1tile="${id}"><span class="p1ti">${ico(done?'check':icon)}</span><b>${name}</b><small>${sub||'&nbsp;'}</small></button>`;
   return `<section class="p3tiles" aria-label="Add">${t('ci','sun','Check in',ci,ci?'Done':'')}${t('food','utensils','Food',false,fd?fd+' logged':'')}${t('water','coffee','Drinks',w>=lo,w?(Math.round(w*10)/10)+' L':'')}${t('move','footprints','Session',false,'')}${t('rec','wind','Recover',false,'')}</section>`}
 const _p3CiDraw=p1CiDraw;p1CiDraw=function(){_p3CiDraw();const host=document.querySelector('#p1Host .ksheet');if(!host||host.querySelector('.p3myday'))return;const yd=D()[iso(addD(parse((P1.ci&&P1.ci.k)||iso(todayDate())),-1))]||{};const done=!!(yd.blocks||[]).length;
@@ -3635,14 +3635,14 @@ const _p3PN=planNav;planNav=function(cur){return _p3PN(cur).replace('Your weeks'
 function p3PatCards(){const DD=D(),now=todayDate();const day=i=>DD[iso(addD(now,-i))];
   const wk=off=>{const a=[];for(let i=off;i<off+7;i++)a.push(day(i));return a};
   const mean=(arr,f)=>{const v=arr.map(x=>{try{return x?f(x):null}catch(e){return null}}).filter(v=>v!=null&&!isNaN(v));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
-  const M=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h',1],['Balance',d=>readiness(d),v=>Math.round(v),1],['Protein',d=>(d.food||[]).length?foodTotals(d).protein:null,v=>Math.round(v)+' g',1],['Water',d=>+d.water||null,v=>v.toFixed(1)+' L',1]];
+  const M=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h',1],['Balance',d=>readiness(d),v=>Math.round(v),1],['Protein',d=>(d.food||[]).length?foodTotals(d).protein:null,v=>Math.round(v)+' g',1],['Water',d=>p3Fluid(d).t||null,v=>v.toFixed(1)+' L',1]];
   const w0=wk(0),w1=wk(7);const rows=M.map(([n,f,fmt])=>{const a=mean(w0,f),b=mean(w1,f);if(a==null)return '';const ch=b!=null&&b!==0?(a-b)/Math.abs(b):null;
     return `<div class="p3cmp"><small>${n}</small><b>${fmt(a)}</b><span class="${ch==null?'':ch>0.03?'up':ch<-0.03?'down':''}">${ch==null?'new':ch>0.03?'▲ '+Math.round(ch*100)+'%':ch<-0.03?'▼ '+Math.round(-ch*100)+'%':'steady'}</span></div>`}).join('');
   const all=[];for(let i=0;i<56;i++){const d=day(i);if(d&&readiness(d)!=null)all.push(d)}let best='';
   if(all.length>=10){const s=[...all].sort((a,b)=>readiness(b)-readiness(a));const q=Math.max(3,Math.floor(s.length/4));const top=s.slice(0,q),bot=s.slice(-q);
     const bits=[];const sl=[mean(top,d=>sleepHours(d)),mean(bot,d=>sleepHours(d))];if(sl[0]!=null&&sl[1]!=null&&sl[0]-sl[1]>=.3)bits.push(`slept <b>${sl[0].toFixed(1)} h</b> (vs ${sl[1].toFixed(1)})`);
     const bm=[mean(top,d=>bedMin(d.bed)),mean(bot,d=>bedMin(d.bed))];if(bm[0]!=null&&bm[1]!=null&&bm[1]-bm[0]>=20)bits.push(`were in bed by <b>${fmtT(Math.round(bm[0])%1440)}</b> (vs ${fmtT(Math.round(bm[1])%1440)})`);
-    const wa=[mean(top,d=>+d.water||null),mean(bot,d=>+d.water||null)];if(wa[0]!=null&&wa[1]!=null&&wa[0]-wa[1]>=.3)bits.push(`drank <b>${wa[0].toFixed(1)} L</b> of water (vs ${wa[1].toFixed(1)})`);
+    const wa=[mean(top,d=>p3Fluid(d).t||null),mean(bot,d=>p3Fluid(d).t||null)];if(wa[0]!=null&&wa[1]!=null&&wa[0]-wa[1]>=.3)bits.push(`drank <b>${wa[0].toFixed(1)} L</b> of water (vs ${wa[1].toFixed(1)})`);
     best=`<article class="card p3best"><div class="chead"><div style="flex:1"><h2>Your best days</h2><div class="sub">Your top ${q} balance days against your lowest ${q}</div></div></div><p class="p3bp">${bits.length?'On your best days you '+bits.join(', ')+'.':'Your best and worst days look alike on sleep, bedtime and water. Keep logging and it will sharpen.'}</p></article>`}
   return (rows?`<article class="card p3wk"><div class="chead"><div style="flex:1"><h2>This week vs last</h2><div class="sub">Daily averages</div></div></div><div class="p3cmps">${rows}</div></article>`:'')+best}
 const _p3PV=p1PatternsView;p1PatternsView=function(){const h=_p3PV();const i=h.indexOf('</article>');return i<0?h+p3PatCards():h.slice(0,i+10)+p3PatCards()+h.slice(i+10)};
@@ -3740,7 +3740,7 @@ async function checkPlanJob(){
   if(pState.busy&&!fresh){pState={...pState,busy:false,msg:P3PART?'Only part of the plan came back. Tap Re-plan to fill the rest.':'Planning took too long. Tap Re-plan to try again.'};P3PART=false;render()}
   return 'idle'}
 // Today: four rings that are also the buttons (Balance, Sleep, Food, Drinks), then Check in, Session, Recover. Habits stay in their own card.
-p3Rings=function(k,s){const d=D()[k]||{};const dt=dayTypeFor(k),ft=foodTotals(d),kt=nutTarget('kcal',dt).t||1;const sh=sleepHours(d),need=sleepNeed(k);const w=+d.water||0;let lo=2.5;try{lo=p1WaterTarget().lo}catch(e){}
+p3Rings=function(k,s){const d=D()[k]||{};const dt=dayTypeFor(k),ft=foodTotals(d),kt=nutTarget('kcal',dt).t||1;const sh=sleepHours(d),need=sleepNeed(k);const w=p3Fluid(d).t;let lo=2.5;try{lo=p1WaterTarget().lo}catch(e){}
   const R=(id,val,max,txt,lab,plus)=>`<button type="button" class="p3ring" data-p3ring="${id}">${ring(val,max,72,4,'fade',txt,'')}<span>${lab}${plus?' <i class="p3plus">+</i>':''}</span></button>`;
   return `<section class="p3rings" aria-label="Your day">${R('balance',s,100,s!=null?Math.round(s):'–','Balance')}${R('sleep',sh,need,sh!=null?sh+'h':'–','Sleep')}${R('food',Math.round(ft.kcal),kt,(ft.kcal?Math.round(ft.kcal/kt*100):0)+'%','Food',1)}${R('drinks',w,lo,w?(Math.round(w*10)/10)+'L':'0L','Drinks',1)}</section>`};
 p3Tiles=function(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);
@@ -3762,7 +3762,7 @@ function p3HRCard(){const now=todayDate();const vals=[];for(let i=13;i>=0;i--)va
 p3PatCards=(function(old){return function(){const h=old();return h.replace(/<article class="card p3best">[\s\S]*?<\/article>/,()=>{const DD=D(),now=todayDate();const all=[];for(let i=0;i<56;i++){const d=DD[iso(addD(now,-i))];if(d&&readiness(d)!=null)all.push(d)}
   if(all.length<10)return '';const s=[...all].sort((a,b)=>readiness(b)-readiness(a));const q=Math.max(3,Math.floor(s.length/4));const top=s.slice(0,q),bot=s.slice(-q);
   const mean=(arr,f)=>{const v=arr.map(x=>{try{return f(x)}catch(e){return null}}).filter(v=>v!=null&&!isNaN(v));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};
-  const rows=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h'],['In bed by',d=>bedMin(d.bed),v=>fmtT(Math.round(v)%1440)],['Water',d=>+d.water||null,v=>v.toFixed(1)+' L']].map(([n,f,fm])=>{const a=mean(top,f),b=mean(bot,f);return a==null||b==null?'':`<div class="p3bd"><small>${n}</small><b>${fm(a)}</b><span>${fm(b)}</span></div>`}).join('');
+  const rows=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h'],['In bed by',d=>bedMin(d.bed),v=>fmtT(Math.round(v)%1440)],['Water',d=>p3Fluid(d).t||null,v=>v.toFixed(1)+' L']].map(([n,f,fm])=>{const a=mean(top,f),b=mean(bot,f);return a==null||b==null?'':`<div class="p3bd"><small>${n}</small><b>${fm(a)}</b><span>${fm(b)}</span></div>`}).join('');
   return rows?`<article class="card p3best"><div class="chead"><div style="flex:1"><h2>Your best days</h2></div></div><div class="p3bdh"><small></small><small>Best days</small><small>Worst days</small></div>${rows}</article>`:''})}})(p3PatCards);
 // Learn and Recover: groups fold
 p3RecFold=(function(old){return function(){const t=tab();if(t==='reports'&&typeof pView!=='undefined'&&pView==='learn'){const save=location.hash;document.querySelectorAll('#app .rcat:not(.p3rf)').forEach(r=>{const h=r.querySelector('h3'),l=r.querySelector('.rprogs');if(!h||!l)return;const name=h.textContent.trim();const n=l.children.length;const d=document.createElement('details');d.className='rcat p3rf';d.style.cssText=r.style.cssText;if(P3RO.has('L'+name))d.open=true;d.addEventListener('toggle',()=>{if(d.open)P3RO.add('L'+name);else P3RO.delete('L'+name)});d.innerHTML=`<summary><h3>${esc(name)}</h3><small>${n} to read</small></summary>`;d.appendChild(l);r.replaceWith(d)});return}return old()}})(p3RecFold);
@@ -3780,7 +3780,7 @@ p3StarRow=(function(old){return function(v,max,w){return old(v,max,w).replace(/^
 p3PatCards=(function(old){return function(){const h=old();return h.replace(/<article class="card p3best">[\s\S]*?<\/article>/,()=>{const DD=D(),now=todayDate();const all=[];for(let i=1;i<=84;i++){const d=DD[iso(addD(now,-i))];if(d&&readiness(d)!=null)all.push(d)}
   if(all.length<21)return '';const s=[...all].sort((a,b)=>readiness(b)-readiness(a));const q=Math.floor(s.length/3);const top=s.slice(0,q),bot=s.slice(-q);
   const mean=(arr,f)=>{const v=arr.map(x=>{try{return f(x)}catch(e){return null}}).filter(v=>v!=null&&!isNaN(v));return v.length>=5?v.reduce((a,b)=>a+b,0)/v.length:null};
-  const rows=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h',.4],['In bed by',d=>bedMin(d.bed),v=>fmtT(Math.round(v)%1440),25],['Water',d=>+d.water||null,v=>v.toFixed(1)+' L',.4]].map(([n,f,fm,min])=>{const a=mean(top,f),b=mean(bot,f);return a==null||b==null||Math.abs(a-b)<min?'':`<div class="p3bd"><small>${n}</small><b>${fm(a)}</b><span>${fm(b)}</span></div>`}).join('');
+  const rows=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h',.4],['In bed by',d=>bedMin(d.bed),v=>fmtT(Math.round(v)%1440),25],['Water',d=>p3Fluid(d).t||null,v=>v.toFixed(1)+' L',.4]].map(([n,f,fm,min])=>{const a=mean(top,f),b=mean(bot,f);return a==null||b==null||Math.abs(a-b)<min?'':`<div class="p3bd"><small>${n}</small><b>${fm(a)}</b><span>${fm(b)}</span></div>`}).join('');
   return rows?`<article class="card p3best"><div class="chead"><div style="flex:1"><h2>Your best days</h2></div></div><div class="p3bdh"><small></small><small>Best days</small><small>Low days</small></div>${rows}</article>`:''})}})(p3PatCards);
 // Real food photos as placeholders (TheMealDB), drawn plate until the photo loads
 const P3PH=(()=>{try{return JSON.parse(localStorage.getItem('p3photos')||'{}')}catch(e){return {}}})();
@@ -4349,7 +4349,7 @@ p1NutInfo=(function(old){return function(k){old(k);const host=document.querySele
   const html=`<section class="p1blk p3src14"><h3>What's behind it (last 2 weeks)</h3><p style="margin:0 0 8px">${verdict}</p>${top.map(z=>`<div class="p3srcR"><span>${esc(z.nm)}${z.sup?' <i>supplement</i>':''}</span><b>${z.days} of ${x.od} days · ${f(z.tot/z.days)} ${n.u}</b><em style="width:${Math.max(4,Math.round(z.tot/x.rows.reduce((a,q)=>a+q.tot,0)*100))}%"></em></div>`).join('')}<p class="ds" style="margin:6px 0 0;font-size:12px">Amounts are per day it was eaten or taken${u.supp?'. The limit for this one only counts supplements':''}.</p></section>`;
   const a=host.querySelector('.p3ul')||host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',html)}})(p1NutInfo);
 // ================= P3: Today reorganised; 5 stars = 5 things you log =================
-function p3Log5(k){const d=D()[k]||{};const meals=new Set((d.food||[]).map(i=>i.meal).filter(m=>m&&m!=='Snack'));const w=+d.water||0;let wt=2;try{wt=p1WaterTarget().lo||2}catch(e){}
+function p3Log5(k){const d=D()[k]||{};const meals=new Set((d.food||[]).map(i=>i.meal).filter(m=>m&&m!=='Snack'));const w=p3Fluid(d).t;let wt=2;try{wt=p1WaterTarget().lo||2}catch(e){}
   return [{id:'ci',l:'Check in',ic:'sun',done:!!(d.sleepQ||d.energy||d.bed),a:'data-p1tile="ci"'},
    {id:'food',l:meals.size>=2?'Meals':'2+ meals',ic:'utensils',done:meals.size>=2,a:'data-p3ring="food"'},
    {id:'water',l:'Water',ic:'droplet',done:w>=wt,a:'data-p3ring="drinks"'},
@@ -6380,6 +6380,54 @@ function p3TeamPlanSync(){if(sampleMode||!sb||!UID)return;if(TEAM.list==null){if
   const cur=meta.teamplan?JSON.stringify({days:meta.teamplan.days,changes:meta.teamplan.changes,koach:meta.teamplan.koach,koachDay:meta.teamplan.koachDay}):'';P3TP.last=js;if(cur===js)return;
   persistMeta('teamplan',{...dg,at:new Date().toISOString()})}
 render=(function(old){return function(){old.apply(this,arguments);clearTimeout(P3TP.t);P3TP.t=setTimeout(()=>{try{p3TeamPlanSync()}catch(e){}},4000)}})(render);
+
+// ================= P3 (25 Nov): drinks and food are one list. Log in either, counted once =================
+const P3DRK=/coffee|latte|cappuccino|flat white|americano|\btea\b|mocha|espresso|macchiato|cortado|hot chocolate|cocoa|juice|smoothie|\bmilk\b|kefir|shake|cola|coke|\bsoda\b|squash|cordial|kombucha|energy drink|lucozade|isotonic|electrolyte|\bwater\b|beer|lager|stout|\bpint\b|wine|cider|whiske?y|\bgin\b|vodka|\brum\b|prosecco|cocktail/i;
+const P3DRKNOT=/porridge|oats|cereal|muesli|granola|sauce|curry|cake|biscuit|bread|pudding|ice cream|yog|pancake|rice|chia|overnight/i;
+const P3ALC=/beer|lager|stout|\bpint\b|wine|cider|whiske?y|\bgin\b|vodka|\brum\b|prosecco|cocktail/i;
+function p3IsDrink(it){if(!it)return false;if(it.src==='coffee'||it.src==='alcohol'||it.drink)return true;const n=String(it.name||'');if(P3DRKNOT.test(n))return false;return P3DRK.test(n)}
+function p3IsAlc(it){return !!it&&(it.src==='alcohol'||(+it.sd||0)>0||P3ALC.test(it.name||''))}
+function p3DrinkMl(it){const s=`${it.qty||''} ${it.name||''}`.toLowerCase();const m=s.match(/(\d+(?:\.\d+)?)\s*ml\b/);const l=s.match(/(\d+(?:\.\d+)?)\s*(l|litre|liter)s?\b/);
+  const c=String(it.qty||'').toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(x\b|cups?|mugs?|glass(?:es)?|pints?|cans?|bottles?|shots?)/);const n=c?+c[1]:1;
+  if(m)return Math.round(+m[1]);if(l)return Math.round(+l[1]*1000);
+  const ml=/espresso/.test(s)?(/double/.test(s)?60:30):/\bpint/.test(s)?568:/\bcan\b|cans\b/.test(s)?330:/bottle/.test(s)?500:/wine|prosecco/.test(s)?175:/\bshot|whiske?y|\bgin\b|vodka|\brum\b/.test(s)?35:/\bmug/.test(s)?300:/glass/.test(s)?200:/coffee|latte|cappuccino|flat white|americano|\btea\b|mocha|chocolate|macchiato|cortado/.test(s)?(/small/.test(s)?180:/large/.test(s)?350:250):250;
+  return Math.round(ml*n)}
+// total drinks for the day: water + every non-alcoholic drink logged anywhere (alcohol is listed but not counted as fluid)
+function p3Fluid(d){d=d||{};const w=+d.water||0;let o=0;(d.food||[]).forEach(it=>{if(p3IsDrink(it)&&!p3IsAlc(it)&&!/\bwater\b/i.test(it.name||''))o+=p3DrinkMl(it)*((+it.pct||100)/100)});
+  return {w,o:Math.round(o)/1000,t:Math.round((w+o/1000)*100)/100}}
+const P3DBASE=['espresso','americano','flat white','latte','cappuccino','mocha','macchiato','cortado','green tea','herbal','hot chocolate','decaf','energy','tea','coffee'];
+function p3Base(n){n=String(n||'').toLowerCase();const b=P3DBASE.find(x=>n.includes(x));if(b)return b;return p3IsDrink({name:n})?n.replace(/^(\d+\s*)?(small|medium|large|single|double)\s+/,'').split(/ with |,|\(/)[0].trim():null}
+function p3DupOf(k,it){if(!it||p3IsAlc(it))return null;const b=p3Base(it.name);if(!b)return null;const at=it.at?p1Min(it.at):null;
+  return ((D()[k]||{}).food||[]).find(x=>p3IsDrink(x)&&!p3IsAlc(x)&&p3Base(x.name)===b&&(at!=null&&x.at?Math.abs(p1Min(x.at)-at)<=45:!!(x.meal&&it.meal&&x.meal===it.meal)))||null}
+let P3DC={key:null,t:0},P3SKIP=false;
+function p3DupGate(k,it){const d=p3DupOf(k,it);if(!d)return true;const key=p3Base(it.name)+'|'+k+'|'+(d.at||'');
+  if(P3DC.key===key&&Date.now()-P3DC.t<8000){P3DC={key:null,t:0};return true}
+  P3DC={key,t:Date.now()};toast(`You already have ${String(d.name).toLowerCase()} at ${d.at||d.meal}. Tap again to add a second one.`,4500);return false}
+// logging from the Drinks sheet: check the food list first (window capture runs before the sheet's own handlers)
+window.addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('#cofLog,[data-p3us]');if(!t||!document.getElementById('p1Host'))return;const k=iso(todayDate());let it;
+  if(t.id==='cofLog'){it=p1CofItem();if(!it)return;it.at=P1C.at||p1Now()}else{const x=P3US[+t.dataset.p3us];if(!x)return;it={...x,at:P1C.at||p1Now()}}
+  it.meal=p1MealFor(it.at);if(!p3DupGate(k,it)){e.stopImmediatePropagation();e.preventDefault();return}P3SKIP=true;setTimeout(()=>{P3SKIP=false},1500)},true);
+// logging from Food: a coffee or tea already logged in Drinks at about the same time isn't added again
+addFood=(function(old){return async function(items,k){k=k||iso(sel);if(P3SKIP){P3SKIP=false;return old.call(this,items,k)}
+  const keep=[],skip=[];(items||[]).forEach(it=>{const m=it.meal||(it.at?p1MealFor(it.at):null);const d=p3IsDrink(it)?p3DupOf(k,{...it,meal:m}):null;if(d&&d.src==='coffee'&&!skip.some(s=>s[1]===d))skip.push([it,d]);else keep.push(it)});
+  if(skip.length)toast(`${skip.map(([,d])=>`${d.name} at ${d.at||d.meal}`).join(', ')} ${skip.length>1?'are':'is'} already in your drinks, so ${skip.length>1?'they weren\'t':'it wasn\'t'} added twice.`,5500);
+  if(!keep.length){render();return}return old.call(this,keep,k)}})(addFood);
+// the Drinks sheet lists every drink in the food log, and the water figure is the day's total
+p1CafToday=(function(old){return function(k){const r=old(k);const d=D()[k]||{};r.its=(d.food||[]).map((x,ix)=>({...x,ix})).filter(x=>p3IsDrink(x)&&!p3IsAlc(x));return r}})(p1CafToday);
+p1DrinksDraw=(function(old){return function(){old();const host=document.querySelector('#p1Host .ksheet');if(!host)return;const k=iso(todayDate());const f=p3Fluid(D()[k]);
+  const wb=host.querySelector('.p1wbig');if(wb&&!host.querySelector('.p3fsplit'))wb.insertAdjacentHTML('afterend',`<div class="p3fsplit ds"><span>${ico('droplet')} Water <b class="num">${Math.round(f.w*100)/100} L</b></span><span>${ico('coffee')} Other drinks <b class="num">${f.o} L</b></span></div>`);
+  if(!(f.w>0)){const tk=host.querySelector('[data-p1w="-0.25"]');if(tk)tk.remove()}const sp=wb&&wb.querySelector('span');if(sp&&!/total/.test(sp.textContent))sp.textContent=sp.textContent.replace(/^of/,'L in total, of');
+  const box=host.querySelector('.p1caf');if(box&&!box.querySelector('.p3once'))box.insertAdjacentHTML('beforeend',`<p class="p3once ds">${ico('check')} These are in your Food log too. Calories and caffeine count once.</p>`);
+  const hd=host.querySelector('.p1cafh');if(hd&&!/drink/.test(hd.textContent)){const n=(p1CafToday(k).its||[]).length;hd.insertAdjacentHTML('afterbegin',`<b class="num">${n}</b> drink${n===1?'':'s'} · `)}}})(p1DrinksDraw);
+// Food page: a Drinks card so drinks logged in the Drinks sheet are easy to see in the food log
+function p3FoodDrinksHTML(k){const d=D()[k]||{};const its=(d.food||[]).map((x,ix)=>({...x,ix})).filter(p3IsDrink);const f=p3Fluid(d);let tg=null;try{tg=p1WaterTarget().lo}catch(e){}
+  if(!its.length&&!f.w)return '';const caf=its.reduce((a,x)=>a+(+x.caffeine||0),0),kc=its.reduce((a,x)=>a+(+kcalOf(x)||0),0);
+  return `<article class="card p3fdr"><div class="p3fdrh"><b>${ico('coffee')} Drinks</b><span class="num">${f.t} L${tg&&k===iso(todayDate())?` of ${tg} L`:''}</span><button type="button" class="linkbtn" data-p3ring="drinks">Open</button></div>
+    <div class="p3fdrs ds num">Water ${Math.round(f.w*100)/100} L · other drinks ${f.o} L${caf?` · ${Math.round(caf)} mg caffeine`:''}${kc?` · ${Math.round(kc)} kcal`:''}</div>
+    ${its.length?`<div class="p3fdrl">${its.sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))).map(x=>`<div class="p3fdri"><span class="num">${esc(x.at||x.meal||'')}</span><b>${esc(x.name)}</b><small class="num">${p3IsAlc(x)?`${+x.sd||''} std`:`${p3DrinkMl(x)} ml`}</small></div>`).join('')}</div>`:''}
+    <p class="ds p3once">${ico('check')} Already inside the meal totals above, counted once.</p></article>`}
+p3FoodMode=(function(old){return function(){old();try{if(tab()!=='food'||fView!=='today'||(P3FT.open||'tot')!=='tot')return;const app=document.getElementById('app');if(!app||app.querySelector('.p3fdr'))return;
+  const h=p3FoodDrinksHTML(iso(sel));if(!h)return;const meals=app.querySelector('article.p1meals')||app.querySelector('.p1plants');if(meals)meals.insertAdjacentHTML(meals.classList.contains('p1plants')?'beforebegin':'afterend',h)}catch(e){}}})(p3FoodMode);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
