@@ -6741,7 +6741,7 @@ render=(function(old){return function(){old.apply(this,arguments);try{const app=
 window.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('.p3rbadge');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const t=document.createElement('button');t.dataset.p3warn='';t.hidden=true;document.getElementById('app').appendChild(t);t.click();t.remove()},true);
 // ================= the "5 logged" strip: pick your own five =================
 const P3L5POOL=[['ci','Check in','sun'],['food','2+ meals','utensils'],['water','Water','droplet'],['move','Session','footprints'],['phone','Phone away','moon'],['bed','Bed on time','moon'],['protein','Protein','beef'],['plants','5 plants','leaf'],['supps','Supplements','pill'],['nodrink','No alcohol','glass-water'],['recover','Recovery','waves']];
-const p3L5Ids=()=>{const m=meta.log5&&Array.isArray(meta.log5.ids)?meta.log5.ids.filter(id=>P3L5POOL.some(p=>p[0]===id)):null;return m&&m.length>=3?m.slice(0,5):['ci','food','water','move','phone']};
+let p3L5Ids=()=>{const m=meta.log5&&Array.isArray(meta.log5.ids)?meta.log5.ids.filter(id=>P3L5POOL.some(p=>p[0]===id)):null;return m&&m.length>=3?m.slice(0,5):['ci','food','water','move','phone']};
 p3Log5=(function(old){return function(k){const base=old(k);const d=D()[k]||{};const by={};base.forEach(x=>by[x.id]=x);const P=id=>P3L5POOL.find(p=>p[0]===id);
   const mk=(id,done,a)=>({id,l:P(id)[1],ic:P(id)[2],done,a});
   return p3L5Ids().map(id=>{if(by[id])return by[id];try{
@@ -6760,6 +6760,68 @@ document.addEventListener('click',async e=>{const q=s=>e.target.closest&&e.targe
   if(x=q('[data-p3l5p]')){const id=x.dataset.p3l5p;let cur=p3L5Ids().slice();if(cur.includes(id)){if(cur.length<=3){toast('Keep at least 3');return}cur=cur.filter(z=>z!==id)}else{if(cur.length>=5){toast('5 is the most. Untick one first.');return}cur.push(id)}
     await persistMeta('log5',{ids:cur,updatedAt:new Date().toISOString()});p3L5Sheet();render();return}
   if(x=q('[data-p3l5t]')){const k=iso(todayDate());const d=D()[k]||{};const l=(d.hab||[]).slice();const id=x.dataset.p3l5t;const i=l.indexOf(id);if(i>=0)l.splice(i,1);else l.push(id);await persistDay(k,{hab:l});render();return}});
+
+// ================= P3 (25 Nov late): one way to pick things — up-and-down wheels — for drinks, alcohol and times; neater nutrient warnings; plants learn links; daily five =================
+// ---- Food "Today so far": high and low as neat rows, tap a nutrient for what to do ----
+microsHTML=(function(old){return function(t,dt,k){try{try{gapOpen=false}catch(e){}let h=old(t,dt,k);h=h.replace(/<button type="button" class="gapbar"[\s\S]*?<\/button>/,'');
+  let hi=[];try{hi=p3ULrisks().map(r=>r.k)}catch(e){}NUTS.filter(n=>!n.macro&&n.hi).forEach(n=>{try{if(t[n.k]>nutTarget(n.k,dt).hi*1.0&&!hi.includes(n.k))hi.push(n.k)}catch(e){}});
+  const micros=NUTS.filter(n=>!n.macro&&n.lo);let lo=t.microN>=2?micros.map(n=>{const tg=nutTarget(n.k,dt);return {k:n.k,pct:tg.lo?t[n.k]/tg.lo:1}}).filter(x=>x.pct<.6&&!hi.includes(x.k)&&!(x.k==='vitD'&&(p1Sun(k)||0)>=3)).sort((a,b)=>a.pct-b.pct).slice(0,4):[];
+  const fib=nutTarget('fibre',dt);if(t.microN>=2&&fib.lo&&t.fibre<fib.lo*.6&&lo.length<4)lo.push({k:'fibre',pct:t.fibre/fib.lo});
+  const late=k<iso(todayDate())||new Date().getHours()>=18;const nm=x=>esc((NUTS.find(n=>n.k===x)||{}).l||x);
+  if(!hi.length&&!lo.length)return h;
+  const blk=`<div class="p3nw">${hi.length?`<div class="p3nwr hi"><span class="p3nwl">${ico('triangle-alert')} Too high lately</span><div class="p3nwc">${hi.map(x=>`<button type="button" data-nutinfo="${x}">${nm(x)}</button>`).join('')}</div></div>`:''}
+    ${lo.length?`<div class="p3nwr lo"><span class="p3nwl">${ico('trending-down')} ${late?'Worth topping up':'Low so far'}</span><div class="p3nwc">${lo.map(x=>`<button type="button" data-nutinfo="${x.k}">${nm(x.k)} <small class="num">${Math.round(x.pct*100)}%</small></button>`).join('')}</div></div>`:''}</div>`;
+  return blk+h}catch(e){return old(t,dt,k)}}})(microsHTML);
+// ---- Plants: links to the learning pages ----
+p3PlantsRowHTML=(function(old){return function(k){return old(k).replace(/<\/div><\/details>$/,`<div class="p3plk"><button type="button" class="linkbtn" data-p3learn="gut">${ico('book-open')} Your gut microbiome ›</button><button type="button" class="linkbtn" data-p3learn="carbs">${ico('book-open')} Carbs are more than bread and pasta ›</button></div></div></details>`)}})(p3PlantsRowHTML);
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3learn]');if(!x)return;e.preventDefault();pView='learn';lv={topic:x.dataset.p3learn,i:0,ans:null};p1Sheet(null);location.hash='reports';render();window.scrollTo({top:0})});
+// ---- Drinks: wheels for drink, size, milk, sugar and "had it"; alcohol the same ----
+function p3AtVals(){const n=new Date();const now=n.getHours()*60+n.getMinutes();const ts=[''];for(let m=Math.floor(now/15)*15;m>=300;m-=15)ts.push(fmtT(m));return ts}
+const p3AtWheel=id=>p3WheelHTML(id,p3AtVals(),P1C.at||'',v=>v||'Now',{label:'Had it',cb:v=>{P1C.at=v||null}});
+let P3ALCI=null;
+const _p3DrinksBase=p1DrinksDraw;
+p1DrinksDraw=function(){const host0=document.querySelector('#p1Host .ksheet');const sc=host0?host0.scrollTop:0;_p3DrinksBase();const host=document.querySelector('#p1Host .ksheet');if(!host)return;
+  const c=COFFEE.find(x=>x[0]===P1C.type);
+  // coffee/tea builder
+  const b=host.querySelector('.p3dbuild');
+  if(b){const it=p1CofItem();const noMilk=c&&/energy|espresso|herbal|green/.test(c[0]);const ml=c?P3CML(c[0]):null;const cur=P3DS.custom?'other':(P1C.type||'');
+    const typeW=p3WheelHTML('dr-type',COFFEE.map(x=>x[0]).concat(['other']),cur,v=>v==='other'?'Something else':(COFFEE.find(x=>x[0]===v)||['',''])[1].split(' / ')[0],{label:'Drink',def:'flatwhite',cb:v=>{if(v==='other'){P3DS.custom=true;P1C.type=null}else{P3DS.custom=false;P1C.type=v;const pr=p1LS.get('cof_'+v);if(pr){P1C.size=pr.size;P1C.milk=pr.milk;P1C.sugar=pr.sugar}}p1DrinksDraw()}});
+    let g=`<div class="p3wg"><div class="p3wc w2"><span class="label">Drink</span>${typeW}</div>`;
+    if(c){g+=`<div class="p3wc"><span class="label">Size</span>${p3WheelHTML('dr-size',Object.keys(CSIZE),P1C.size,v=>`${ml[v][0]} · ${ml[v][1]}`,{label:'Size',cb:v=>{P1C.size=v;p1DrinksDraw()}})}</div>`;
+      if(!noMilk)g+=`<div class="p3wc"><span class="label">Milk</span>${p3WheelHTML('dr-milk',Object.keys(MILK),P1C.milk||(c[3]?'semi':'none'),v=>MILK[v][0],{label:'Milk',cb:v=>{P1C.milk=v;p1DrinksDraw()}})}</div>`;
+      if(!/energy/.test(c[0]))g+=`<div class="p3wc"><span class="label">Sugar</span>${p3WheelHTML('dr-sugar',['0','1','2'],String(P1C.sugar||0),v=>v==='0'?'None':v==='1'?'1 tsp':'2 tsp',{label:'Sugar',cb:v=>{P1C.sugar=+v;p1DrinksDraw()}})}</div>`;
+      g+=`<div class="p3wc"><span class="label">Had it</span>${p3AtWheel('dr-at')}</div></div><button type="button" class="primary p3coflog" id="cofLog">Log it<small class="num">${esc(it.name)} · ${it.caffeine} mg · ${it.kcal} kcal</small></button>`}
+    else if(P3DS.custom)g+=`<div class="p3wc"><span class="label">Had it</span>${p3AtWheel('dr-at')}</div></div>${p3CustomHTML()}`;else g+='</div>';
+    b.innerHTML=g}
+  // favourites: had-it wheel instead of the sideways row
+  host.querySelectorAll('.p3trow').forEach(r=>{const inAlc=!!r.closest('.p3dsec')&&/Alcohol/.test(r.closest('.p3dsec').querySelector('.p3dsh').textContent);if(inAlc){r.remove();return}
+    if(b){r.remove();return}r.outerHTML=`<div class="p3wg"><div class="p3wc w2"><span class="label">Had it</span>${p3AtWheel('dr-atf')}</div></div>`});
+  // alcohol: drink wheel + had-it wheel + Log
+  const ag=host.querySelector('.p3agrid');
+  if(ag){if(P3ALCI==null){const ra=p3RecentAlc();P3ALCI=ra.length?ra[0]:0}const a=ALC[P3ALCI];
+    ag.outerHTML=`<div class="p3wg"><div class="p3wc w2"><span class="label">Drink</span>${p3WheelHTML('al-type',ALC.map((x,i)=>String(i)),String(P3ALCI),v=>ALC[+v][0],{label:'Drink',cb:v=>{P3ALCI=+v;p1DrinksDraw()}})}</div><div class="p3wc"><span class="label">Had it</span>${p3AtWheel('al-at')}</div></div>
+      <button type="button" class="primary p3coflog" data-alc="${P3ALCI}">Log it<small class="num">${esc(a[0])} · ${a[1]} standard · ${a[2]} kcal</small></button>`}
+  p3WheelInit(host);host.scrollTop=sc};
+// ---- daily five: check-in and water always; pick 3 more from a longer list ----
+ICO['smartphone']='<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/>';
+const P3L5FIX=['ci','water'];
+P3L5POOL.length=0;[['ci','Check in','smile'],['water','Water','droplet'],['food','2+ meals','utensils'],['move','Session','dumbbell'],['walk','Walk outside','footprints'],['mobility','Stretch or mobility','person-standing'],['recover','Recovery','waves'],
+  ['breath','Breathwork','wind'],['meditate','Meditation','brain'],['cold','Cold water','snowflake'],['daylight','Morning daylight','sun'],['bed','Bed on time','bed'],['phone','Phone away','smartphone'],['nocafpm','No coffee after 2','coffee'],
+  ['protein','Protein','beef'],['plants','5 plants','leaf'],['veg','5 fruit and veg','carrot'],['supps','Supplements','pill'],['nodrink','No alcohol','glass-water'],['nosweets','No sweets','candy'],['read','Read','book-open'],['journal','Journal','pencil'],['grateful','Gratitude','hand-heart']].forEach(x=>P3L5POOL.push(x));
+p3L5Ids=()=>{const m=meta.log5&&Array.isArray(meta.log5.ids)?meta.log5.ids.filter(id=>!P3L5FIX.includes(id)&&P3L5POOL.some(p=>p[0]===id)):null;return P3L5FIX.concat((m&&m.length?m:['food','move','phone']).slice(0,3))};
+const p3RecText=d=>JSON.stringify([...(d.recovery||[]),...(d.extras||[]),...(d.hc||[])]).toLowerCase();
+p3Log5=(function(old){return function(k){const base=old(k);const d=D()[k]||{};const hab=d.hab||[];const rt=p3RecText(d);const P=id=>P3L5POOL.find(p=>p[0]===id)||[id,id,'circle'];
+  return base.map(x=>{const p=P(x.id);if(['ci','water','food','move','phone'].includes(x.id))return {...x,l:p[1],ic:p[2]};
+    const auto={walk:/walk|hike|stroll/.test(rt),mobility:/mobil|stretch|yoga|foam|pilates/.test(rt),breath:/breath/.test(rt),meditate:/medit|mindful|body scan/.test(rt),cold:/cold|ice|plunge|sea swim/.test(rt),
+      nocafpm:k<iso(todayDate())||new Date().getHours()>=14?!(d.food||[]).some(f=>+f.caffeine>0&&f.at&&p1Min(f.at)>=840):false}[x.id];
+    const done=x.done||!!auto||hab.includes(x.id);const a=['protein','plants','supps','recover','bed'].includes(x.id)?x.a:`data-p3l5t="${x.id}"`;return {...x,l:p[1],ic:p[2],done,a}})}})(p3Log5);
+p3L5Sheet=function(){const cur=p3L5Ids();const extra=cur.filter(x=>!P3L5FIX.includes(x));
+  p1Sheet(`<div class="kshead"><div><h2>Your daily five</h2><small class="ds">Check in and water every day, plus 3 of your choice</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  <div class="p3l5pick">${P3L5POOL.map(([id,l,ic])=>{const fx=P3L5FIX.includes(id);const on=cur.includes(id);return `<button type="button" ${fx?'disabled':`data-p3l5p="${id}"`} aria-pressed="${on}"><span class="p3l5i">${ico(ic)}</span><b>${esc(l)}</b>${fx?'<small class="ds">Always on</small>':''}<span class="p3l5c">${on?ico('check'):''}</span></button>`}).join('')}</div>
+  <p class="ds" style="font-size:12px">${extra.length} of 3 picked. Most tick themselves from what you log; tap the others on Today.</p>`)};
+window.addEventListener('click',async e=>{const x=e.target.closest&&e.target.closest('[data-p3l5p]');if(!x)return;e.stopImmediatePropagation();const id=x.dataset.p3l5p;let ex=p3L5Ids().filter(z=>!P3L5FIX.includes(z));
+  if(ex.includes(id))ex=ex.filter(z=>z!==id);else{if(ex.length>=3){toast('3 is the most. Untick one first.');return}ex.push(id)}
+  await persistMeta('log5',{ids:ex,updatedAt:new Date().toISOString()});p3L5Sheet();render()},true);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
