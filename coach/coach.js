@@ -594,7 +594,7 @@ function render(){if(render._busy){setTimeout(render,0);return}render._busy=true
 function render2(){TIPS={};tipN=0;const rt=route();const root=$('#root');
   if(!SESSION){root.innerHTML=gateHTML();return}
   const title=rt.v==='player'?'Player':(VIEWS.find(v=>v[0]===rt.v)||VIEWS[0])[1];
-  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,gps:()=>viewGPS(),trends:viewTrends,calendar:viewCalendar,messages:viewMessages,sc:viewSCHub,physio:viewPhysioHub,recovery:viewRecovery,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
+  let body;if(LOADING)body='<div class="spin"></div>';else body=({setup:viewSetup,gps:()=>viewGPS(),tests:()=>viewTests(),trends:viewTrends,calendar:viewCalendar,messages:viewMessages,sc:viewSCHub,physio:viewPhysioHub,recovery:viewRecovery,nutrition:viewNutHub,mindset:viewMindset}[rt.v]||(rt.v==='player'?()=>viewPlayer(rt.id):viewOverview))();
   const sy=scrollY;root.innerHTML=shell(body,title);try{enhancePickers();const ms=$('#msgScroll');if(ms)ms.scrollTop=ms.scrollHeight}catch(e){}if(render._v===location.hash)scrollTo(0,sy);else scrollTo(0,0);render._v=location.hash}
 let GATE={mode:'in',msg:''};
 function gateHTML(){if(GATE.mode==='up')return `<div class="gate"><form class="gcard" id="signup">${kwm()}<div><h1>Join the backroom team</h1><p class="muted small" style="margin-top:4px">For coaches, S&amp;C, physios, nutritionists and mindset coaches. You need the staff code from your team's manager.</p></div>
@@ -1825,7 +1825,7 @@ function gpsHeatView(){const H=GPS.hm;const ss=gpsSessions().filter(x=>x.rows.so
     <div class="gleg"><span>Less</span><i></i><span>More</span></div></section>`}
 // ---------- patterns: worked out here, then Koach can dig deeper ----------
 function gpsPatterns(){const out=[];const k=todayK();
-  allPlayers().forEach(p=>{const rs=gRowsOf(p.id);if(rs.length<4)return;
+  allPlayers().forEach(p=>{const rs=gRowsOf(p.id);if(rs.length<6)return;
     // HSR spikes followed by a niggle
     let spikes=0,hit=0;for(let w=0;w<12;w++){const end=addK(k,-7*w);const a=gAcwr(p.id,end,'hsr');if(a!=null&&a>1.4){spikes++;let n=false;for(let j=1;j<=7;j++){const d=p.D[addK(end,j)];if(d&&(d.niggles||[]).some(x=>+x.pain>=3))n=true}if(n)hit++}}
     if(hit>=1)out.push({p,w:6+hit,t:'Niggles follow high-speed spikes',s:`${hit} of ${spikes} weeks where HSR jumped over 140% of usual were followed by a niggle within 7 days. Build HSR up more gradually for ${first(p.name)}.`});
@@ -1839,9 +1839,10 @@ function gpsPatterns(){const out=[];const k=todayK();
     const s14=rs.filter(r=>r.day>=addK(k,-14));if(s14.length>=3&&v.length){const best=Math.max(...v);if(!s14.some(r=>+r.m.vmax>=best*.9))out.push({p,w:3,t:'Not near top speed for 2 weeks',s:`No session above 90% of their best (${best.toFixed(1)} km/h) in 14 days. A few short max-speed efforts protect hamstrings.`})}
     const a=gAcwr(p.id,k,'hsr');if(a!=null&&a>1.5)out.push({p,w:9,t:'High-speed running spike now',s:`This week's HSR is ${Math.round(a*100)}% of their usual week.`});else if(a!=null&&a<.6&&s14.length)out.push({p,w:3,t:'Light on high-speed running',s:`This week's HSR is only ${Math.round(a*100)}% of usual. Returning from a lighter spell spikes risk later.`})});
   return out.sort((a,b)=>b.w-a.w)}
+function evStaff(p){const k=todayK();let ci=0;for(let i=0;i<84;i++){if(checkedIn(p.D[addK(k,-i)]))ci++}const g=gRowsOf(p.id).length;return `Based on ${g} GPS session${g===1?'':'s'} and ${ci} check-in${ci===1?'':'s'} over 12 weeks.`}
 function gpsPatternsView(){const pt=gpsPatterns();const ai=GPS.ai;
   return `<section class="card"><header><div><h2>Patterns Keel found</h2><p>Worked out from each player's GPS history alongside what they log in Keel: sleep, balance and niggles. These are patterns, not diagnoses. Use them to start a conversation.</p></div></header>
-    ${pt.length?`<div class="gpat">${pt.slice(0,30).map(x=>`<div class="gpi"><button data-player="${esc(x.p.id)}"><b>${esc(x.p.name)}</b></button><div><b>${esc(x.t)}</b><div class="small muted">${esc(x.s)}</div></div></div>`).join('')}</div>`:'<div class="small muted">Not enough history yet. Patterns appear once players have about 4 GPS sessions.</div>'}</section>
+    ${pt.length?`<div class="gpat">${pt.slice(0,30).map(x=>`<div class="gpi"><button data-player="${esc(x.p.id)}"><b>${esc(x.p.name)}</b></button><div><b>${esc(x.t)}</b><div class="small muted">${esc(x.s)}</div><div class="small muted" style="opacity:.8;margin-top:2px">${esc(evStaff(x.p))}</div></div></div>`).join('')}</div>`:'<div class="small muted">Not enough history yet. Patterns appear once a player has 6 GPS sessions, so they rest on more than a couple of days.</div>'}</section>
    <section class="card"><header><div><h2>Ask Koach</h2><p>Koach reads 12 weeks of GPS for the squad with Keel's load, sleep, balance and niggles, and looks for what you might have missed: who is trending towards trouble, what came before past niggles, and what to change this week.</p></div></header>
     <div class="toolbar"><input class="sel" id="gAsk" placeholder="Optional: a question, e.g. why is Fiachra's top speed down?" style="flex:1;min-width:240px" value="${esc(GPS.ask||'')}"><button class="btn" id="gAI" ${GPS.aiBusy?'disabled':''}>${GPS.aiBusy?'Koach is reading…':'Analyse the squad'}</button></div>
     ${ai?`<div class="gai">${ai.summary?`<p><b>${esc(ai.summary)}</b></p>`:''}${(ai.findings||[]).map(f=>`<div class="gpi"><button data-player="${esc((allPlayers().find(p=>nrm(p.name)===nrm(f.player))||{}).id||'')}"><b>${esc(f.player||'Squad')}</b></button><div><b>${esc(f.finding||'')}</b><div class="small muted">${esc(f.evidence||'')}</div>${f.action?`<div class="small"><b>Do:</b> ${esc(f.action)}</div>`:''}</div></div>`).join('')}</div>`:''}</section>`}
@@ -2086,6 +2087,86 @@ nutWorkspace=(function(old){return function(p){const h=old.apply(this,arguments)
 document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-tcopen]');if(!x)return;e.preventDefault();e.stopImmediatePropagation();const pid=x.dataset.tcopen;const p=SQUAD.find(y=>y.id===pid);const t=tcOf(p);const it=t&&(t.items||[])[+x.dataset.tci];if(!it)return;
   const b=tcBase(pid);Object.entries(it.change||{}).forEach(([dt,c])=>{b[dt]=b[dt]||{};Object.entries(c).forEach(([m,v])=>{if(isNum(b[dt][m]))b[dt][m]=Math.round(b[dt][m]+v)})});
   const tg=tgtOf(pid);S.nutT={pid,t:b,why:[it.title,tcChange(it.change)],note:tg&&tg.note||''};S.ptab='nutrition';location.hash='player/'+encodeURIComponent(pid);render()},true);
+
+
+// ================= Combined flag (Kieran's review): under-fuelling + poor sleep + fatigue on 2+ of the last 4 days =================
+function cfStaff(p,k){const t=(tgtOf(p.id)&&tgtOf(p.id).targets)||ownTargets(p.id)||APP_DEF;const days=[];
+  for(let i=1;i<=4;i++){const kk=addK(k,-i),d=p.D[kk];const f=foodOn(p,kk);if(!d||!f||(f.n||0)<2)continue;const dt=isTrainDay(p,kk)?'training':'rest';const T=t[dt]||APP_DEF[dt];
+    const fuel=(+f.kcal||0)<T.kcal*.8||(T.carbs>=120&&(+f.carbs||0)<T.carbs*.7);const sh=sleepHours(d);const slp=(sh!=null&&sh<6.5)||(isNum(d.sleepQ)&&d.sleepQ<=2);const b=p.E.bal(kk);const fat=(isNum(d.energy)&&d.energy<=2)||(b!=null&&b<55);
+    days.push({kk,all:fuel&&slp&&fat})}
+  const hit=days.filter(x=>x.all);return hit.length>=2?{n:hit.length,of:days.length}:null}
+flagsFor=(function(old){return function(p,k){const out=old.apply(this,arguments);try{const c=cfStaff(p,k);if(c){out.push({w:8,ic:'zap',col:'var(--alert)',t:'Under-fuelled, poor sleep, flat',s:`All three on ${c.n} of the last ${c.of} days with food logged. Check food and rest before a hard session.`});out.sort((a,b)=>b.w-a.w)}}catch(e){}return out}})(flagsFor);
+
+
+// ================= Testing (Kieran's review): fitness tests per player, history and change, squad and position tables =================
+// [id, name, group, unit, better, how to enter]
+const TESTS=[['sq1rm','Back squat, est. 1RM','Strength','kg','up','kgx'],['bp1rm','Bench press, est. 1RM','Strength','kg','up','kgx'],['tb1rm','Trap bar deadlift, est. 1RM','Strength','kg','up','kgx'],
+  ['s10','10 m sprint','Speed','s','down','num'],['s20','20 m sprint','Speed','s','down','num'],['cmj','Countermovement jump','Power','cm','up','num'],
+  ['yoyo','Yo-Yo IR1','Conditioning','m','up','num'],['run5k','5 km time','Conditioning','min','down','time']];
+const TGROUPS=['Strength','Speed','Power','Conditioning'];
+const tDef=id=>TESTS.find(t=>t[0]===id);
+const TST={rows:null,loading:false,team:null,entry:false,err:'',saving:false};
+S.tTest=S.tTest||'s10';
+const epley=(kg,reps)=>reps<=1?kg:kg*(1+reps/30);
+function tParse(def,raw){const s=String(raw||'').trim().toLowerCase().replace(',','.');if(!s)return null;
+  if(def[5]==='kgx'){const m=s.match(/^(\d+(?:\.\d+)?)\s*(?:kg)?\s*(?:x|×|\*)\s*(\d+)$/);if(m){const kg=+m[1],r=+m[2];if(r<1||r>12)return {err:'Use 1 to 12 reps'};return {v:Math.round(epley(kg,r)*2)/2,raw:`${kg} × ${r}`}}const n=+s;return isFinite(n)&&n>0?{v:n,raw:null}:{err:'Type kg × reps, e.g. 100 x 5'}}
+  if(def[5]==='time'){const m=s.match(/^(\d{1,2})[:.](\d{2})$/);if(m)return {v:+m[1]*60+ +m[2],raw:null};return {err:'Type it like 21:30'}}
+  const n=+s;return isFinite(n)&&n>0?{v:n,raw:null}:{err:'Numbers only'}}
+function tFmt(def,v){if(v==null||!isFinite(v))return '-';if(def[5]==='time'){const m=Math.floor(v/60),sx=Math.round(v%60);return m+':'+String(sx).padStart(2,'0')}if(def[3]==='s')return (+v).toFixed(2);if(def[3]==='cm')return (+v).toFixed(1);if(def[3]==='m')return Math.round(v).toLocaleString('en-IE');return (Math.round(v*2)/2).toLocaleString('en-IE')}
+const tUnit=def=>def[5]==='time'?'':' '+def[3];
+function tChange(def,a,b){if(a==null||b==null)return '';const d=a-b;if(Math.abs(d)<1e-9)return `<span class="muted">same</span>`;const good=def[4]==='up'?d>0:d<0;const pct=b?Math.abs(d/b*100):0;
+  return `<span style="color:${good?'var(--good)':'var(--alert)'}">${d>0?'+':'−'}${tFmt(def,Math.abs(d))}${def[5]==='time'?'':tUnit(def)}<small class="tpct">${pct.toFixed(pct<10?1:0)}%</small></span>`}
+function demoTests(){const out=[];const k=todayK();const R=(()=>{let s=7;return ()=>{s=(s*16807)%2147483647;return (s-1)/2147483646}})();const dates=[-84,-42,-7].map(n=>addK(k,n));
+  allPlayers().forEach((p,ix)=>{const line=posLine(p);const base={sq1rm:110+R()*40-(line==='GK'?10:0),bp1rm:80+R()*30,tb1rm:150+R()*50,s10:1.78+R()*.16+(line==='GK'?.06:0),s20:3.02+R()*.2+(line==='GK'?.08:0),cmj:36+R()*10,yoyo:1600+R()*800-(line==='GK'?400:0)+(line==='MID'?200:0),run5k:1200+R()*180};
+    dates.forEach((day,j)=>{Object.entries(base).forEach(([t,v])=>{if(R()<.12)return;const def=tDef(t);const imp=(def[4]==='up'?1:-1)*(j*(.02+R()*.025))-(R()*.015)*(def[4]==='up'?1:-1);let val=v*(1+imp);
+      if(def[3]==='kg')val=Math.round(val/2.5)*2.5;else if(def[3]==='s')val=Math.round(val*100)/100;else if(def[3]==='cm')val=Math.round(val*10)/10;else val=Math.round(val);out.push({id:'dt'+out.length,player_id:p.id,test:t,value:val,day,raw:null})})})});return out}
+async function tstLoad(force){const tid=TEAM&&TEAM.team_id;if(!tid)return;if(!force&&TST.team===tid&&TST.rows)return;TST.team=tid;TST.loading=true;TST.err='';
+  if(isDemo()){TST.rows=demoTests();TST.loading=false;render();return}
+  try{const {data,error}=await sb.from('team_tests').select('id,player_id,test,value,raw,day,note').eq('team_id',tid).order('day');if(error)throw error;TST.rows=data||[]}
+  catch(e){TST.rows=[];TST.err=/team_tests|relation|schema/i.test(String(e.message||e))?'needsdb':String(e.message||e)}
+  TST.loading=false;render()}
+const tRows=(pid,t)=>(TST.rows||[]).filter(r=>r.player_id===pid&&r.test===t).sort((a,b)=>a.day<b.day?-1:1);
+function viewTests(){if(!TST.rows||TST.team!==(TEAM&&TEAM.team_id)){setTimeout(()=>tstLoad(),0);return '<div class="spin"></div>'}
+  if(TST.err==='needsdb')return `<section class="card"><header><div><h2>Testing</h2><p>One step left: run <b>supabase/tests.sql</b> once in Supabase (SQL Editor, New query, paste, Run). Then reload this page.</p></div></header></section>`;
+  const def=tDef(S.tTest)||TESTS[0];const ps=allPlayers();const k=todayK();
+  const groups=`<div class="toolbar" style="flex-wrap:wrap;gap:8px">${TGROUPS.map(g=>`<div class="tgrp"><span class="small muted">${g}</span><div class="seg">${TESTS.filter(t=>t[2]===g).map(t=>`<button data-set="tTest" data-val="${t[0]}" aria-pressed="${S.tTest===t[0]}">${esc(t[1].replace(', est. 1RM',''))}</button>`).join('')}</div></div>`).join('')}</div>`;
+  const rows=ps.map(p=>{const r=tRows(p.id,def[0]);const last=r[r.length-1],prev=r[r.length-2],firstR=r[0];const best=r.length?(def[4]==='up'?Math.max(...r.map(x=>+x.value)):Math.min(...r.map(x=>+x.value))):null;return {p,r,last,prev,firstR,best}});
+  const withV=rows.filter(x=>x.last);const sortV=x=>def[4]==='up'?-x.last.value:+x.last.value;withV.sort((a,b)=>sortV(a)-sortV(b));const none=rows.filter(x=>!x.last);
+  const av=list=>{const v=list.filter(x=>x.last).map(x=>+x.last.value);return v.length?{v:avg(v),n:v.length}:null};
+  const lines=[['GK','Goalkeepers'],['DEF','Backs'],['MID','Midfield'],['FWD','Forwards']].map(([c,n])=>({n,a:av(rows.filter(x=>posLine(x.p)===c))})).filter(x=>x.a);const sq=av(rows);
+  const table=`<div style="overflow-x:auto"><table class="list ttab"><tr><th>#</th><th>Player</th><th class="hm">Position</th><th>Latest</th><th>Tested</th><th class="hm">Previous</th><th>Change</th><th class="hm">Since first</th><th class="hm">Best</th></tr>
+    ${withV.map((x,i)=>`<tr><td class="muted">${i+1}</td><td><button class="linkish" data-player="${esc(x.p.id)}"><b>${esc(x.p.name)}</b></button></td><td class="muted hm">${esc(x.p.pos||'-')}</td><td class="nw"><b>${tFmt(def,+x.last.value)}</b>${tUnit(def)}${x.last.raw?`<div class="small muted">${esc(x.last.raw)}</div>`:''}</td><td class="muted nw">${fmtK(x.last.day,{day:'numeric',month:'short'})}</td><td class="hm nw">${x.prev?tFmt(def,+x.prev.value):'-'}</td><td class="nw">${x.prev?tChange(def,+x.last.value,+x.prev.value):''}</td><td class="hm nw">${x.r.length>2?tChange(def,+x.last.value,+x.firstR.value):''}</td><td class="hm nw">${tFmt(def,x.best)}</td></tr>`).join('')}
+    ${sq?`<tr class="tavg"><td></td><td><b>Squad average</b><div class="small muted">${sq.n} tested</div></td><td class="hm"></td><td class="nw"><b>${tFmt(def,sq.v)}</b>${tUnit(def)}</td><td colspan="5"></td></tr>`:''}
+    ${lines.map(l=>`<tr class="tavg"><td></td><td>${l.n}<div class="small muted">${l.a.n} tested</div></td><td class="hm"></td><td class="nw"><b>${tFmt(def,l.a.v)}</b>${tUnit(def)}</td><td colspan="5"></td></tr>`).join('')}</table></div>
+    ${none.length?`<div class="small muted" style="margin-top:8px">Not tested yet: ${none.map(x=>esc(x.p.name)).join(', ')}.</div>`:''}`;
+  const entry=TST.entry?`<section class="card"><header><div><h2>Record results: ${esc(def[1])}</h2><p>${def[5]==='kgx'?'Type the weight and reps, e.g. <b>100 x 5</b>. Keel works out the estimated 1RM (Epley). A plain number is taken as a 1RM.':def[5]==='time'?'Type minutes and seconds, e.g. <b>21:30</b>.':`In ${esc(def[3])}. ${def[4]==='down'?'Lower is better.':'Higher is better.'}`} Leave a player blank if they didn't test.</p></div></header>
+    <div class="toolbar"><label class="small muted" for="tDay">Date</label><input class="sel" type="date" id="tDay" value="${esc(S.tDay||k)}" max="${k}"></div>
+    <div style="overflow-x:auto"><table class="list"><tr><th>Player</th><th>Position</th><th>Last result</th><th>Today's result</th></tr>${ps.map(p=>{const r=tRows(p.id,def[0]);const l=r[r.length-1];return `<tr><td>${esc(p.name)}</td><td class="muted">${esc(p.pos||'-')}</td><td class="muted">${l?tFmt(def,+l.value)+tUnit(def)+' · '+fmtK(l.day,{day:'numeric',month:'short'}):'-'}</td><td><input class="sel tin" data-tin="${esc(p.id)}" inputmode="${def[5]==='num'?'decimal':'text'}" placeholder="${def[5]==='kgx'?'100 x 5':def[5]==='time'?'21:30':def[3]}" style="width:120px"></td></tr>`}).join('')}</table></div>
+    ${TST.msg?`<div class="small" style="color:var(--alert);margin-top:8px">${esc(TST.msg)}</div>`:''}<div class="toolbar" style="margin-top:12px"><button class="btn" id="tSave" ${TST.saving?'disabled':''}>${TST.saving?'Saving…':'Save results'}</button><button class="btn ghost" id="tCancel">Cancel</button></div></section>`:'';
+  return `<section class="card"><header><div><h2>Testing</h2><p>Fitness tests by date, each player's change since last time, and the squad and position averages. Pick a test:</p></div>${TST.entry?'':`<button class="btn" id="tNew">Record results</button>`}</header>${groups}</section>${entry}
+    <section class="card"><header><div><h2>${esc(def[1])}</h2><p>${def[4]==='up'?'Higher is better':'Lower is better'}. Best first. Change is against each player's previous test${def[5]==='kgx'?'; 1RM is estimated from the weight and reps lifted':''}.</p></div></header>${withV.length?table:`<div class="small muted">No ${esc(def[1].toLowerCase())} results yet. Tap Record results to add the first.</div>`}</section>`}
+// on the player page: every test, with history and change
+function testsCard(p){if(!TST.rows||TST.team!==(TEAM&&TEAM.team_id)){setTimeout(()=>tstLoad(),0);return ''}const any=TESTS.filter(t=>tRows(p.id,t[0]).length);if(!any.length)return '';
+  return `<section class="card"><header><div><h2>Testing</h2><p>Each test over time, the change since the last one, and the squad average.</p></div><a class="btn ghost sm" href="#tests">All tests</a></header><div class="tcards">${any.map(t=>{const r=tRows(p.id,t[0]);const l=r[r.length-1],pv=r[r.length-2];
+    const sq=allPlayers().map(q=>{const rr=tRows(q.id,t[0]);return rr.length?+rr[rr.length-1].value:null}).filter(v=>v!=null);
+    return `<div class="tcard"><div class="tch"><b>${esc(t[1])}</b><span class="nw"><b>${tFmt(t,+l.value)}</b>${tUnit(t)}</span></div>
+      <div class="tcm"><span>${pv?tChange(t,+l.value,+pv.value)+' since last':'First test'}</span><span class="muted">Squad ${sq.length?tFmt(t,avg(sq))+tUnit(t):'-'}</span></div>
+      <div class="tchist">${r.map(x=>`<span>${fmtK(x.day,{day:'numeric',month:'short'})} <b>${tFmt(t,+x.value)}</b></span>`).join('')}</div></div>`}).join('')}</div></section>`}
+viewPlayer=(function(old){return function(id){const h=old(id);const p=SQUAD.find(x=>x.id===id);if(!p)return h;let c='';try{c=testsCard(p)}catch(e){}return h+c}})(viewPlayer);
+document.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);
+  if(c('#tNew')){TST.entry=true;TST.msg='';render();return}
+  if(c('#tCancel')){TST.entry=false;TST.msg='';render();return}
+  if(c('#tSave')){const def=tDef(S.tTest);const day=($('#tDay')||{}).value||todayK();const out=[];let bad=null;
+    document.querySelectorAll('[data-tin]').forEach(inp=>{if(bad)return;const r=tParse(def,inp.value);if(!r)return;if(r.err){bad=`${(SQUAD.find(p=>p.id===inp.dataset.tin)||{}).name||'A player'}: ${r.err}`;return}out.push({team_id:TEAM.team_id,player_id:inp.dataset.tin,test:def[0],value:r.v,raw:r.raw,day})});
+    if(bad){TST.msg=bad;render();return}if(!out.length){TST.msg='No results typed in.';render();return}
+    if(isDemo()){out.forEach((r,i)=>TST.rows.push(Object.assign({id:'n'+Date.now()+i},r)));TST.entry=false;TST.msg='';toast(`${out.length} result${out.length>1?'s':''} saved (demo)`);render();return}
+    TST.saving=true;render();const {error}=await sb.from('team_tests').insert(out);TST.saving=false;if(error){TST.msg='Could not save: '+error.message;render();return}
+    TST.entry=false;TST.msg='';toast(`${out.length} result${out.length>1?'s':''} saved`);await tstLoad(true);return}});
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='tDay')S.tDay=e.target.value});
+(function(){const st=document.createElement('style');st.textContent=`.tgrp{display:flex;flex-direction:column;gap:4px}.tavg td{background:color-mix(in srgb,var(--faint) 12%,transparent)}.ttab td.nw,.ttab .nw,.nw{white-space:nowrap}.tpct{display:block;font-size:11px;opacity:.85}.tcm .tpct{display:inline;margin-left:4px}.tcm .tpct::before{content:'('}.tcm .tpct::after{content:')'}
+.tcards{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}.tcard{padding:12px 14px;border:1px solid var(--line);border-radius:14px}.tch{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.tcm{display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:4px}.tchist{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:12px;color:var(--muted)}.tchist b{color:var(--text);font-weight:600}@media (max-width:640px){.ttab .hm{display:none}}
+.linkish{background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left}`;document.head.appendChild(st)})();
+VIEWS.splice(VIEWS.findIndex(v=>v[0]==='trends'),0,['tests','Testing','load','Tools']);
 
 
 (async()=>{

@@ -461,10 +461,11 @@ For any alcoholic drink, add "sd": the number of Irish standard drinks (10 g alc
 For each item give ${NUT_JSON}.
 Coffees and teas ARE items (an almond cappuccino is about 44 kcal, 4 g net carbs, 125 mg caffeine; tea with almond milk about 45 mg caffeine). Plain water and the SIS (SiS GO Hydro) electrolyte tablet can be items too if mentioned; one SIS tablet is 9 kcal, 0.8 g carbs, 345 mg sodium, 102 mg calcium, 65 mg potassium, 8 mg magnesium, 1.3 mg zinc. Supplements count as items.
 "meal" is one of "Breakfast","Lunch","Dinner","Snack". "dish" is the dish or plate the item belongs to (e.g. "Chicken stir-fry"): items eaten together on one plate share the same dish name; a stand-alone item such as a coffee has "dish":"". "at" is the time eaten as "HH:MM" (24 h) when stated or clearly implied, else null.
-Reply with ONLY JSON: {"items":[{"name":"short name","qty":"amount","meal":"Lunch","at":"13:00","kcal":0,"protein":0,"carbs":0,"fat":0,"fibre":0,"sodium":0,"potassium":0,"magnesium":0,"calcium":0,"iron":0,"zinc":0,"selenium":0,"iodine":0,"vitA":0,"vitC":0,"vitD":0,"vitK":0,"b12":0,"folate":0,"choline":0,"omega3":0,"caffeine":0,"plants":["spinach"]}],"water":litres of plain water mentioned or null}`;
+Reply with ONLY JSON: {"items":[{"name":"short name","qty":"amount","meal":"Lunch","at":"13:00","kcal":0,"protein":0,"carbs":0,"fat":0,"fibre":0,"sodium":0,"potassium":0,"magnesium":0,"calcium":0,"iron":0,"zinc":0,"selenium":0,"iodine":0,"vitA":0,"vitC":0,"vitD":0,"vitK":0,"b12":0,"folate":0,"choline":0,"omega3":0,"caffeine":0,"plants":["spinach"],"conf":"high","unsure":""}],"water":litres of plain water mentioned or null}
+"conf" is how sure you are of the portion and what the food is: "high" (clear amount or label, or a standard item), "medium" (a fair guess) or "low" (hard to see or judge, hidden oil or sauce, unclear size, could be something else). When it's "medium" or "low", "unsure" says in under 10 words what you couldn't tell, e.g. "portion of rice hard to judge"; else "".`;
 function cleanItems(arr,meal,est,src){const nowT=iso(sel)===iso(todayDate())?fmtT(new Date().getHours()*60+new Date().getMinutes()):null;
   return (Array.isArray(arr)?arr:[]).filter(x=>x&&x.name).map(x=>{const m=MEALS.includes(x.meal)?x.meal:meal;const o={name:String(x.name).slice(0,70),dish:String(x.dish||'').slice(0,50),qty:String(x.qty||'').slice(0,60),meal:m,at:tmin(x.at)!=null?fmtT(tmin(x.at)):(nowT&&src!=='diary'?nowT:MEAL_T[m]),est:!!est,src:src||'manual'};
-    NK.forEach(k=>{o[k]=k==='kcal'?(isNum(x.kcal)?Math.round(+x.kcal):null):Math.max(0,+x[k]||0)});o.plants=Array.isArray(x.plants)?x.plants.map(p=>String(p).toLowerCase().slice(0,30)).slice(0,15):[];if(x.micros===false)o.micros=false;return o})}
+    NK.forEach(k=>{o[k]=k==='kcal'?(isNum(x.kcal)?Math.round(+x.kcal):null):Math.max(0,+x[k]||0)});o.plants=Array.isArray(x.plants)?x.plants.map(p=>String(p).toLowerCase().slice(0,30)).slice(0,15):[];if(x.micros===false)o.micros=false;if(['high','medium','low'].includes(x.conf))o.conf=x.conf;if(x.unsure)o.unsure=String(x.unsure).slice(0,80);return o})}
 async function persistDay(k,fields){
   const cur=days[k]||{date:k};const doc={...cur,...fields,date:k,savedAt:new Date().toISOString()};days[k]=doc;
   if(daysCol){try{await daysCol.doc(k).set(doc)}catch(e){toast('Could not save. Try again.');return false}}
@@ -2172,7 +2173,7 @@ function foodTodayHTML(dIso){
   const meals=MEALS.map(m=>{const its=food.filter(i=>i.meal===m);return its.length?p1MealHTML(m,its):''}).join('');
   const pm=pd?(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot||'')):[];const pmDone=pd?(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot||'')&&planLogged(dIso,ix)).length:0;
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Meal plans are built from it.</span><em>Add my food ›</em></button>`:''}
-  <article class="card p1ftot"><div class="chead"><div style="flex:1;min-width:0"><h2>${isToday?'Today so far':'This day'}</h2><div class="sub">${DAYT[dt].label} targets · ${t.n?`${t.n} item${t.n>1?'s':''}`:'nothing logged yet'}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
+  <article class="card p1ftot"><div class="chead"><div style="flex:1;min-width:0"><h2>${isToday?'Today so far':'This day'}</h2><div class="sub">${DAYT[dt].label} targets · ${t.n?`${t.n} item${t.n>1?'s':''}`:'nothing logged yet'} · <button type="button" class="p3howl" data-howcalc>How we work it out</button></div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
     ${p1FoodBars(t,dt,'d')}${microsHTML(t,dt,dIso)}</article>
   ${foodActionsHTML(dIso)}
   ${meals?`<article class="card p1meals">${meals}</article>`:''}
@@ -3943,7 +3944,7 @@ p3WDraw=function(){if(!P3W.on)return;const {a,d,items,sets}=P3W;const ex=id=>(a.
         ${cur>=0?(P3T.end&&P3T.kind==='hold'?'':`<button type="button" class="primary p3wdo" data-p3whold="${secs}">${ico('play')} Start ${secs>=60?Math.round(secs/60*10)/10+' min':secs+' s'}</button><small class="p3whint">It beeps when time's up, so you don't need to watch the screen.</small>`):`<div class="p3wall">All ${ss.length} done</div>`}`}
     else{setsH=`<div class="p3wticks">${ss.map((x,j)=>`<button type="button" class="p3wtk${x.done?' on':''}" data-p3wdone="${j}" aria-pressed="${x.done}" aria-label="Set ${j+1}"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><small>${j+1}</small></button>`).join('')}</div>`}
     body=`<section class="p3wex"><div class="p3wexh"><div><small>Exercise ${P3W.i+1} of ${n}</small><h3>${esc(e.name)}</h3></div>${e.video?`<button type="button" class="p3wvid" data-mypvid="${esc(e.id)}" data-mypa="${esc(a.assignment)}" aria-label="Watch ${esc(e.name)}">${ico('play')}<span>Watch</span></button>`:''}</div>
-      <div class="p3wtgt">${esc(tgt)}</div>${a.load!==100&&kind==='weight'?`<div class="p3wnote">${esc(mypLoadNote(a.load))}</div>`:''}${it.note||e.cues?`<div class="p3wcue">${esc(it.note||e.cues)}</div>`:''}${last&&kind==='weight'?`<div class="p3wlast">Last time: ${last.kg} kg × ${last.reps}</div>`:''}
+      <div class="p3wtgt">${esc(tgt)}</div>${a.load!==100&&kind==='weight'?`<div class="p3wnote">${esc(mypLoadNote(a.load))}</div>`:''}${it.note||e.cues?`<div class="p3wcue">${esc(it.note||e.cues)}</div>`:''}${last&&kind==='weight'?p3NextHTML(last,it,ss):''}
       ${tmr}${setsH}</section>`}
   p1Sheet(`<div class="kshead"><div><h2>${esc(d.title||'S&C session')}</h2><small class="ds">${esc(a.programme.name)}${a.team?' · '+esc(a.team):''}</small></div><button type="button" class="x" id="p3wClose" aria-label="Close">${ico('x')}</button></div>
     <div class="p3wbar"><i style="width:${Math.round(doneSets/Math.max(1,allSets)*100)}%"></i></div>${body}
@@ -4267,7 +4268,8 @@ p1NutInfo=(function(old){return function(k){old(k);const u=P3UL[k];const n=NUTS.
   else if(v>u.ul*0.8)h=`<section class="p1blk p3ul mid"><h3>Close to the safe limit</h3><p style="margin:0">${f(v)} ${n.u}${u.supp?' from supplements':''} today, near the ${u.ul} ${n.u} safe daily limit. ${esc(u.risk)}</p></section>`;
   else if(tg.lo&&tot>tg.lo)h=`<section class="p1blk p3ul ok"><h3>Is too much a risk?</h3><p style="margin:0">No. You're over target but well under the safe limit of ${u.ul} ${n.u} a day${u.supp?' from supplements':''}.</p></section>`;
   if(!h)return;const a=host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',h)}})(p1NutInfo);
-nutBar=(function(old){return function(n,val,tg){const h=old(n,val,tg);const u=P3UL[n.k];if(!u||u.supp||!(val>u.ul))return h;return h.replace(`<span>${n.l} <i`,`<span>${n.l} <span class="p3ulb">Over safe limit</span> <i`)}})(nutBar);
+var P3NBW=1;// weekly view: compare the daily average with the safe limit
+nutBar=(function(old){return function(n,val,tg){const h=old(n,val,tg);const u=P3UL[n.k];if(!u||u.supp||!(val/P3NBW>u.ul))return h;return h.replace(`<span>${n.l} <i`,`<span>${n.l} <span class="p3ulb">Over safe limit</span> <i`)}})(nutBar);
 // ================= P3: Koach watches how often you go over a safe limit =================
 function p3ULfreq(k){const t0=todayDate();let n7=0,o7=0,n14=0,o14=0;for(let i=0;i<14;i++){const d=D()[iso(addD(t0,-i))];if(!d||!((d.food||[]).length||(()=>{try{return suppItems(d).length}catch(e){return 0}})()))continue;const over=p3ULval(k,d)>P3UL[k].ul;n14++;if(over)o14++;if(i<7){n7++;if(over)o7++}}return {n7,o7,n14,o14}}
 function p3ULrisks(){return Object.keys(P3UL).map(k=>({k,...p3ULfreq(k)})).filter(r=>r.o7>=3||r.o14>=5).sort((a,b)=>b.o14-a.o14)}
@@ -4579,6 +4581,19 @@ Use the session feedback to judge whether the plan, the recovery and the balance
   }catch(e){const m={not_granted:'The overview needs your permission to use the AI coach.',rate_limited:'Too many requests just now. Try again in a few minutes.'};aiState={busy:false,text:e.text||'',err:m[e&&e.code]||'Could not finish the overview. Try again.'}}
   render();
 }
+// 5 km time trials over the weeks, and the threshold pace each one set
+function fivekTrendHTML(){const tt=Object.values(L()).filter(l=>toSec(l.fivek)).sort((a,b)=>a.date<b.date?-1:1);
+  if(!tt.length)return `<div class="hint">No 5 km time trial logged yet. Log one from a test week in your plan and it sets your threshold pace.</div>`;
+  const thr=l=>toSec(l.fivek)/5+17.5;const pts=tt.map(l=>({x:parse(l.date)/DAY,y:toSec(l.fivek),lab:short(parse(l.date))}));const tp=tt.map(l=>({x:parse(l.date)/DAY,y:thr(l),lab:short(parse(l.date))}));
+  const f=tt[0],z=tt[tt.length-1],d=toSec(f.fivek)-toSec(z.fivek);
+  const rows=tt.slice().reverse().map((l,i,a)=>{const prev=a[i+1];const ch=prev?toSec(prev.fivek)-toSec(l.fivek):null;const s5=toSec(l.fivek)/5;
+    return `<tr><td>${fmtD(parse(l.date),{day:'numeric',month:'short'})}</td><td class="num"><b>${esc(l.fivek)}</b></td><td class="num">${fromSec(s5+15)}-${fromSec(s5+20)}</td><td class="num" style="color:${ch==null?'var(--muted)':ch>0?'var(--ok)':ch<0?'var(--warn)':'var(--muted)'}">${ch==null?'-':(ch>0?'-':'+')+fromSec(Math.abs(ch))}</td></tr>`}).join('');
+  return (tt.length>1?`<div class="tests"><div><b class="num">${esc(f.fivek)}</b><small>First</small></div><div><b class="num">${esc(z.fivek)}</b><small>Latest</small></div><div><b class="num" style="color:${d>0?'var(--ok)':d<0?'var(--warn)':'var(--fg)'}">${d===0?'0:00':(d>0?'-':'+')+fromSec(Math.abs(d))}</b><small>Change</small></div></div>`
+    +`<div class="hint" style="margin-top:10px">5 km time</div>`+lineChart(pts,{fmtY:v=>fromSec(v),invert:true,color:'var(--t)',pad:10,h:120})
+    +`<div class="hint">Threshold pace set (per km, middle of the range)</div>`+lineChart(tp,{fmtY:v=>fromSec(v),invert:true,color:'var(--k-green)',pad:3,h:110}):'')
+    +`<table class="p3tt"><thead><tr><th>Date</th><th>5 km</th><th>Threshold /km</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table>`
+    +(tt.length<2?`<div class="hint">One test so far. Log a re-test in a few weeks to see the trend.</div>`:'')}
+(function(){const st=document.createElement('style');st.textContent=`.p3tt{display:table;table-layout:fixed;width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}.p3tt th{text-align:left;font-weight:500;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:6px 4px;border-bottom:1px solid var(--line)}.p3tt td{padding:8px 4px;border-bottom:1px solid var(--line)}`;document.head.appendChild(st)})();
 function viewReports(){
   const LL=L(),DD=D();const now=sampleMode?SAMPLE.now:todayDate();
   const toggle=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">${sampleMode?`<span class="sample">Example data as of ${fmtD(now)}, not yours</span>`:'<span class="label">So far</span>'}<button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'Show my data':'See an example'}</button></div>`;
@@ -4631,7 +4646,7 @@ function viewReports(){
    (inj.lead?W('What came before a niggle','The 3 days before each new niggle compared with your usual 3 days.',inj.lead):'')+
    W('Hyrox classes','From the boards you scanned.',hyroxAnalysis())+
    `<div class="sect">Performance</div>`+
-   W('5 km tests','',`<div class="tests"><div><b class="num">${base?esc(base.fivek):'-'}</b><small>Week 1 baseline</small></div><div><b class="num">${re?esc(re.fivek):'-'}</b><small>Week 12 re-test</small></div><div><b class="num" style="color:${base&&re&&toSec(re.fivek)<toSec(base.fivek)?'var(--ok)':'var(--fg)'}">${diff}</b><small>Change</small></div></div>`)+
+   W('5 km and threshold pace','Every 5 km time trial you log, and the threshold pace it set for your threshold runs (5 km pace + 15-20 s per km). Higher on the chart is faster.',fivekTrendHTML())+
    W('Threshold pace','Average rep pace per km. Higher on the chart is faster.',lineChart(pace,{fmtY:v=>fromSec(v),invert:true,color:'var(--t)',pad:5}))+
    W('Strength','Trap-bar deadlift top set (kg).',lineChart(tb,{fmtY:v=>Math.round(v),color:'var(--s)',pad:5,h:130})+'<div class="hint">Split squat dumbbells (kg each hand).</div>'+lineChart(ss,{fmtY:v=>Math.round(v),color:'var(--s)',pad:2,h:110}))+
    W('Body weight','Morning weight (kg), when logged.',lineChart(series('weight'),{pad:1,fmtY:v=>v.toFixed(1),color:'var(--o)',h:110}));
@@ -6552,12 +6567,25 @@ p3WDraw=(function(old){return function(){old.apply(this,arguments);if(!P3W.on||P
     if(sec)sec.insertAdjacentHTML('beforeend',`<button type="button" class="ghost p3wallb" data-p3wall>${ico('check')} All ${left} sets done${kind==='weight'&&s?` at ${s.kg} kg × ${s.reps}`:''}</button>`)}}})(p3WDraw);
 window.addEventListener('click',e=>{if(!(e.target.closest&&e.target.closest('[data-p3wall]'))||!P3W.on)return;e.stopImmediatePropagation();const ss=P3W.sets[P3W.i];const f=ss.find(z=>!z.done);ss.forEach(s=>{if(!s.done){s.kg=f.kg;s.reps=f.reps;s.done=true}});
   try{clearInterval(P3T.t);P3T.end=0}catch(z){}p3WSave();if(P3W.i<P3W.items.length-1)P3W.i++;else P3W.fin=true;p3WSave();p3WDraw()},true);
+// next weight: from last time's kg, reps and how hard it felt (RPE). A suggestion only: tap Use, or change it on the slider
+const r25=v=>Math.round(v/2.5)*2.5;
+function p3NextKg(last,it){const kg=+last.kg,r=last.rpe,tr=p3WReps(it.reps),met=+last.reps>=tr;if(!(kg>0))return null;
+  if(r==null)return {kg,why:'No effort rating last time, so start at the same weight.'};
+  if(r<=6)return {kg:kg+(kg>=60?5:2.5),why:`Felt easy last time (RPE ${r}), so add ${kg>=60?5:2.5} kg.`};
+  if(r<=8)return met?{kg:kg+2.5,why:`RPE ${r} and you hit your reps, so add 2.5 kg.`}:{kg,why:`RPE ${r} but reps came up short, so stay at ${kg} kg.`};
+  return met?{kg,why:`Very hard last time (RPE ${r}), so hold at ${kg} kg.`}:{kg:Math.max(0,kg-Math.max(2.5,r25(kg*.05))),why:`Very hard and reps came up short (RPE ${r}), so drop ${Math.max(2.5,r25(kg*.05))} kg.`}}
+function p3NextHTML(last,it,ss){const n=p3NextKg(last,it);const lt=`Last time: ${last.kg} kg × ${last.reps}${last.rpe!=null?` · RPE ${last.rpe}`:''}`;if(!n)return `<div class="p3wlast">${lt}</div>`;
+  const cur=ss.find(s=>!s.done);const using=cur&&+cur.kg===n.kg;
+  return `<div class="p3wnext"><div class="p3wlast" style="margin:0">${lt}</div><div class="p3wnxr"><div><b>Next: ${n.kg} kg</b><small>${esc(n.why)}</small></div>${cur?(using?`<span class="p3wnxok">${ico('check')} Using</span>`:`<button type="button" class="p3wnxb" data-p3wnext="${n.kg}">Use</button>`):''}</div></div>`}
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3wnext]');if(!x||!P3W.on)return;e.preventDefault();e.stopImmediatePropagation();const kg=+x.dataset.p3wnext;(P3W.sets[P3W.i]||[]).forEach(s=>{if(!s.done)s.kg=kg});p3WSave();p3WDraw()},true);
+(function(){const st=document.createElement('style');st.textContent=`.p3wnext{margin:10px 0;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--surface)}.p3wnxr{display:flex;align-items:center;gap:10px;margin-top:6px}.p3wnxr>div{flex:1}.p3wnxr b{display:block;font-size:16px}.p3wnxr small{color:var(--muted);font-size:12px;line-height:1.35}
+.p3wnxb{min-height:40px;padding:0 18px;border-radius:99px;border:0;background:var(--k-amber);color:#15171E;font:600 14px/1 var(--font-body)}.p3wnxok{display:flex;gap:4px;align-items:center;color:var(--ok);font-size:13px;font-weight:600}.p3wnxok .ki,.p3wnxok svg{width:16px;height:16px}`;document.head.appendChild(st)})();
 // "last time" comes from your saved sessions (own plan and team programmes), not just this phone
 let P3LAST={};
-function p3LastBuild(){const m={};const add=(ex,day,arr)=>{if(!ex||!arr||!arr.length)return;const top=arr.reduce((a,s)=>(+s.kg>+a.kg||(+s.kg===+a.kg&&+s.reps>+a.reps))?s:a,arr[0]);if(!m[ex]||m[ex].day<day)m[ex]={kg:+top.kg,reps:+top.reps,day}};
-  Object.values(L()).forEach(l=>{if(l&&l.sets)l.sets.forEach(r=>add(r.ex,l.date,r.done))});(P3LAST._sc||[]).forEach(r=>(r.sets||[]).forEach(x=>add(x.ex,r.day,x.done)));m._sc=P3LAST._sc;P3LAST=m}
-async function p3LastLoad(){if(!sb||!UID)return;try{const {data}=await sb.from('sc_logs').select('day,sets').eq('player_id',UID).gte('day',iso(addD(todayDate(),-180)));P3LAST._sc=data||[]}catch(e){}p3LastBuild()}
-p3WLast=(function(old){return function(id){if(!P3LAST._b){P3LAST._b=1;p3LastBuild()}const s=P3LAST[id];if(s)return {kg:s.kg,reps:s.reps};return old(id)}})(p3WLast);
+function p3LastBuild(){const m={};const add=(ex,day,arr,rpe)=>{if(!ex||!arr||!arr.length)return;const top=arr.reduce((a,s)=>(+s.kg>+a.kg||(+s.kg===+a.kg&&+s.reps>+a.reps))?s:a,arr[0]);if(!m[ex]||m[ex].day<day)m[ex]={kg:+top.kg,reps:+top.reps,day,rpe:isNum(+rpe)&&+rpe>0?+rpe:null}};
+  Object.values(L()).forEach(l=>{if(l&&l.sets)l.sets.forEach(r=>add(r.ex,l.date,r.done,r.rpe||l.rpe))});(P3LAST._sc||[]).forEach(r=>(r.sets||[]).forEach(x=>add(x.ex,r.day,x.done,x.rpe||r.rpe)));m._sc=P3LAST._sc;P3LAST=m}
+async function p3LastLoad(){if(!sb||!UID)return;try{const {data}=await sb.from('sc_logs').select('day,sets,rpe').eq('player_id',UID).gte('day',iso(addD(todayDate(),-180)));P3LAST._sc=data||[]}catch(e){}p3LastBuild()}
+p3WLast=(function(old){return function(id){if(!P3LAST._b){P3LAST._b=1;p3LastBuild()}const s=P3LAST[id];if(s)return {kg:s.kg,reps:s.reps,rpe:s.rpe,day:s.day};return old(id)}})(p3WLast);
 mypLoad=(function(old){return async function(){await old.apply(this,arguments);p3LastLoad()}})(mypLoad);
 
 // ---- wearables: pair a device. Saved to your account so staff know who wears what; live data switches on when the connection is set up ----
@@ -7057,6 +7085,171 @@ window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closes
 .rotr{display:grid;grid-template-columns:1fr auto 92px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .rotr b{font-weight:500}.rotr span{color:var(--muted);font-size:13px}.rotr em{font-style:normal;font-size:12px;font-weight:600;text-align:right}
 .rotr.ok em{color:var(--good,#3a9a5b)}.rotr.near em{color:var(--k-amber)}.rotr.short em,.rotr.over em{color:var(--bad,#c4453c)}`;document.head.appendChild(st)})();
+
+// ================= Plan adapts (Kieran's review): missed key sessions, and stepping up when sessions feel easy =================
+const PA_KEY=['S','T','X'];const PA_RPE={S:7,E:4,H:8,T:7,X:6};
+const paState=()=>meta.planAdapt||{handled:{},snooze:{},step:{}};
+// a key session in the last 3 days that wasn't done, and not already moved or dropped
+function paMissed(){const t=todayDate();const st=paState();for(let i=1;i<=3;i++){const d=addD(t,-i),k=iso(d),p=planFor(d);if(!p||p.pre||!PA_KEY.includes(p.type))continue;if(st.handled[k])continue;
+  const l=L()[k];if(l&&l.status!=='missed')continue;if((D()[k]||{}).extras&&(D()[k].extras||[]).some(x=>x.dur>=30))continue;
+  // was it done on another day nearby (moved)?
+  return {k,d,p,target:paTarget(d,p)}}return null}
+// next suitable day: from today to Sunday, a rest or easy day, not next to another hard day
+function paTarget(from,p){const t=todayDate();const end=addD(t,6-((t.getDay()+6)%7));for(let d=t;d<=end;d=addD(d,1)){const k=iso(d),q=planFor(d);if(!q||L()[k]||!['R','E'].includes(q.type))continue;
+  const nb=[-1,1].map(o=>{const dd=addD(d,o),qq=planFor(dd);return qq&&iso(dd)!==iso(from)&&HARDC.includes(qq.type)&&!(L()[iso(dd)]&&L()[iso(dd)].status==='missed')});if(nb.some(Boolean))continue;return {k,d,q}}return null}
+// step up: the last 2 or 3 of a session type all felt easy
+function paEasy(l){const sfb=(D()[l.date]||{}).sfb||{};const r=+l.rpe;const exp=PA_RPE[l.type]||6;return sfb.effort==='easier'||(r>0&&r<=exp-2)}
+const PA_STEP={S:'Add 2.5-5 kg to your main lifts, or one more set of the first exercise.',T:'Add one threshold rep, or run the reps 5 s/km quicker.',X:'Add 5-10 minutes to the long run.',E:'Add 5-10 minutes to your easy runs.',H:'Pick the next harder scaling in your class.'};
+function paStep(){const st=paState();const today=iso(todayDate());for(const ty of ['S','T','X','E']){if((st.snooze[ty]||'')>today)continue;const s=st.step[ty];if(s&&s.at>=iso(addD(todayDate(),-21)))continue;
+  const ls=Object.values(L()).filter(l=>l.type===ty&&l.status&&l.status!=='missed'&&l.date<=today).sort((a,b)=>a.date<b.date?1:-1).slice(0,3);if(ls.length<2)continue;
+  const run=ls.findIndex(l=>!paEasy(l));const n=run<0?ls.length:run;if(n>=2)return {ty,n,ls:ls.slice(0,n)}}return null}
+async function paSave(st){return persistMeta('planAdapt',{handled:st.handled,snooze:st.snooze,step:st.step,updatedAt:new Date().toISOString()})}
+function paCard(){if(sampleMode)return '';let h='';const m=paMissed();
+  if(m){const nm=TNAME[m.p.type];h+=`<section class="p3tr"><span class="label">Plan · missed session</span><h3>${esc(nm)} on ${fmtD(m.d,{weekday:'long'})} didn't happen</h3>
+    <p>${m.target?`Keel can move it to <b>${m.target.k===iso(todayDate())?'today':fmtD(m.target.d,{weekday:'long'})}</b> (${esc(TNAME[m.target.q.type].toLowerCase())} day, no hard session either side) and check the rest of the week still fits.`:`There's no good day left this week without stacking hard days, so the best bet is to drop it and pick up next week.`}</p>
+    <div class="p3trb">${m.target?`<button type="button" data-pamove="${m.k}|${m.target.k}">Move to ${m.target.k===iso(todayDate())?'today':fmtD(m.target.d,{weekday:'short'})}</button>`:''}<button type="button" class="${m.target?'ghost':''}" data-padrop="${m.k}">Drop it</button></div></section>`}
+  const s=paStep();if(s){const nm=TNAME[s.ty];h+=`<section class="p3tr"><span class="label">Plan · step it up</span><h3>${esc(nm)} has felt easy ${s.n} times running</h3>
+    <p>Your last ${s.n} ${esc(nm.toLowerCase())} sessions were rated easier than planned${s.ls.map(l=>l.rpe).filter(Boolean).length?` (effort ${s.ls.map(l=>l.rpe||'-').join(', ')} out of 10)`:''}. Time for a small step up:</p><p class="p3trc">${esc(PA_STEP[s.ty])}</p>
+    <div class="p3trb"><button type="button" data-pastep="${s.ty}">Step it up</button><button type="button" class="ghost" data-pasnooze="${s.ty}">Not yet</button></div></section>`}
+  return h}
+p3Koach=(function(old){return function(k){const h=old.apply(this,arguments);if(k&&k!==iso(todayDate()))return h;let c='';try{c=paCard()}catch(e){}return h+c}})(p3Koach);
+// the step-up shows on the session itself for 3 weeks
+sessionHTML=(function(old){return function(d,pl){const h=old.apply(this,arguments);try{const s=paState().step[pl.type];if(s&&s.at>=iso(addD(todayDate(),-21))&&iso(d)>=s.at)return h+`<div class="note"><b>Stepped up${s.at?` (${fmtD(parse(s.at),{day:'numeric',month:'short'})})`:''}:</b> ${esc(PA_STEP[pl.type]||'')}</div>`}catch(e){}return h}})(sessionHTML);
+window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;const st=paState();st.handled=st.handled||{};st.snooze=st.snooze||{};st.step=st.step||{};
+  if(x=c('[data-pamove]')){e.preventDefault();e.stopImmediatePropagation();const [a,b]=x.dataset.pamove.split('|');st.handled[a]='moved';await paSave(st);await moveSession(a,b);return}
+  if(x=c('[data-padrop]')){e.preventDefault();e.stopImmediatePropagation();st.handled[x.dataset.padrop]='dropped';await paSave(st);toast('Dropped. The rest of the week stays as it is.');render();return}
+  if(x=c('[data-pastep]')){e.preventDefault();e.stopImmediatePropagation();st.step[x.dataset.pastep]={at:iso(todayDate())};await paSave(st);toast('Stepped up. You\'ll see it on the session.',3000);render();return}
+  if(x=c('[data-pasnooze]')){e.preventDefault();e.stopImmediatePropagation();st.snooze[x.dataset.pasnooze]=iso(addD(todayDate(),10));await paSave(st);render();return}},true);
+
+// ================= How we work it out (Kieran's review): how targets are set, with EFSA reference values; women's micronutrient targets =================
+const NUTDEF=NUTS.map(n=>({k:n.k,lo:n.lo,hi:n.hi}));
+// adult reference values from EFSA (Dietary Reference Values, summary report 2017 and later opinions). FSAI uses these for Ireland.
+// [men, women, kind, why Keel's target differs]
+const EFSA={fibre:[25,25,'AI','Keel aims a bit higher (30-40 g) for gut health and fullness.'],sodium:[2000,2000,'safe intake','Higher in Keel (3-4 g) to replace what you sweat out training.'],potassium:[3500,3500,'AI',''],
+  magnesium:[350,300,'AI','A little higher in Keel for training and sleep.'],calcium:[950,950,'PRI','1,000 mg if you\'re 18 to 24.'],iron:[11,16,'PRI','Women after the menopause: 11 mg, same as men.'],zinc:[11.7,8.9,'PRI','EFSA ties zinc to phytate in the diet: this is for a typical mixed diet.'],
+  selenium:[70,70,'AI',''],iodine:[150,150,'AI',''],vitA:[750,650,'PRI',''],vitC:[110,95,'PRI',''],vitD:[15,15,'AI','In Ireland most people need a supplement from October to March.'],vitK:[70,70,'AI','Keel aims higher, easily covered by greens.'],
+  b12:[4,4,'AI',''],folate:[330,330,'PRI','400 µg in Keel, the usual advice for women who could get pregnant.'],choline:[400,400,'AI','Keel uses the US figure (550 mg men, 425 mg women).'],omega3:[.25,.25,'AI (EPA+DHA)','Keel aims for 1-2 g for training recovery and heart health.'],caffeine:[400,400,'safe limit','No more than about 200 mg in one go, and 200 mg a day if pregnant.']};
+const KEEL_F={iron:{lo:16},zinc:{lo:9},magnesium:{lo:320,hi:420},vitA:{lo:650},vitC:{lo:95,hi:200},choline:{lo:425}};
+function p3Sex(){let s='';try{s=String((PROFILE&&PROFILE.answers&&PROFILE.answers.sex)||(PROFILE&&PROFILE.sex)||'')}catch(e){}return /female|woman/i.test(s)?'f':/male|man/i.test(s)?'m':''}
+function p3Age(){try{return +((PROFILE&&PROFILE.answers&&PROFILE.answers.age)||0)}catch(e){return 0}}
+applyProfile=(function(old){return function(p){NUTS.forEach(n=>{const d=NUTDEF.find(x=>x.k===n.k);if(d){n.lo=d.lo;n.hi=d.hi}});
+  const sx=(()=>{const s=String((p&&p.answers&&p.answers.sex)||p.sex||'');return /female|woman/i.test(s)?'f':''})();
+  if(sx==='f'){const age=+((p.answers||{}).age||0);Object.entries(KEEL_F).forEach(([k,v])=>{const n=NUTS.find(x=>x.k===k);if(!n)return;if(k==='iron'&&age>=51)return;Object.assign(n,v)})}
+  return old.apply(this,arguments)}})(applyProfile);
+function howSheet(){const sx=p3Sex();const col=sx==='f'?1:0;const who=sx==='f'?'women':sx==='m'?'men':'adults';const team=trTeam();
+  const fmt=(v,u)=>u==='g'&&v<1?(v*1000)+' mg':(v>=1000?v.toLocaleString('en-IE'):v)+(u==='kcal'?'':' '+u);
+  const rows=NUTS.filter(n=>EFSA[n.k]).map(n=>{const e=EFSA[n.k];const nu=v=>fmt(v,n.u).replace(/\s\S+$/,'');const t=n.lo!=null&&n.hi!=null?`${nu(n.lo)}-${fmt(n.hi,n.u)}`:n.lo!=null?fmt(n.lo,n.u):`max ${fmt(n.hi,n.u)}`;
+    const ref=sx?fmt(e[col],n.u):e[0]===e[1]?fmt(e[0],n.u):`${fmt(e[0],n.u)} / ${fmt(e[1],n.u)}`;
+    return `<tr><td><b>${esc(n.l)}</b>${e[3]?`<small>${esc(e[3])}</small>`:''}</td><td class="num">${t}</td><td class="num">${ref}<small>${esc(e[2])}</small></td></tr>`}).join('');
+  const R=DAYT.rest,T=DAYT.training,M=DAYT.match;
+  p1Sheet(`<div class="kshead"><div><h2>How we work it out</h2><small class="ds">Where your food targets come from</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  ${team?`<div class="hwnote">Your targets are set by <b>${esc(team)}</b>. The method below is how Keel sets them for everyone else, and the reference values still apply.</div>`:''}
+  <section class="hw"><h3>Calories</h3><p>Keel starts from the energy your body burns at rest, using your age, sex, height and weight, then adds your daily activity, including the work you do. That gives a rest day figure.</p>
+  <p>Training days add what a session costs, and match days add a bit more again. For fat loss Keel takes off about 300-500 kcal a day; for putting on muscle it adds about 200-400 kcal.</p>
+  <div class="hwt"><div><b class="num">${R.kcal.toLocaleString('en-IE')}</b><small>Rest day</small></div><div><b class="num">${T.kcal.toLocaleString('en-IE')}</b><small>Training day</small></div><div><b class="num">${M.kcal.toLocaleString('en-IE')}</b><small>Match day</small></div></div>
+  <p class="ds">On track means within 10% of the day's figure. Calorie counts from food photos and labels are rarely closer than that.</p></section>
+  <section class="hw"><h3>Protein, carbs and fat</h3><p><b>Protein:</b> 1.6-2.2 g per kg of body weight, the range sports nutrition bodies use for people who train. It's the same every day, as repair goes on whether you train or not. Counts as on track from 90% up.</p>
+  <p><b>Carbs:</b> set by how much you train, highest on match days (${M.carbs} g) and lowest on rest days (${R.carbs} g). On track up to 10% over.</p>
+  <p><b>Fat:</b> what's left of the calories once protein and carbs are in. On track within 10% either side.</p></section>
+  <section class="hw"><h3>Vitamins and minerals</h3><p>Targets are for ${sx?`${who}, from the sex in your profile`:'adult men until you add your sex in your profile'}. The reference column is the official EU value from EFSA, which the FSAI uses for Ireland. Where Keel aims differently, it says why.</p>
+  <table class="hwtab"><thead><tr><th>Nutrient</th><th>Keel target</th><th>EFSA ${sx?who:'men / women'}</th></tr></thead><tbody>${rows}</tbody></table>
+  <p class="ds" style="font-size:12px">PRI: enough for almost everyone. AI: the amount healthy people get, used where there's too little data for a PRI. Pregnancy and breastfeeding change several of these: ask your GP or a dietitian.</p></section>
+  <section class="hw"><h3>Sources</h3><p class="ds" style="font-size:12px">EFSA, Dietary Reference Values for nutrients, summary report (2017) and later opinions. FSAI, healthy eating guidelines for Ireland. Protein range: International Society of Sports Nutrition position stand.</p></section>`)}
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-howcalc]');if(!x)return;e.preventDefault();e.stopImmediatePropagation();howSheet()},true);
+(function(){const st=document.createElement('style');st.textContent=`.hw{margin:14px 0 4px}.hw h3{margin:0 0 6px;font:600 16px/1.3 var(--font-body)}.hw p{margin:6px 0;font-size:14px;line-height:1.5}
+.hwt{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.hwt div{padding:10px;border-radius:12px;background:var(--surface);border:1px solid var(--line);text-align:center}.hwt b{display:block;font-size:20px}.hwt small{color:var(--muted);font-size:12px}
+.hwnote{padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--k-amber) 10%,transparent);font-size:14px}
+.hwtab{display:table;table-layout:fixed;width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}.hwtab th{text-align:left;font-weight:500;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:6px 4px;border-bottom:1px solid var(--line)}
+.hwtab th:first-child{width:42%}.hwtab td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top}.hwtab td small{display:block;color:var(--muted);font-size:11px;line-height:1.35;margin-top:2px;font-weight:400}
+.p3howl{background:none;border:0;padding:0;color:var(--k-blue,var(--text));text-decoration:underline;text-underline-offset:2px;font:inherit;cursor:pointer}`;document.head.appendChild(st)})();
+
+// ================= Weekly vitamins, minerals and fibre (Kieran's review): last 7 days against the weekly target =================
+let P3VW='day';
+function p3WeekMicros(k){const end=parse(k);let n=0;const sum={},tg={};const list=NUTS.filter(x=>!x.macro||x.k==='fibre');
+  for(let i=0;i<7;i++){const dk=iso(addD(end,-i)),d=D()[dk]||{};const dt=dayTypeFor(dk);if((d.food||[]).length||suppItems(d).length)n++;const t=foodTotals(d);
+    list.forEach(x=>{sum[x.k]=(sum[x.k]||0)+(+t[x.k]||0);const g=nutTarget(x.k,dt);const o=tg[x.k]||(tg[x.k]={lo:null,hi:null});if(g.lo!=null)o.lo=(o.lo||0)+g.lo;if(g.hi!=null)o.hi=(o.hi||0)+g.hi})}
+  Object.values(tg).forEach(o=>{o.t=o.lo||o.hi;const f=v=>Math.round(v).toLocaleString('en-IE');o.txt=o.lo!=null&&o.hi!=null?`${f(o.lo)}-${f(o.hi)}`:o.lo!=null?`${f(o.lo)}+`:`max ${f(o.hi)}`});
+  return {n,sum,tg,list}}
+microsHTML=(function(old){return function(t,dt,k){let h=old.apply(this,arguments);const i=h.indexOf('<details class="wu"');if(i<0)return h;
+  const seg=`<div class="p3vseg" role="group" aria-label="Show"><button type="button" data-p3vw="day" aria-pressed="${P3VW==='day'}">${k===iso(todayDate())?'Today':'This day'}</button><button type="button" data-p3vw="week" aria-pressed="${P3VW==='week'}">Last 7 days</button></div>`;
+  const how=`<p class="ds" style="font-size:12px;margin:8px 0 0"><button type="button" class="p3howl" data-howcalc>How we work out these targets</button></p>`;
+  if(P3VW==='week'){const w=p3WeekMicros(k);const ok=w.list.filter(x=>status(w.sum[x.k],w.tg[x.k])==='ok').length;
+    const body=`<div class="macs" style="padding:4px 0 12px"><div class="hint" style="font-size:12px;color:var(--muted);margin-bottom:6px">${w.n} of 7 days logged. Totals for the week against 7 days of targets, so one low day can be made up on another.${w.n<7?' Days with nothing logged count as zero, so these look lower than they are.':''}</div>${(()=>{P3NBW=7;try{return w.list.map(x=>nutBar(x,w.sum[x.k],w.tg[x.k])).join('')}finally{P3NBW=1}})()}${how}</div>`;
+    h=h.replace(/<details class="wu"([^>]*)><summary>[\s\S]*?<\/summary>[\s\S]*$/,`<details class="wu"$1><summary>Last 7 days · ${ok} of ${w.list.length} on target</summary>${seg}${body}</details>`);return h}
+  return h.replace(/(<details class="wu"[^>]*><summary>[\s\S]*?<\/summary>)/,`$1${seg}`).replace(/<\/details>\s*$/,`${how}</details>`)}})(microsHTML);
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3vw]');if(!x)return;e.preventDefault();e.stopImmediatePropagation();P3VW=x.dataset.p3vw;render()},true);
+(function(){const st=document.createElement('style');st.textContent=`.p3vseg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:8px 0 10px;border-radius:99px;background:var(--surface);border:1px solid var(--line)}
+.p3vseg button{min-height:36px;border:0;border-radius:99px;background:transparent;color:var(--text);font:500 13px/1 var(--font-body)}.p3vseg button[aria-pressed="true"]{background:var(--text);color:var(--bg,#fff)}`;document.head.appendChild(st)})();
+
+// ================= AI food estimates: how sure (Kieran's review). Unsure items get a "check this one" flag =================
+const p3Unsure=i=>i&&i.est&&i.conf==='low'&&!i.checked;
+p1FoodRow=(function(old){return function(i){const h=old.apply(this,arguments);if(!p3Unsure(i)||sampleMode)return h;
+  const flag=`<div class="p3chk"><span class="p3chki">${ico('triangle-alert')}</span><span><b>Check this one.</b> ${esc((u=>u.charAt(0).toUpperCase()+u.slice(1)+(/[.!?]$/.test(u)?'':'.'))(i.unsure||'Keel wasn\'t sure of the portion'))} Use − or + to fix it.</span><button type="button" data-fchk="${i.ix}">Looks right</button></div>`;
+  return h.replace('<div class="p1fib">',flag+'<div class="p1fib">')}})(p1FoodRow);
+async function p3FoodMark(ix,patch){const k=iso(sel);const f=((D()[k]||{}).food||[]).slice();if(!f[+ix])return;f[+ix]=Object.assign({},f[+ix],patch);await persistDay(k,{food:f})}
+window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-fchk]')){e.preventDefault();e.stopImmediatePropagation();await p3FoodMark(x.dataset.fchk,{checked:true});toast('Thanks. Marked as checked.');render();return}
+  if(x=c('[data-fpct]')){const ix=x.dataset.fpct.split(':')[0];const f=((D()[iso(sel)]||{}).food||[])[+ix];if(f&&p3Unsure(f))f.checked=true}},true);
+// a count on the meal header, so it's seen without opening the meal
+(function(){const st=document.createElement('style');st.textContent=`.p3chk{display:flex;gap:8px;align-items:flex-start;margin:6px 0 2px;padding:8px 10px;border-radius:12px;background:color-mix(in srgb,var(--k-amber) 12%,transparent);font-size:13px;line-height:1.4}
+.p3chk>span:nth-child(2){flex:1}.p3chki{color:var(--k-amber);flex:none}.p3chki svg{width:16px;height:16px}.p3chk button{flex:none;min-height:32px;padding:0 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:500 12px/1 var(--font-body)}
+.p3chkn{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;vertical-align:middle;margin-left:6px;padding:2px 7px;border-radius:99px;background:color-mix(in srgb,var(--k-amber) 18%,transparent);color:var(--text);font-size:11px;font-weight:600}.p3chkn svg{width:12px;height:12px}`;document.head.appendChild(st)})();
+function p3ChkBadges(){if(tab()!=='food')return;const k=iso(sel);const f=(D()[k]||{}).food||[];document.querySelectorAll('details.p1meal').forEach(dm=>{const m=(dm.dataset.ms||'').replace('meal','');const n=f.filter(i=>i.meal===m&&p3Unsure(i)).length;const b=dm.querySelector('summary .p1mh b');if(!b)return;const old=b.querySelector('.p3chkn');if(old)old.remove();if(n)b.insertAdjacentHTML('beforeend',`<span class="p3chkn" title="${n} to check" aria-label="${n} to check">${ico('triangle-alert')}${n}</span>`)})}
+render=(function(old){return function(){const r=old.apply(this,arguments);try{p3ChkBadges()}catch(e){}return r}})(render);
+
+// ================= Food pictures that match (Kieran's review) =================
+// Before: a random recipe photo that happened to contain the main ingredient (a yogurt bowl could show a curry).
+// Now: a recipe photo only when the recipe name really matches the dish; otherwise a photo of the main ingredient itself.
+const P3IMG={salmon:'Salmon',tuna:'Tuna',prawns:'King Prawns',cod:'Cod',chicken:'Chicken',beef:'Beef',lamb:'Lamb',pork:'Pork',bacon:'Bacon',eggs:'Eggs',penne_rigate:'Penne Rigate',spaghetti:'Spaghetti',rice_noodles:'Rice Noodles',rice:'Rice',tofu:'Tofu',lentils:'Lentils',chickpeas:'Chickpeas',kidney_beans:'Kidney Beans',potatoes:'Potatoes',cheese:'Cheese',feta:'Feta',oats:'Oats',yogurt:'Greek Yogurt',banana:'Banana',strawberries:'Strawberries',chocolate:'Dark Chocolate',flour:'Flour',bread:'Bread',mushrooms:'Mushrooms',spinach:'Spinach',red_pepper:'Red Pepper',avocado:'Avocado'};
+const P3PH2=(()=>{try{localStorage.removeItem('p3photos');return JSON.parse(localStorage.getItem('p3photos2')||'{}')}catch(e){return {}}})();
+const P3STOP=new Set(['and','with','the','a','of','in','on','bowl','plate','cup','x2','x3','style','post','training','recovery','home','made','homemade','my','easy','quick','mixed','side','fresh','large','small','medium']);
+function p3Words(n){return String(n||'').toLowerCase().replace(/[^a-z\s-]/g,' ').split(/[\s-]+/).filter(w=>w.length>2&&!P3STOP.has(w))}
+function p3MatchMeal(name,meals){const st=w=>w.replace(/s$/,'');const ws=new Set(p3Words(name).map(st));if(ws.size<2)return null;let best=null,bs=0;(meals||[]).forEach(m=>{const ms=new Set(p3Words(m.strMeal).map(st));const ov=[...ws].filter(w=>ms.has(w)).length;const sc=ov/new Set([...ws,...ms]).size;if(sc>bs){bs=sc;best=m}});return best&&bs>=.75?best.strMealThumb:null}
+P3ING.sort((a,b)=>{const pri=k=>['brownie','chocolate','cake'].includes(k)?0:1;return pri(a[0])-pri(b[0])});
+const P3PQ2={};
+p3Photo=async function(name){const key=String(name||'').toLowerCase().trim();if(!key)return null;if(key in P3PH2)return P3PH2[key];
+  const ing=p3PhotoKey(name);const fallback=ing&&P3IMG[ing]?`https://www.themealdb.com/images/ingredients/${encodeURIComponent(P3IMG[ing])}.png`:null;
+  const ws=p3Words(name);let url=null;
+  if(ws.length>=2){const q=ws.slice(0,2).join(' ');if(!P3PQ2[q])P3PQ2[q]=fetch('https://www.themealdb.com/api/json/v1/1/search.php?s='+encodeURIComponent(q)).then(r=>r.json()).then(j=>j&&j.meals||[]).catch(()=>null);
+    const meals=await P3PQ2[q];if(meals===null)return fallback;url=p3MatchMeal(name,meals)}
+  url=url||fallback;P3PH2[key]=url;try{localStorage.setItem('p3photos2',JSON.stringify(P3PH2))}catch(e){}return url};
+p3PhotoFill=function(){document.querySelectorAll('[data-p3photo]:not([data-p3pd])').forEach(async el=>{el.dataset.p3pd='1';const u=await p3Photo(el.dataset.p3photo);if(!u)return;const ingr=u.includes('/images/ingredients/');
+  const img=new Image();img.alt='';img.className='p3photo'+(ingr?' p3ingr':'');let tried=false;img.onerror=()=>{if(!tried&&!ingr){tried=true;img.src=u}};img.onload=()=>{el.classList.add('hasph');if(!img.parentNode)el.appendChild(img)};img.src=ingr?u:u+'/preview'})};
+(function(){const st=document.createElement('style');st.textContent=`.p3photo.p3ingr{object-fit:contain!important;background:var(--surface);padding:8%;box-sizing:border-box}`;document.head.appendChild(st)})();
+
+// ================= Combined flag (Kieran's review): under-fuelling + poor sleep + fatigue lining up =================
+function cfDays(){const out=[];for(let i=1;i<=4;i++){const k=iso(addD(todayDate(),-i)),d=D()[k];if(!d)continue;const f=d.food||[];if(f.length<3)continue;
+  const t=foodTotals(d),dt=dayTypeFor(k);const kt=nutTarget('kcal',dt).t||DAYT[dt].kcal,ct=nutTarget('carbs',dt).t||DAYT[dt].carbs;const kp=t.kcal/kt,cp=ct?t.carbs/ct:1;
+  const fuel=kp<.8||(ct>=120&&cp<.7);const sh=sleepHours(d);const slp=(sh!=null&&sh<6.5)||(isNum(d.sleepQ)&&d.sleepQ<=2);const r=readiness(d);const fat=(isNum(d.energy)&&d.energy<=2)||(r!=null&&r<55);
+  out.push({k,fuel,slp,fat,all:fuel&&slp&&fat,kp,cp,sh,kcal:Math.round(t.kcal),kt,carbs:Math.round(t.carbs),ct})}return out}
+function cfCard(){if(sampleMode)return '';const st=meta.cflag||{};if((st.snooze||'')>iso(todayDate()))return '';const ds=cfDays();const hit=ds.filter(x=>x.all);if(hit.length<2)return '';
+  const dn=k=>fmtD(parse(k),{weekday:'long'});const line=hit.map(x=>`${dn(x.k)}: ${x.kcal.toLocaleString('en-IE')} of ${x.kt.toLocaleString('en-IE')} kcal, ${x.carbs} g carbs, ${x.sh!=null?Math.round(x.sh*10)/10+' h sleep':'poor sleep'}`).join('. ');
+  return `<section class="p3tr p3cf"><span class="label">Koach · worth acting on</span><h3>Under-fuelled, short on sleep and running flat</h3>
+  <p>On ${hit.length} of the last ${ds.length} days all three lined up: eating well under your target, a poor night and low energy. Together they drag each other down, and it's how niggles and illness start.</p>
+  <p class="ds" style="font-size:13px">${esc(line)}.</p>
+  <ul class="p3cfl"><li><b>Eat to your target today</b>, carbs especially around training, and protein at every meal.</li><li><b>Protect tonight's sleep:</b> 8 hours in bed, screens off earlier.</li><li><b>Go lighter</b> in today's session if you still feel flat.</li></ul>
+  <p class="ds" style="font-size:12px">Based on ${ds.length} days of food logs and check-ins. If it keeps happening, talk to your coach or nutritionist.</p>
+  <div class="p3trb"><button type="button" data-cfok>Got it</button></div></section>`}
+p3Koach=(function(old){return function(k){const h=old.apply(this,arguments);if(k&&k!==iso(todayDate()))return h;let c='';try{c=cfCard()}catch(e){}return h+c}})(p3Koach);
+window.addEventListener('click',async e=>{const x=e.target.closest&&e.target.closest('[data-cfok]');if(!x)return;e.preventDefault();e.stopImmediatePropagation();await persistMeta('cflag',{snooze:iso(addD(todayDate(),3)),at:new Date().toISOString()});render()},true);
+(function(){const st=document.createElement('style');st.textContent=`.p3cf{border-color:color-mix(in srgb,var(--bad,#c4453c) 45%,var(--line))}.p3cfl{margin:8px 0;padding-left:18px;font-size:14px;line-height:1.5}.p3cfl li{margin:3px 0}`;document.head.appendChild(st)})();
+
+// ================= Evidence and missing data (Kieran's review): say what advice is based on; no patterns until there's enough =================
+const EV_MIN=14;
+function evCounts(n){const t=todayDate();let ci=0,food=0,sess=0,fb=0;for(let i=0;i<n;i++){const k=iso(addD(t,-i)),d=D()[k];if(d){if(readiness(d)!=null)ci++;if((d.food||[]).length>=3)food++;if(d.sfb)fb++}const l=L()[k];if(l&&l.status&&l.status!=='missed')sess++}return {ci,food,sess,fb,n}}
+const evLine=(c,extra)=>`<p class="evn">${ico('circle-alert')}<span>Based on ${c.ci} day${c.ci===1?'':'s'} of check-ins, ${c.food} day${c.food===1?'':'s'} of food logs and ${c.sess} session${c.sess===1?'':'s'} in the last ${c.n===56?'8 weeks':c.n===28?'4 weeks':c.n+' days'}.${extra?' '+extra:''}</span></p>`;
+const evWait=(c,what)=>`<article class="card evwait"><div class="chead"><div style="flex:1"><h2>${what} need a bit more data</h2><div class="sub">They show once you have ${EV_MIN} days of check-ins. You have ${c.ci} so far${c.ci?', so about '+(EV_MIN-c.ci)+' to go':''}. Before that, any pattern would be guesswork.</div></div></div><div class="evbar"><i style="width:${Math.min(100,c.ci/EV_MIN*100)}%"></i></div></article>`;
+p1PatternsView=(function(old){return function(){const h=old.apply(this,arguments);if(sampleMode)return h;const c=evCounts(56);const t=document.createElement('template');t.innerHTML=h;const R=t.content;
+  const lab=[...R.querySelectorAll('.label')].find(x=>/last 8 weeks/i.test(x.textContent));if(lab)lab.textContent=`From ${c.ci} days of check-ins`;
+  const first=R.querySelector('article.card');if(first)first.insertAdjacentHTML('beforebegin',evLine(c,'Patterns compare your own better and worse days. They show what goes together, not what causes what.'));
+  if(c.ci<EV_MIN){const kill=[...R.querySelectorAll('article.card')].filter(a=>a.classList.contains('p3best')||/links up|Your best days|What affects/i.test((a.querySelector('h2')||{}).textContent||''));
+    if(kill.length){kill[0].insertAdjacentHTML('beforebegin',evWait(c,'Your patterns'));kill.forEach(a=>a.remove())}}
+  return t.innerHTML}})(p1PatternsView);
+correlations=(function(old){return function(){const c=evCounts(56);if(!sampleMode&&c.ci<EV_MIN)return `<div class="hint">Patterns show after ${EV_MIN} days of check-ins. You have ${c.ci} so far.</div>`;return (sampleMode?'':evLine(c))+old.apply(this,arguments)}})(correlations);
+coachHTML=(function(old){return function(aiText,savedAI){const h=old.apply(this,arguments);if(sampleMode||!aiText)return h;const c=evCounts(28);return h.replace(/<\/details>\s*$/,`${evLine(c,c.ci<10?'That\'s not much yet, so take this as a first read.':'')}</details>`)}})(coachHTML);
+trCard=(function(old){return function(){const h=old.apply(this,arguments);if(!h)return h;const c=evCounts(56);return h.replace(/<div class="p3trb">/,`${evLine(c)}<div class="p3trb">`)}})(trCard);
+(function(){const st=document.createElement('style');st.textContent=`.evn{display:flex;gap:6px;align-items:flex-start;margin:8px 0;font-size:12px;line-height:1.4;color:var(--muted)}.evn .ki,.evn svg{width:14px;height:14px;flex:none;margin-top:1px}
+.evbar{height:6px;border-radius:99px;background:var(--line);margin:0 16px 16px;overflow:hidden}.evbar i{display:block;height:100%;background:var(--k-green,#3a9a5b)}`;document.head.appendChild(st)})();
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
