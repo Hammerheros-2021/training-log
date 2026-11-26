@@ -2068,6 +2068,26 @@ buildDemoSC=(function(old){return function(){const r=old.apply(this,arguments);c
       return {ex:it.ex,name:e?e.name:'',target:{sets:it.sets,reps:it.reps,load:it.load},done:Array.from({length:n},(_,j)=>({kg:j===n-1?kg:Math.max(2.5,kg-2.5*(n-1-j)),reps}))}})});return r}})(buildDemoSC);
 
 // ================= start =================
+// ================= Koach target checks from players (26 Nov) =================
+// Players' Keel spots patterns (flat on match days, flat in sessions, weight off track) and sends them here. The nutritionist reviews and sends new targets.
+const TCDT={match:'Match day',training:'Training day',rest:'Rest day'};
+const tcOf=p=>{const t=p&&p.TP&&p.TP.tcheck;if(!t||!t.at)return null;return addK(t.at,8)>=todayK()?t:null};
+const tcChange=ch=>Object.entries(ch||{}).map(([dt,c])=>`${TCDT[dt]||dt}: ${Object.entries(c).filter(([,v])=>v).map(([m,v])=>`${m==='kcal'?'calories':m} ${v>0?'+':''}${v}${m==='kcal'?'':' g'}`).join(', ')}`).join(' · ');
+function tcBase(pid){const tg=tgtOf(pid);return JSON.parse(JSON.stringify(tg?tg.targets:(ownTargets(pid)||APP_DEF)))}
+function tcItemsHTML(p,full){const t=tcOf(p);if(!t)return '';const it=(t.items||[]).map((x,i)=>`<div class="flag" style="margin-bottom:8px;align-items:flex-start"><span class="ic" style="background:color-mix(in srgb,${x.kind==='change'?'var(--caution)':'var(--blue-2)'} 18%,transparent);color:${x.kind==='change'?'var(--caution)':'var(--blue)'}">${ico('zap')}</span>
+    <span class="who" style="flex:1">${full?'':`<b>${esc(p.name)}</b> `}<b>${esc(x.title)}</b><span>${esc(x.body)}</span>${x.change?`<span style="color:var(--text)"><b>Suggested:</b> ${esc(tcChange(x.change))}</span>`:''}</span>
+    ${x.change?`<button class="btn sm" data-tcopen="${esc(p.id)}" data-tci="${i}">Review targets</button>`:full?'':`<button class="btn ghost sm" data-nutopen="${esc(p.id)}">Open</button>`}</div>`).join('');
+  const ac=(t.active||[]).map(a=>`<div class="small muted" style="margin:2px 0 8px">Changed ${esc(fmtK(a.at,{day:'numeric',month:'short'}))} (${esc(tcChange(a.change))}). Keel checks if it helped on ${esc(fmtK(a.checkAt,{day:'numeric',month:'short'}))}.${full?'':' '+esc(first(p.name))}</div>`).join('');
+  return it+ac}
+viewNutrition=(function(old){return function(){const h=old.apply(this,arguments);const ps=sharing().filter(p=>tcOf(p));if(!ps.length)return h;
+  const n=ps.reduce((a,p)=>a+((tcOf(p).items||[]).filter(x=>x.kind==='change').length),0);
+  return `<section class="card"><header><div><h2>Koach target checks</h2><p>From players' check-ins and session feedback. Koach only suggests a change once it has ruled out poor sleep and not eating to the targets. ${n?`${n} suggested change${n>1?'s':''} to review.`:''}</p></div></header>${ps.map(p=>tcItemsHTML(p,false)).join('')}</section>`+h}})(viewNutrition);
+nutWorkspace=(function(old){return function(p){const h=old.apply(this,arguments);const x=tcItemsHTML(p,true);return x?`<section class="card"><header><div><h2>Koach target check</h2><p>What Keel has spotted for ${esc(first(p.name))}.</p></div></header>${x}</section>`+h:h}})(nutWorkspace);
+document.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-tcopen]');if(!x)return;e.preventDefault();e.stopImmediatePropagation();const pid=x.dataset.tcopen;const p=SQUAD.find(y=>y.id===pid);const t=tcOf(p);const it=t&&(t.items||[])[+x.dataset.tci];if(!it)return;
+  const b=tcBase(pid);Object.entries(it.change||{}).forEach(([dt,c])=>{b[dt]=b[dt]||{};Object.entries(c).forEach(([m,v])=>{if(isNum(b[dt][m]))b[dt][m]=Math.round(b[dt][m]+v)})});
+  const tg=tgtOf(pid);S.nutT={pid,t:b,why:[it.title,tcChange(it.change)],note:tg&&tg.note||''};S.ptab='nutrition';location.hash='player/'+encodeURIComponent(pid);render()},true);
+
+
 (async()=>{
   try{if(/[?&]demo\b/.test(location.search))throw 0;const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){if(/[?&](preview|demo)\b/.test(location.search)){SESSION={user:{email:'preview',id:'x'}};TEAMS=[demoTeam()];TEAM=TEAMS[0];const as=(location.search.match(/as=(\w+)/)||[])[1];if(as)S.demoAs=as;const d=buildDemo();SQUAD=d.squad;NOTES=d.notes;attachNotes();Object.assign(SC,buildDemoSC());Object.assign(NUT,buildDemoNut());Object.assign(RH,buildDemoRehab());Object.assign(HUB,buildDemoHub());SQUAD.forEach(p=>p._di={});GPS.rows=buildDemoGPS();GPS.loaded=true;render();return}

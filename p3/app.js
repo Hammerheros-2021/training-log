@@ -6867,6 +6867,172 @@ window.addEventListener('click',async e=>{const x=e.target.closest&&e.target.clo
   if(f.includes(id)){if(f.length<=3){toast('Keep at least 3 favourites');return}f=f.filter(z=>z!==id)}else{if(f.length>=P3FAVMAX){toast(`${P3FAVMAX} is the most. Untick one first.`);return}f.push(id)}
   await persistMeta('log5',Object.assign({},meta.log5||{},{fav:f,updatedAt:new Date().toISOString()}));p3L5Sheet();render()},true);
 
+// ================= Target review (26 Nov): Koach checks if the food targets are working and suggests changes, then checks back =================
+// Stage 1: spot patterns (flat on match days, fading in sessions, weight not moving toward the goal), rule out sleep and not eating the target, then suggest a small change.
+// Stage 2: three weeks after a change, compare with before. Worked: keep it. No better: offer to put it back.
+const TR_MIN_LOG=12, TR_ADH=.6;
+const trK=n=>iso(addD(todayDate(),n));
+const trLog=d=>(d&&d.food||[]).length>=3;
+function trLow(d){if(!d)return null;let v=null;const f=d.sfb;if(f&&(f.energy||f.flow||f.feel)){v=f.energy==='low'||f.flow==='faded'||(+f.feel>0&&+f.feel<=2)}
+  if(isNum(d.energy)){v=(v||false)||d.energy<=2}return v}
+function trAdh(from,to){let n=0,ok=0;for(let i=from;i<=to;i++){const k=trK(-i),d=D()[k];if(!trLog(d))continue;n++;const dt=dayTypeFor(k);if(status(foodTotals(d).kcal,nutTarget('kcal',dt))==='ok')ok++}return {n,share:n?ok/n:0}}
+function trAdhSince(k0){let n=0,ok=0;for(let k=k0;k<iso(todayDate());k=iso(addD(parse(k),1))){const d=D()[k];if(!trLog(d))continue;n++;if(status(foodTotals(d).kcal,nutTarget('kcal',dayTypeFor(k)))==='ok')ok++}return {n,share:n?ok/n:0}}
+function trSleepBad(d){const sh=sleepHours(d);return (sh!=null&&sh<6.5)||(isNum(d.sleepQ)&&d.sleepQ<=2)}
+function trAte(k){const d=D()[k];if(!trLog(d))return null;const t=nutTarget('carbs',dayTypeFor(k)).t||0;return t?foodTotals(d).carbs>=t*.85:null}
+// a group of days (match days, or training days) and how many were flat
+function trGroup(types,fromK,toK){const days=[];for(let k=fromK;k<toK;k=iso(addD(parse(k),1))){if(!types.includes(dayTypeFor(k)))continue;const d=D()[k]||{};const low=trLow(d);if(low==null)continue;days.push({k,low,d})}
+  const lows=days.filter(x=>x.low);return {days,lows,share:days.length?lows.length/days.length:0}}
+function trWeight(fromK,toK){const pts=[];for(let k=fromK;k<=toK;k=iso(addD(parse(k),1))){const w=+(D()[k]||{}).weight;if(w>30&&w<300)pts.push([(parse(k)-parse(fromK))/864e5,w])}
+  if(pts.length<4||pts[pts.length-1][0]-pts[0][0]<14)return null;const n=pts.length,mx=pts.reduce((a,p)=>a+p[0],0)/n,my=pts.reduce((a,p)=>a+p[1],0)/n;
+  let sxy=0,sxx=0;pts.forEach(([x,y])=>{sxy+=(x-mx)*(y-my);sxx+=(x-mx)**2});const slope=sxx?sxy/sxx*7:0;return {slope:Math.round(slope*100)/100,now:Math.round((my+slope/7*(pts[pts.length-1][0]-mx))*10)/10}}
+function trGoal(now){const a=(PROFILE&&PROFILE.answers)||{};const tw=+a.targetWeight;if(tw&&now){if(tw<now-1)return 'lose';if(tw>now+1)return 'gain'}
+  const g=[a.mainGoal,a.goals,PROFILE&&PROFILE.plan&&PROFILE.plan.goalLine].join(' ');if(/lose|lean|cut|fat/i.test(g))return 'lose';if(/gain|bulk|muscle|size/i.test(g))return 'gain';return null}
+const TRDT={match:'Match day',training:'Training day',rest:'Rest day'};
+function trTxtChange(ch){return Object.keys(ch).map(dt=>{const c=ch[dt];const p=[];if(c.carbs)p.push(`carbs ${DAYT[dt].carbs} to ${DAYT[dt].carbs+c.carbs} g`);if(c.fat)p.push(`fat ${DAYT[dt].fat} to ${DAYT[dt].fat+c.fat} g`);if(c.kcal)p.push(`calories ${DAYT[dt].kcal} to ${DAYT[dt].kcal+c.kcal}`);return `${TRDT[dt]}: ${p.join(', ')}`}).join('. ')}
+function trState(){const t=meta.tr||{};return {active:t.active||[],history:t.history||[],snooze:t.snooze||{},pending:t.pending||null,seen:t.seen||null}}
+function trBusy(sig){const s=trState();return s.active.some(a=>a.sig===sig)||(s.snooze[sig]&&s.snooze[sig]>iso(todayDate()))}
+// stage 1: what to suggest today (at most one thing at a time)
+function trAnalyse(){const out=[];const today=iso(todayDate());const adh=trAdh(1,28);const stuck=adh.n>=TR_MIN_LOG&&adh.share>=TR_ADH;
+  const fuel=(sig,types,from,minN,share,ch,what)=>{if(trBusy(sig))return;const g=trGroup(types,from,today);if(g.days.length<minN||g.share<share)return;
+    const sl=g.lows.filter(x=>trSleepBad(x.d)).length;const ate=g.lows.map(x=>[trAte(x.k),trAte(iso(addD(parse(x.k),-1)))]).filter(a=>a[0]!=null);const short=ate.filter(a=>a[0]===false||a[1]===false).length;
+    const base={sig,share:Math.round(g.share*100)/100,n:g.days.length,low:g.lows.length};
+    if(sl>=Math.ceil(g.lows.length/2))return out.push({...base,kind:'advice',title:`Flat on ${what}, but it looks like sleep`,body:`You felt flat on ${g.lows.length} of your last ${g.days.length} ${what}. On most of those you'd slept badly the night before, so more food isn't the answer yet. Aim for a good night before the next one and Koach will look again.`});
+    if(ate.length&&short>=Math.ceil(ate.length/2))return out.push({...base,kind:'advice',title:`Flat on ${what}: eat the carbs you have`,body:`You felt flat on ${g.lows.length} of your last ${g.days.length} ${what}. On most of them you ate well under your carb target that day or the day before. Hit the target you have first, then Koach will look again.`});
+    if(!stuck)return out.push({...base,kind:'advice',title:`Flat on ${what}`,body:`You felt flat on ${g.lows.length} of your last ${g.days.length} ${what}. Koach can't tell if the targets are right until you're closer to them most days (you were on target ${Math.round(adh.share*100)}% of logged days). Stick with them for 2 weeks and Koach will look again.`});
+    out.push({...base,kind:'change',change:ch,title:`Flat on ${what}: more carbs`,body:`You felt flat on ${g.lows.length} of your last ${g.days.length} ${what}, even though you slept OK and ate to your targets. That usually means not enough fuel. Koach suggests a bit more carbohydrate on those days, then it checks back in 3 weeks.`})};
+  fuel('match',['match'],trK(-56),3,.6,{match:{carbs:40,kcal:160}},'match days');
+  fuel('train',['training','light'],trK(-28),5,.5,{training:{carbs:25,kcal:100}},'training days');
+  if(!trBusy('weight')){const w=trWeight(trK(-35),trK(-1));const goal=w&&trGoal(w.now);
+    if(w&&goal){const fast=w.slope<-(w.now*.01);const stall=goal==='lose'?w.slope>-.15:w.slope<.1;
+      const ch=v=>({rest:{kcal:v,carbs:v>0?25:-20,fat:v>0?6:-8},training:{kcal:v,carbs:v>0?25:-20,fat:v>0?6:-8},match:{kcal:v,carbs:v>0?25:-20,fat:v>0?6:-8}});
+      const base={sig:'weight',slope:w.slope,goal};
+      if(goal==='lose'&&fast)out.push({...base,kind:'change',change:ch(150),title:'Losing weight too fast',body:`You're dropping about ${Math.abs(w.slope)} kg a week. More than 1% of body weight a week costs muscle and energy. Koach suggests 150 calories more a day, then it checks back in 3 weeks.`});
+      else if(stall&&!stuck)out.push({...base,kind:'advice',title:'Weight not moving',body:`Your weight is ${goal==='lose'?'not coming down':'not going up'} (${w.slope>0?'+':''}${w.slope} kg a week). Before changing the numbers, get closer to your targets most days: you were on target ${Math.round(adh.share*100)}% of logged days. Koach will look again in 2 weeks.`});
+      else if(stall)out.push({...base,kind:'change',change:ch(goal==='lose'?-150:150),title:goal==='lose'?'Weight not coming down':'Weight not going up',body:`You've stuck to your targets but your weight trend is ${w.slope>0?'+':''}${w.slope} kg a week. Koach suggests ${goal==='lose'?'150 calories less':'150 calories more'} a day, mostly from carbs and fat. Protein stays the same. It checks back in 3 weeks.`})}}
+  return out}
+// stage 2: reviews of changes made 3+ weeks ago
+function trMetric(sig,fromK,toK){if(sig==='match'||sig==='train'){const g=trGroup(sig==='match'?['match']:['training','light'],fromK,toK);return {n:g.days.length,share:g.share,low:g.lows.length}}
+  const w=trWeight(fromK,toK);return w?{n:1,slope:w.slope}:{n:0}}
+function trReviewDue(){const today=iso(todayDate());return trState().active.filter(a=>a.checkAt<=today&&!a.verdict).map(a=>{const after=trMetric(a.sig,a.at,today);const adh=trAdhSince(a.at);
+  const need=a.sig==='match'?2:a.sig==='train'?4:1;
+  if(after.n<need||adh.n<8||adh.share<TR_ADH)return {...a,verdict:(a.extended||0)>=2?'unclear':'wait',after,adh:adh.share};
+  let better;if(a.sig==='weight'){const up=((a.change.rest||{}).kcal||0)>0;better=a.goal==='lose'&&up?after.slope>=a.before.slope+.15:a.goal==='lose'?a.before.slope-after.slope>=.15:after.slope-a.before.slope>=.15}
+  else better=after.share<=a.before.share-.25||after.share<.35;
+  return {...a,verdict:better?'worked':'nochange',after,adh:adh.share}})}
+async function trSave(s){return persistMeta('tr',{active:s.active,history:s.history.slice(-40),snooze:s.snooze,pending:s.pending||null,seen:s.seen||null,updatedAt:new Date().toISOString()})}
+async function trApply(ch,sign){const n=JSON.parse(JSON.stringify((PROFILE&&PROFILE.nutrition)||{}));Object.keys(ch).forEach(dt=>{n[dt]=Object.assign({},DAYT[dt],n[dt]||{});['kcal','protein','carbs','fat'].forEach(m=>{if(ch[dt][m]){n[dt][m]=Math.max(0,Math.round(+n[dt][m]+sign*ch[dt][m]));DAYT[dt][m]=n[dt][m]}})});
+  if(PROFILE)return saveProfile(Object.assign({},PROFILE,{nutrition:n}));return false}
+const trTeam=()=>{try{return MYN&&MYN.d&&MYN.d.targets?(MYN.d.targets.set_by_name||'your nutritionist'):null}catch(e){return null}};
+let TRC=null;
+function trCard(){if(typeof sampleMode!=='undefined'&&sampleMode)return '';const today=iso(todayDate());let r;try{if(!TRC||TRC.k!==today||TRC.v!==JSON.stringify(meta.tr||{})){TRC={k:today,v:JSON.stringify(meta.tr||{}),rev:trReviewDue(),sug:trAnalyse()}}r=TRC}catch(e){return ''}
+  const team=trTeam();const btn=(a,l,ghost)=>`<button type="button" class="${ghost?'ghost':''}" data-trx="${a}">${l}</button>`;
+  const rv=r.rev.find(x=>x.verdict!=='wait');
+  if(rv){const was=rv.sig==='weight'?`${rv.before.slope} kg a week`:`flat ${rv.before.low} of ${rv.before.n}`;const now=rv.sig==='weight'?`${rv.after.slope} kg a week`:`flat ${rv.after.low} of ${rv.after.n}`;
+    const t=rv.verdict==='worked'?`<b>It worked.</b> Before: ${was}. Since: ${now}. Keeping the new targets.`:rv.verdict==='unclear'?`<b>Hard to tell.</b> Not enough days logged or on target since the change. Keep it, or put the old targets back?`:`<b>No real change.</b> Before: ${was}. Since: ${now}. The change doesn't seem to be helping. Put the old targets back?`;
+    return `<section class="p3tr"><span class="label">Koach · checking a change</span><p>${esc(rv.title)}, ${fmtD(parse(rv.at),{day:'numeric',month:'short'})}.</p><p>${t}</p><div class="p3trb">${rv.verdict==='worked'?btn('ok:'+rv.id,'OK'):btn('revert:'+rv.id,'Put it back')+btn('keep:'+rv.id,'Keep it',1)}</div></section>`}
+  const s=r.sug[0];if(!s)return '';
+  if(s.kind==='advice')return `<section class="p3tr"><span class="label">Koach · target check</span><h3>${esc(s.title)}</h3><p>${esc(s.body)}</p><div class="p3trb">${btn('snooze:'+s.sig,'Got it')}</div></section>`;
+  if(team)return `<section class="p3tr"><span class="label">Koach · target check</span><h3>${esc(s.title)}</h3><p>${esc(s.body)}</p><p class="ds">Your targets are set by ${esc(team)}, so Koach can't change them. Suggested: ${esc(trTxtChange(s.change))}. Worth showing them.</p><div class="p3trb">${btn('snooze:'+s.sig,'Got it')}</div></section>`;
+  return `<section class="p3tr"><span class="label">Koach · target check</span><h3>${esc(s.title)}</h3><p>${esc(s.body)}</p><p class="p3trc">${esc(trTxtChange(s.change))}</p><div class="p3trb">${btn('apply:'+s.sig,'Make the change')}${btn('snooze:'+s.sig,'Not now',1)}</div></section>`}
+p3Koach=(function(old){return function(k){const h=old.apply(this,arguments);if(k&&k!==iso(todayDate()))return h;let c='';try{c=trCard()}catch(e){}return h+c}})(p3Koach);
+window.addEventListener('click',async e=>{const x=e.target.closest&&e.target.closest('[data-trx]');if(!x)return;e.preventDefault();e.stopImmediatePropagation();
+  const [act,arg]=x.dataset.trx.split(':');const s=trState();const today=iso(todayDate());const snooze=d=>{s.snooze[arg]=iso(addD(todayDate(),d))};
+  if(act==='snooze'){snooze(14);await trSave(s);TRC=null;render();return}
+  if(act==='apply'){const sug=(TRC&&TRC.sug||[]).find(z=>z.sig===arg&&z.kind==='change');if(!sug)return;
+    const before=trMetric(arg,arg==='match'?trK(-56):arg==='train'?trK(-28):trK(-35),today);
+    const ok=await trApply(sug.change,1);if(!ok)return;
+    s.active.push({id:Date.now().toString(36),sig:arg,title:sug.title,change:sug.change,at:today,checkAt:iso(addD(todayDate(),21)),before:arg==='weight'?{slope:sug.slope}:before,goal:sug.goal||null});
+    s.history.push({at:today,sig:arg,what:'changed',change:sug.change,title:sug.title});await trSave(s);TRC=null;toast('Targets updated. Koach checks back in 3 weeks.',3500);render();return}
+  const i=s.active.findIndex(a=>a.id===arg);if(i<0)return;const a=s.active[i];
+  if(act==='revert'){await trApply(a.change,-1);s.active.splice(i,1);s.history.push({at:today,sig:a.sig,what:'put back',change:a.change,title:a.title});s.snooze[a.sig]=iso(addD(todayDate(),28));await trSave(s);TRC=null;toast('Old targets are back.');render();return}
+  if(act==='ok'||act==='keep'){s.active.splice(i,1);s.history.push({at:today,sig:a.sig,what:act==='ok'?'worked, kept':'kept',change:a.change,title:a.title});s.snooze[a.sig]=iso(addD(todayDate(),21));await trSave(s);TRC=null;render();return}},true);
+// a review with too little data gets 2 more weeks, at most twice
+render=(function(old){return function(){try{if(!(typeof sampleMode!=='undefined'&&sampleMode)&&meta&&meta.tr&&(meta.tr.active||[]).length){const due=trReviewDue().filter(x=>x.verdict==='wait');
+  if(due.length){const s=trState();due.forEach(d=>{const a=s.active.find(z=>z.id===d.id);if(a){a.checkAt=iso(addD(todayDate(),14));a.extended=(a.extended||0)+1}});trSave(s);TRC=null}}}catch(e){}return old.apply(this,arguments)}})(render);
+(function(){const st=document.createElement('style');st.textContent=`.p3tr{margin:12px 0;padding:14px 16px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.p3tr h3{margin:4px 0 6px;font:600 16px/1.3 var(--font-body)}.p3tr p{margin:4px 0;font-size:14px;line-height:1.45}.p3trc{font-weight:600}
+.p3trb{display:flex;gap:8px;margin-top:10px}.p3trb button{flex:1;min-height:44px;border-radius:99px;border:1px solid var(--k-amber);background:var(--k-amber);color:#15171E;font:600 14px/1 var(--font-body)}
+.p3trb button.ghost{background:transparent;border-color:var(--line);color:var(--text)}`;document.head.appendChild(st)})();
+
+Object.assign(ICO,{scale:`<circle cx="12" cy="5" r="3"/><path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z"/>`});
+// target checks reach the staff dashboard (inside the 'teamplan' summary, only while sharing with a team)
+function trStaffBody(s){const w=s.sig==='match'?'match days':'training days';const base=`Flat on ${s.low} of their last ${s.n} ${w}`;
+  if(s.kind==='change')return base+', with OK sleep and eating to their targets.';if(/sleep/i.test(s.title))return base+', mostly after a poor night\'s sleep.';
+  if(/eat the carbs/i.test(s.title))return base+', mostly eating well under their carb target that day or the day before.';return base+', but not on target most days yet.'}
+function trForStaff(){try{const WB={'Losing weight too fast':'Losing weight faster than 1% of body weight a week.','Weight not coming down':'Weight trend not coming down toward their goal, though they stick to the targets.','Weight not going up':'Weight trend not going up toward their goal, though they stick to the targets.','Weight not moving':'Weight trend not moving toward their goal, but they are not on target most days yet.'};
+  const sug=trAnalyse().map(s=>({sig:s.sig,kind:s.kind,title:s.title,body:s.sig==='weight'?(WB[s.title]||'Weight trend off track for their goal.'):trStaffBody(s),change:s.change||null}));const act=trState().active.map(a=>({sig:a.sig,title:a.title,at:a.at,checkAt:a.checkAt,change:a.change}));
+  return sug.length||act.length?{at:iso(todayDate()),items:sug,active:act}:null}catch(e){return null}}
+p3TeamPlanDigest=(function(old){return function(){const d=old.apply(this,arguments);const t=trForStaff();if(t)d.tcheck=t;return d}})(p3TeamPlanDigest);
+p3TeamPlanSync=function(){if(sampleMode||!sb||!UID)return;if(TEAM.list==null){if(!TEAM.loading)teamLoad();return}
+  if(!TEAM.list.some(m=>m.role!=='coach'&&m.share))return;const dg=p3TeamPlanDigest();const js=JSON.stringify(dg);if(js===P3TP.last)return;
+  const tp=meta.teamplan;const cur=tp?JSON.stringify(Object.assign({days:tp.days,changes:tp.changes,koach:tp.koach,koachDay:tp.koachDay},tp.tcheck?{tcheck:tp.tcheck}:{})):'';P3TP.last=js;if(cur===js)return;
+  persistMeta('teamplan',{...dg,at:new Date().toISOString()})};
+const trSharing=()=>{try{return !!(TEAM&&TEAM.list&&TEAM.list.some(m=>m.role!=='coach'&&m.share))}catch(e){return false}};
+trCard=(function(old){return function(){const h=old.apply(this,arguments);if(!h||!trTeam())return h;
+  return trSharing()?h.replace(/Worth showing them\./,'It\'s on their dashboard too, so they can change them.'):h}})(trCard);
+// weigh-in on Today: shows when the goal is about weight or you've weighed in this month
+function wiList(n){const o=[];for(let i=0;i<n;i++){const k=trK(-i);const w=+(D()[k]||{}).weight;if(w>30&&w<300)o.push({k,w})}return o}
+function wiRow(){if(typeof sampleMode!=='undefined'&&sampleMode)return '';const l=wiList(30);let goal=null;try{goal=trGoal(l[0]&&l[0].w)}catch(e){}if(!l.length&&!goal)return '';
+  const today=iso(todayDate());if(l[0]&&l[0].k===today)return `<button type="button" class="p3wi done" data-wiopen><span>${ico('scale')}</span><b>Weighed in</b><small>${l[0].w} kg today</small></button>`;
+  const ago=l[0]?Math.round((parse(today)-parse(l[0].k))/864e5):null;
+  return `<button type="button" class="p3wi" data-wiopen><span>${ico('scale')}</span><b>Weigh in</b><small>${l[0]?`Last ${l[0].w} kg, ${ago===1?'yesterday':ago+' days ago'}`:'Once or twice a week is plenty'}</small></button>`}
+let WI=null;
+function wiSheet(){const l=wiList(60);const today=iso(todayDate());if(WI==null)WI=(l[0]&&l[0].w)||80;let tr=null;try{tr=trWeight(trK(-35),trK(0))}catch(e){}
+  p1Sheet(`<div class="kshead"><div><h2>Weigh in</h2><small class="ds">Same time, same way: first thing, after the loo, before food</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  <div class="p3wis"><button type="button" data-wis="-0.5">−½</button><button type="button" data-wis="-0.1">−</button><b class="num" id="wiV">${WI.toFixed(1)}</b><span>kg</span><button type="button" data-wis="0.1">+</button><button type="button" data-wis="0.5">+½</button></div>
+  <button type="button" class="p3wisave" data-wisave>Save</button>
+  ${tr?`<p class="ds" style="margin-top:12px">Trend: <b>${tr.slope>0?'+':''}${tr.slope} kg a week</b> over the last 5 weeks. Day to day it jumps about with water and food, so Koach goes by the trend.</p>`:`<p class="ds" style="margin-top:12px">After 4 weigh-ins over 2 weeks Koach can show your trend and check your targets against your goal.</p>`}
+  ${l.length?`<p class="ds" style="font-size:12px">${l.slice(0,6).map(x=>`${fmtD(parse(x.k),{day:'numeric',month:'short'})}: ${x.w}`).join(' · ')}</p>`:''}`)}
+p3Tiles=(function(old){return function(){const h=old.apply(this,arguments);let w='';try{w=wiRow()}catch(e){}return h+w}})(p3Tiles);
+window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(c('[data-wiopen]')){e.preventDefault();e.stopImmediatePropagation();WI=null;wiSheet();return}
+  if(x=c('[data-wis]')){e.preventDefault();e.stopImmediatePropagation();WI=Math.max(30,Math.min(250,Math.round((WI+ +x.dataset.wis)*10)/10));const v=document.getElementById('wiV');if(v)v.textContent=WI.toFixed(1);return}
+  if(c('[data-wisave]')){e.preventDefault();e.stopImmediatePropagation();const ok=await persistDay(iso(todayDate()),{weight:WI});p1Sheet(null);if(ok)toast(`Saved: ${WI.toFixed(1)} kg`);TRC=null;render();return}},true);
+(function(){const st=document.createElement('style');st.textContent=`.p3wi{display:flex;align-items:center;gap:10px;width:100%;margin:10px 0 0;padding:12px 14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--text);text-align:left;font:inherit}
+.p3wi b{font-weight:600}.p3wi small{margin-left:auto;color:var(--muted);font-size:13px}.p3wi.done{opacity:.75}
+.p3wis{display:flex;align-items:center;justify-content:center;gap:8px;margin:14px 0}.p3wis b{font-size:40px;min-width:110px;text-align:center}.p3wis span{color:var(--muted);margin-right:6px}
+.p3wis button{width:46px;height:46px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:600 16px/1 var(--font-body)}
+.p3wisave{width:100%;min-height:48px;border-radius:99px;border:0;background:var(--k-amber);color:#15171E;font:600 15px/1 var(--font-body)}`;document.head.appendChild(st)})();
+
+// ================= Rest of today (26 Nov): say what you'll likely eat, see where you'd finish against every target. Nothing is logged. =================
+let ROT={busy:false,err:'',items:null,text:''};
+function rotLoad(){const k=iso(todayDate());const m=meta.rot;if(m&&m.k===k&&!ROT.items&&!ROT.busy){ROT.items=m.items||null;ROT.text=m.text||''}if(m&&m.k!==k&&ROT.items){ROT.items=null;ROT.text=''}}
+const rotF=(v,u)=>u==='kcal'||u==='mg'||u==='µg'?Math.round(v).toLocaleString('en-IE'):(Math.round(v*10)/10).toString();
+function rotRows(){const k=iso(todayDate());const d=D()[k]||{};const dt=dayTypeFor(k);const now=foodTotals(d);const end=foodTotals(Object.assign({},d,{food:(d.food||[]).concat(ROT.items||[])}));
+  return NUTS.map(n=>{const tg=nutTarget(n.k,dt);if(tg.lo==null&&tg.hi==null)return null;const v=end[n.k]||0;const st=status(v,tg);
+    let lab,cls;if(tg.lo!=null&&v<tg.lo){lab=`Short ${rotF(tg.lo-v,n.u)} ${n.u==='kcal'?'kcal':n.u}`;cls=v>=tg.lo*.8?'near':'short'}else if(tg.hi!=null&&v>tg.hi){lab='Over';cls='over'}else{lab='On target';cls='ok'}
+    return {n,now:now[n.k]||0,end:v,tg,lab,cls,st}}).filter(Boolean)}
+function rotSheet(){rotLoad();const k=iso(todayDate());const has=ROT.items&&ROT.items.length;
+  let res='';if(has){const rows=rotRows();const ok=rows.filter(r=>r.cls==='ok').length;const short=rows.filter(r=>r.cls==='short'||r.cls==='near');const over=rows.filter(r=>r.cls==='over');
+    const sec=(title,rs)=>rs.length?`<div class="label" style="margin:14px 0 6px">${title}</div>${rs.map(r=>`<div class="rotr ${r.cls}"><b>${esc(r.n.l)}</b><span class="num">${rotF(r.now,r.n.u)} → ${rotF(r.end,r.n.u)}</span><em>${esc(r.lab)}</em></div>`).join('')}`:'';
+    res=`<div class="rotsum"><b>${ok} of ${rows.length}</b> on target by tonight${short.length?`. Still short: ${short.slice(0,4).map(r=>esc(r.n.l.toLowerCase())).join(', ')}${short.length>4?'…':''}`:''}${over.length?`. Over: ${over.map(r=>esc(r.n.l.toLowerCase())).join(', ')}`:''}.</div>
+    <p class="ds" style="font-size:12px;margin:4px 0 0">Counting: ${ROT.items.map(i=>esc(i.name)).join(', ')}. Not logged. Log the food as usual when you eat it.</p>
+    ${sec('Macros',rows.filter(r=>r.n.macro))}${sec('Vitamins and minerals',rows.filter(r=>!r.n.macro))}`}
+  p1Sheet(`<div class="kshead"><div><h2>Rest of today</h2><small class="ds">Say what you'll likely eat. Keel shows where you'd finish.</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  <textarea id="rotT" class="in" rows="3" placeholder="e.g. Steak, cauliflower, broccoli and liver for dinner, then yogurt, raspberries and walnuts" style="width:100%;box-sizing:border-box">${esc(ROT.text||'')}</textarea>
+  <div style="display:flex;gap:8px;margin-top:8px">${speakBtn('rotT')}<button type="button" class="rotgo" data-rotgo ${ROT.busy?'disabled':''}>${ROT.busy?'Working it out…':has?'Check again':'Check it'}</button></div>
+  ${ROT.err?`<p class="ds" style="color:var(--bad)">${esc(ROT.err)}</p>`:''}${res}`)}
+async function rotGo(){const el=document.getElementById('rotT');const txt=(el&&el.value||'').trim();if(!txt){toast('Say or type what you plan to eat');return}
+  ROT={busy:true,err:'',items:ROT.items,text:txt};rotSheet();
+  try{const j=await sample.json(`The person is planning the REST OF TODAY. These foods are NOT eaten yet; they are what they will likely eat later today:\n"""${txt}"""\n${foodRules()}`);
+    const it=cleanItems(j&&j.items,'Dinner',true,'plan');if(!it.length)throw {code:'invalid_json'};ROT={busy:false,err:'',items:it,text:txt};
+    persistMeta('rot',{k:iso(todayDate()),text:txt,items:it,at:new Date().toISOString()})}
+  catch(e){ROT={busy:false,err:foodErr(e),items:ROT.items,text:txt}}
+  if(document.getElementById('rotT'))rotSheet()}
+// the button: beside the high / low buttons on today's food, or on its own if there are none
+microsHTML=(function(old){return function(t,dt,k){const h=old.apply(this,arguments);if(k!==iso(todayDate())||(typeof sampleMode!=='undefined'&&sampleMode))return h;
+  const b=`<button type="button" class="p3nwb rot" data-rotopen aria-label="Rest of today: will I hit my targets?">${ico('sparkles')}<span>Rest of today</span></button>`;
+  return h.includes('<div class="p3nwi">')?h.replace('<div class="p3nwi">','<div class="p3nwi">'+b):`<div class="p3nwi">${b}</div>`+h}})(microsHTML);
+window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
+  if(c('[data-rotopen]')){e.preventDefault();e.stopImmediatePropagation();ROT.err='';rotSheet();return}
+  if(c('[data-rotgo]')){e.preventDefault();e.stopImmediatePropagation();if(!ROT.busy)rotGo();return}},true);
+(function(){const st=document.createElement('style');st.textContent=`.p3nwb.rot{color:var(--text)}
+.rotgo{flex:1;min-height:46px;border-radius:99px;border:0;background:var(--k-amber);color:#15171E;font:600 15px/1 var(--font-body)}.rotgo[disabled]{opacity:.6}
+.rotsum{margin-top:14px;padding:12px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:14px;line-height:1.45}
+.rotr{display:grid;grid-template-columns:1fr auto 92px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.rotr b{font-weight:500}.rotr span{color:var(--muted);font-size:13px}.rotr em{font-style:normal;font-size:12px;font-weight:600;text-align:right}
+.rotr.ok em{color:var(--good,#3a9a5b)}.rotr.near em{color:var(--k-amber)}.rotr.short em,.rotr.over em{color:var(--bad,#c4453c)}`;document.head.appendChild(st)})();
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
