@@ -2173,7 +2173,7 @@ function foodTodayHTML(dIso){
   const meals=MEALS.map(m=>{const its=food.filter(i=>i.meal===m);return its.length?p1MealHTML(m,its):''}).join('');
   const pm=pd?(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot||'')):[];const pmDone=pd?(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot||'')&&planLogged(dIso,ix)).length:0;
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Meal plans are built from it.</span><em>Add my food ›</em></button>`:''}
-  <article class="card p1ftot"><div class="chead"><div style="flex:1;min-width:0"><h2>${isToday?'Today so far':'This day'}</h2><div class="sub">${DAYT[dt].label} targets · ${t.n?`${t.n} item${t.n>1?'s':''}`:'nothing logged yet'} · <button type="button" class="p3howl" data-howcalc>How we work it out</button></div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
+  <article class="card p1ftot"><div class="chead"><div style="flex:1;min-width:0"><h2>${isToday?'Today so far':'This day'}</h2></div><div class="p3totr"><button type="button" class="p3howl p3howtop" data-howcalc>How we work it out</button>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div></div>
     ${p1FoodBars(t,dt,'d')}${microsHTML(t,dt,dIso)}</article>
   ${foodActionsHTML(dIso)}
   ${meals?`<article class="card p1meals">${meals}</article>`:''}
@@ -7237,18 +7237,19 @@ window.addEventListener('click',async e=>{const x=e.target.closest&&e.target.clo
 // ================= Evidence and missing data (Kieran's review): say what advice is based on; no patterns until there's enough =================
 const EV_MIN=14;
 function evCounts(n){const t=todayDate();let ci=0,food=0,sess=0,fb=0;for(let i=0;i<n;i++){const k=iso(addD(t,-i)),d=D()[k];if(d){if(readiness(d)!=null)ci++;if((d.food||[]).length>=3)food++;if(d.sfb)fb++}const l=L()[k];if(l&&l.status&&l.status!=='missed')sess++}return {ci,food,sess,fb,n}}
-const evLine=(c,extra)=>`<p class="evn">${ico('circle-alert')}<span>Based on ${c.ci} day${c.ci===1?'':'s'} of check-ins, ${c.food} day${c.food===1?'':'s'} of food logs and ${c.sess} session${c.sess===1?'':'s'} in the last ${c.n===56?'8 weeks':c.n===28?'4 weeks':c.n+' days'}.${extra?' '+extra:''}</span></p>`;
+const evLine=(c,extra)=>`<p class="evn">${ico('circle-alert')}<span>From ${c.ci} check-ins, ${c.food} food days, ${c.sess} sessions (${c.n===56?'8':c.n===28?'4':Math.round(c.n/7)} wks).${extra?' '+extra:''}</span></p>`;
 const evWait=(c,what)=>`<article class="card evwait"><div class="chead"><div style="flex:1"><h2>${what} need a bit more data</h2><div class="sub">They show once you have ${EV_MIN} days of check-ins. You have ${c.ci} so far${c.ci?', so about '+(EV_MIN-c.ci)+' to go':''}. Before that, any pattern would be guesswork.</div></div></div><div class="evbar"><i style="width:${Math.min(100,c.ci/EV_MIN*100)}%"></i></div></article>`;
 p1PatternsView=(function(old){return function(){const h=old.apply(this,arguments);if(sampleMode)return h;const c=evCounts(56);const t=document.createElement('template');t.innerHTML=h;const R=t.content;
-  const lab=[...R.querySelectorAll('.label')].find(x=>/last 8 weeks/i.test(x.textContent));if(lab)lab.textContent=`From ${c.ci} days of check-ins`;
-  const first=R.querySelector('article.card');if(first)first.insertAdjacentHTML('beforebegin',evLine(c,'Patterns compare your own better and worse days. They show what goes together, not what causes what.'));
+  const lab=[...R.querySelectorAll('.label')].find(x=>/last 8 weeks/i.test(x.textContent));if(lab){lab.className='p3evh';lab.innerHTML=`<b>Last 8 weeks</b><span>${c.ci} check-ins</span>`}
   if(c.ci<EV_MIN){const kill=[...R.querySelectorAll('article.card')].filter(a=>a.classList.contains('p3best')||/links up|Your best days|What affects/i.test((a.querySelector('h2')||{}).textContent||''));
     if(kill.length){kill[0].insertAdjacentHTML('beforebegin',evWait(c,'Your patterns'));kill.forEach(a=>a.remove())}}
   return t.innerHTML}})(p1PatternsView);
 correlations=(function(old){return function(){const c=evCounts(56);if(!sampleMode&&c.ci<EV_MIN)return `<div class="hint">Patterns show after ${EV_MIN} days of check-ins. You have ${c.ci} so far.</div>`;return (sampleMode?'':evLine(c))+old.apply(this,arguments)}})(correlations);
-coachHTML=(function(old){return function(aiText,savedAI){const h=old.apply(this,arguments);if(sampleMode||!aiText)return h;const c=evCounts(28);return h.replace(/<\/details>\s*$/,`${evLine(c,c.ci<10?'That\'s not much yet, so take this as a first read.':'')}</details>`)}})(coachHTML);
+coachHTML=(function(old){return function(aiText,savedAI){const h=old.apply(this,arguments);if(sampleMode||!aiText)return h;const c=evCounts(28);return h.replace(/<\/details>\s*$/,`${evLine(c,c.ci<10?'Early days, so a first read.':'')}</details>`)}})(coachHTML);
 trCard=(function(old){return function(){const h=old.apply(this,arguments);if(!h)return h;const c=evCounts(56);return h.replace(/<div class="p3trb">/,`${evLine(c)}<div class="p3trb">`)}})(trCard);
-(function(){const st=document.createElement('style');st.textContent=`.evn{display:flex;gap:6px;align-items:flex-start;margin:8px 0;font-size:12px;line-height:1.4;color:var(--muted)}.evn .ki,.evn svg{width:14px;height:14px;flex:none;margin-top:1px}
+(function(){const st=document.createElement('style');st.textContent=`.p3evh{display:flex;flex-direction:column;gap:1px;line-height:1.25}.p3evh b{font:600 15px/1.25 var(--font-body);color:var(--text)}.p3evh span{font-size:12px;color:var(--muted)}
+.p3totr{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}.p3howtop{font-size:12px;color:var(--muted)}
+.evn{display:flex;gap:6px;align-items:flex-start;margin:8px 0;font-size:12px;line-height:1.4;color:var(--muted)}.evn .ki,.evn svg{width:14px;height:14px;flex:none;margin-top:1px}
 .evbar{height:6px;border-radius:99px;background:var(--line);margin:0 16px 16px;overflow:hidden}.evbar i{display:block;height:100%;background:var(--k-green,#3a9a5b)}`;document.head.appendChild(st)})();
 
 (async()=>{
