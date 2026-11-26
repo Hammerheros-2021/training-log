@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0A100D">
-<script>try{var q=new URLSearchParams(location.search).get("look");if(q)localStorage.setItem("keelLook",q);var v=localStorage.getItem("keelLook")||"auto";if(v==="auto"){var n=new Date(),h=n.getHours()+n.getMinutes()/60,S=[[8.6,16.6],[8,17.5],[7,18.5],[6.5,20.3],[5.5,21.2],[5,22],[5.2,21.8],[6,20.8],[7,19.6],[7.8,18.4],[8,16.6],[8.6,16.2]][n.getMonth()];v=h>=S[0]&&h<S[1]?"bone":"forest"}document.documentElement.dataset.look=v}catch(e){}</script>
+<script>try{var L=["bone","forest","keel","auto"],q=new URLSearchParams(location.search).get("look");if(q&&L.indexOf(q)>=0)localStorage.setItem("keelLook",q);var v=localStorage.getItem("keelLook")||"auto";if(L.indexOf(v)<0)v="auto";if(v==="auto")v=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"forest":"bone";document.documentElement.dataset.look=v}catch(e){}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Keel">
@@ -2081,6 +2081,6 @@ html[data-look="forest"]{--bg:#0E0E10!important;--surface:#18181B!important;--li
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p6b"></script>
+<script src="/p3/app.js?v=p6c"></script>
 </body>
 </html>

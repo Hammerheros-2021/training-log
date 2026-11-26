@@ -7252,6 +7252,14 @@ trCard=(function(old){return function(){const h=old.apply(this,arguments);if(!h)
 .evn{display:flex;gap:6px;align-items:flex-start;margin:8px 0;font-size:12px;line-height:1.4;color:var(--muted)}.evn .ki,.evn svg{width:14px;height:14px;flex:none;margin-top:1px}
 .evbar{height:6px;border-radius:99px;background:var(--line);margin:0 16px 16px;overflow:hidden}.evbar i{display:block;height:100%;background:var(--k-green,#3a9a5b)}`;document.head.appendChild(st)})();
 
+// ================= Looks: Bone, Forest and Keel only, plus Match phone (Bone or Forest, following the phone's light or dark mode) =================
+P3LOOKS.length=0;P3LOOKS.push(['bone','Bone','Light paper, forest green'],['forest','Forest','Dark and calm'],['keel','Keel','Black, the logo colours'],['auto','Match phone','Bone or Forest, with your phone\'s light or dark mode']);
+const p3PhoneDark=()=>!!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+p3LookNow=function(){const v=p3LookPref();if(v!=='auto')return v;return p3PhoneDark()?'forest':'bone'};
+p3ApplyLook=function(){const e=p3LookNow();if(document.documentElement.dataset.look!==e)document.documentElement.dataset.look=e;const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=e==='bone'?'#F4F1EB':e==='forest'?'#0E0E10':(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0B0C10')};
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{p3ApplyLook();try{render()}catch(e){}})}catch(e){}
+p3ApplyLook();
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
