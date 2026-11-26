@@ -6996,7 +6996,7 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
 
 // ================= Rest of today (26 Nov): say what you'll likely eat, see where you'd finish against every target. Nothing is logged. =================
 let ROT={busy:false,err:'',items:null,text:''};
-function rotLoad(){const k=iso(todayDate());const m=meta.rot;if(m&&m.k===k&&!ROT.items&&!ROT.busy){ROT.items=m.items||null;ROT.text=m.text||''}if(m&&m.k!==k&&ROT.items){ROT.items=null;ROT.text=''}}
+function rotLoad(){const k=iso(todayDate());const m=meta.rot;if(m&&m.k===k&&!ROT.items&&!ROT.busy){ROT.items=m.items||null;ROT.text=m.text||'';ROT.tips=m.tips||null}if(m&&m.k!==k&&ROT.items){ROT.items=null;ROT.text=''}}
 const rotF=(v,u)=>u==='kcal'||u==='mg'||u==='µg'?Math.round(v).toLocaleString('en-IE'):(Math.round(v*10)/10).toString();
 function rotRows(){const k=iso(todayDate());const d=D()[k]||{};const dt=dayTypeFor(k);const now=foodTotals(d);const end=foodTotals(Object.assign({},d,{food:(d.food||[]).concat(ROT.items||[])}));
   return NUTS.map(n=>{const tg=nutTarget(n.k,dt);if(tg.lo==null&&tg.hi==null)return null;const v=end[n.k]||0;const st=status(v,tg);
@@ -7004,8 +7004,10 @@ function rotRows(){const k=iso(todayDate());const d=D()[k]||{};const dt=dayTypeF
     return {n,now:now[n.k]||0,end:v,tg,lab,cls,st}}).filter(Boolean)}
 function rotSheet(){rotLoad();const k=iso(todayDate());const has=ROT.items&&ROT.items.length;
   let res='';if(has){const rows=rotRows();const ok=rows.filter(r=>r.cls==='ok').length;const short=rows.filter(r=>r.cls==='short'||r.cls==='near');const over=rows.filter(r=>r.cls==='over');
-    const sec=(title,rs)=>rs.length?`<div class="label" style="margin:14px 0 6px">${title}</div>${rs.map(r=>`<div class="rotr ${r.cls}"><b>${esc(r.n.l)}</b><span class="num">${rotF(r.now,r.n.u)} → ${rotF(r.end,r.n.u)}</span><em>${esc(r.lab)}</em></div>`).join('')}`:'';
+    const sec=(title,rs)=>rs.length?`<div class="label" style="margin:14px 0 6px">${title}</div>${rs.map(rotBar).join('')}`:'';
     res=`<div class="rotsum"><b>${ok} of ${rows.length}</b> on target by tonight${short.length?`. Still short: ${short.slice(0,4).map(r=>esc(r.n.l.toLowerCase())).join(', ')}${short.length>4?'…':''}`:''}${over.length?`. Over: ${over.map(r=>esc(r.n.l.toLowerCase())).join(', ')}`:''}.</div>
+    ${ROT.tips&&ROT.tips.length?`<div class="rottips"><span class="label">Koach suggests</span>${ROT.tips.map(t=>`<p>${ico('sparkles')}<span>${esc(t)}</span></p>`).join('')}</div>`:ROT.tipsBusy?'<p class="ds" style="font-size:13px;margin-top:8px">Koach is looking for easy wins…</p>':''}
+    <div class="rotkey"><span><i class="a"></i>Eaten</span><span><i class="b"></i>Planned</span><span><i class="t"></i>Target</span></div>
     <p class="ds" style="font-size:12px;margin:4px 0 0">Counting: ${ROT.items.map(i=>esc(i.name)).join(', ')}. Not logged. Log the food as usual when you eat it.</p>
     ${sec('Macros',rows.filter(r=>r.n.macro))}${sec('Vitamins and minerals',rows.filter(r=>!r.n.macro))}`}
   p1Sheet(`<div class="kshead"><div><h2>Rest of today</h2><small class="ds">Say what you'll likely eat. Keel shows where you'd finish.</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
@@ -7015,10 +7017,22 @@ function rotSheet(){rotLoad();const k=iso(todayDate());const has=ROT.items&&ROT.
 async function rotGo(){const el=document.getElementById('rotT');const txt=(el&&el.value||'').trim();if(!txt){toast('Say or type what you plan to eat');return}
   ROT={busy:true,err:'',items:ROT.items,text:txt};rotSheet();
   try{const j=await sample.json(`The person is planning the REST OF TODAY. These foods are NOT eaten yet; they are what they will likely eat later today:\n"""${txt}"""\n${foodRules()}`);
-    const it=cleanItems(j&&j.items,'Dinner',true,'plan');if(!it.length)throw {code:'invalid_json'};ROT={busy:false,err:'',items:it,text:txt};
+    const it=cleanItems(j&&j.items,'Dinner',true,'plan');if(!it.length)throw {code:'invalid_json'};ROT={busy:false,err:'',items:it,text:txt,tips:null,tipsBusy:true};
     persistMeta('rot',{k:iso(todayDate()),text:txt,items:it,at:new Date().toISOString()})}
-  catch(e){ROT={busy:false,err:foodErr(e),items:ROT.items,text:txt}}
+  catch(e){ROT={busy:false,err:foodErr(e),items:ROT.items,text:txt,tips:ROT.tips}}
+  if(document.getElementById('rotT'))rotSheet();if(ROT.tipsBusy)rotTips()}
+async function rotTips(){const rows=rotRows();const bad=rows.filter(r=>r.cls!=='ok');
+  if(!bad.length){ROT.tips=['That plan gets you on target for everything. Nothing to add.'];ROT.tipsBusy=false}
+  else{const lines=bad.map(r=>`${r.n.l}: would finish at ${rotF(r.end,r.n.u)} ${r.n.u}, target ${r.tg.txt||((r.tg.lo!=null?r.tg.lo:'')+(r.tg.hi!=null?'-'+r.tg.hi:''))} (${r.lab})`).join('\n');
+    try{const j=await sample.json(`Someone has planned the rest of today's food: "${ROT.text}". With that plan, these targets would be missed by tonight:\n${lines}\nAbout them: ${ABOUT}. Food approach: ${APPROACH}.\nGive 2 or 3 short, practical tweaks to THIS plan that fix the biggest gaps without breaking the others, e.g. "Add 2 eggs to dinner: covers your choline and B12". Prefer adding to or swapping within the planned meals over new meals. Name the food and amount, and which targets it fixes. If something is over, say what to cut. Plain Irish English, no em dashes, each under 20 words. Reply ONLY with JSON: {"tips":["...","..."]}`);
+      ROT.tips=(j&&Array.isArray(j.tips)?j.tips:[]).map(t=>String(t).replace(/\s*—\s*/g,', ').slice(0,180)).slice(0,3)}catch(e){ROT.tips=[]}
+    ROT.tipsBusy=false}
+  try{const m=meta.rot;if(m&&m.k===iso(todayDate()))persistMeta('rot',Object.assign({},m,{tips:ROT.tips}))}catch(e){}
   if(document.getElementById('rotT'))rotSheet()}
+function rotBar(r){const ref=r.tg.t||r.tg.lo||r.tg.hi||1;const top=Math.max(r.tg.hi||ref,ref)*1.25;const sc=Math.max(top,r.end*1.05);const pc=v=>Math.max(0,Math.min(100,v/sc*100));
+  const lo=r.tg.lo!=null?pc(r.tg.lo):null,hi=r.tg.hi!=null?pc(r.tg.hi):null;const tgt=r.n.macro&&r.tg.t?`${rotF(r.tg.t,r.n.u)}`:r.tg.lo!=null&&r.tg.hi!=null?`${rotF(r.tg.lo,r.n.u)}-${rotF(r.tg.hi,r.n.u)}`:r.tg.lo!=null?`${rotF(r.tg.lo,r.n.u)}+`:`max ${rotF(r.tg.hi,r.n.u)}`;
+  return `<div class="rotb ${r.cls}"><div class="rotbh"><b>${esc(r.n.l)}</b><span class="num">${rotF(r.end,r.n.u)} <small>of ${tgt} ${r.n.u==='kcal'?'':esc(r.n.u)}</small></span><em>${esc(r.lab)}</em></div>
+    <div class="rotbt">${lo!=null&&hi!=null?`<i class="zone" style="left:${lo}%;width:${hi-lo}%"></i>`:''}<i class="a" style="width:${pc(r.now)}%"></i><i class="b" style="left:${pc(r.now)}%;width:${Math.max(0,pc(r.end)-pc(r.now))}%"></i>${r.n.macro&&r.tg.t?`<i class="t" style="left:${pc(r.tg.t)}%"></i>`:`${lo!=null?`<i class="t" style="left:${lo}%"></i>`:''}${hi!=null?`<i class="t" style="left:${hi}%"></i>`:''}`}</div></div>`}
 // the button: beside the high / low buttons on today's food, or on its own if there are none
 microsHTML=(function(old){return function(t,dt,k){const h=old.apply(this,arguments);if(k!==iso(todayDate())||(typeof sampleMode!=='undefined'&&sampleMode))return h;
   const b=`<button type="button" class="p3nwb rot" data-rotopen aria-label="Rest of today: will I hit my targets?">${ico('sparkles')}<span>Rest of today</span></button>`;
@@ -7029,6 +7043,13 @@ window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closes
 (function(){const st=document.createElement('style');st.textContent=`.p3nwb.rot{color:var(--text)}
 .rotgo{flex:1;min-height:46px;border-radius:99px;border:0;background:var(--k-amber);color:#15171E;font:600 15px/1 var(--font-body)}.rotgo[disabled]{opacity:.6}
 .rotsum{margin-top:14px;padding:12px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:14px;line-height:1.45}
+.rotb{padding:8px 0;border-bottom:1px solid var(--line)}.rotbh{display:grid;grid-template-columns:1fr auto 84px;gap:8px;align-items:baseline;font-size:14px}.rotbh b{font-weight:500}.rotbh span{font-size:13px}.rotbh small{color:var(--muted)}
+.rotbh em{font-style:normal;font-size:12px;font-weight:600;text-align:right}.rotb.ok em{color:var(--good,#3a9a5b)}.rotb.near em{color:var(--k-amber)}.rotb.short em,.rotb.over em{color:var(--bad,#c4453c)}
+.rotbt{position:relative;height:8px;border-radius:99px;background:var(--line);margin-top:6px;overflow:hidden}.rotbt i{position:absolute;top:0;bottom:0}
+.rotbt i.a{left:0;background:var(--muted)}.rotbt i.b{background:var(--good,#3a9a5b)}.rotb.near .rotbt i.b{background:var(--k-amber)}.rotb.short .rotbt i.b,.rotb.over .rotbt i.b{background:var(--bad,#c4453c)}
+.rotbt i.zone{background:color-mix(in srgb,var(--good,#3a9a5b) 18%,transparent)}.rotbt i.t{width:2px;margin-left:-1px;background:var(--text)}
+.rotkey{display:flex;gap:14px;margin-top:12px;font-size:12px;color:var(--muted)}.rotkey i{display:inline-block;width:10px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}.rotkey i.a{background:var(--muted)}.rotkey i.b{background:var(--good,#3a9a5b)}.rotkey i.t{width:2px;background:var(--text)}
+.rottips{margin-top:10px;padding:12px 14px;border-radius:14px;border:1px solid var(--k-amber);background:color-mix(in srgb,var(--k-amber) 8%,transparent)}.rottips p{display:flex;gap:8px;margin:6px 0 0;font-size:14px;line-height:1.4}.rottips p .ki{flex:none;color:var(--k-amber)}
 .rotr{display:grid;grid-template-columns:1fr auto 92px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .rotr b{font-weight:500}.rotr span{color:var(--muted);font-size:13px}.rotr em{font-style:normal;font-size:12px;font-weight:600;text-align:right}
 .rotr.ok em{color:var(--good,#3a9a5b)}.rotr.near em{color:var(--k-amber)}.rotr.short em,.rotr.over em{color:var(--bad,#c4453c)}`;document.head.appendChild(st)})();
