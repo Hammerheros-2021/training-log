@@ -131,9 +131,9 @@ function sessionHTML(d,pl){
   else if(k==='T'){const test=!THRMIN[wi];
     if(test){title=pl.wk===1?'5 km baseline':'5 km re-test';sub='Flat route, all out after the warm-up';body=exRow('','5 km time trial','Even pacing. Log your time: it sets your threshold pace.','5 km');}
     else{sub=`${THR[wi]} · about 50' total`;const t5=latest5k(iso(d));let pace='5 km pace + 15-20 s/km';
-      if(t5){const s=toSec(t5.fivek)/5;pace=fromSec(s+15)+'-'+fromSec(s+20)+' /km';}
+      if(t5){const s=toSec(t5.fivek)/5;pace=fromSec(s+15)+'-'+fromSec(s+20)+' /km';var tmill=kmhOf(s+20)+'-'+kmhOf(s+15)+' km/h';}
       body=exRow('W','Warm-up','Include 3 strides.',"15'")+exRow('1','Threshold reps','RPE 7, comfortably hard.',THR[wi].split(' /')[0])+exRow('','Recovery jog','',THR[wi].split('/ ')[1]||'')+exRow('C','Cool-down','Easy jog.',"10'")+
-        `<div class="note"><b>Your threshold pace:</b> ${esc(pace)}${t5?` <span style="color:var(--muted)">(from 5 km of ${esc(t5.fivek)})</span>`:''}</div>`;}
+        `<div class="note"><b>Your threshold pace:</b> ${esc(pace)}${t5?` <span style="color:var(--muted)">(from 5 km of ${esc(t5.fivek)})</span><br><b>On a treadmill:</b> ${esc(tmill)} <span style="color:var(--muted)">at 1% incline</span>`:''}</div>`;}
     extra+=warmupBlock();}
   else if(k==='X'){title='Speed + long run';sub=`After sunrise on grass · 20' block then ${LONG[wi]}' easy`;
     body=SPEED.map(e=>exRow(e.tag,e.nm,e.cue,e.d[p])).join('');
@@ -1093,9 +1093,10 @@ function planStickHTML(){
 // ---- plan tab: plan first, settings at the bottom ----
 function planTopHTML(p){const d0=p.days[0].date,d1=p.days[p.days.length-1].date;
   return `<div class="plantop"><div><b>Your plan · ${short(parse(d0))}-${short(parse(d1))}</b><small>${pState.busy?'Re-planning now…':pState.msg?esc(pState.msg):`Made ${fmtD(new Date(p.createdAt),{weekday:'short',day:'numeric',month:'short'})}`}</small></div><button type="button" class="ghost" id="toReplan">Change &amp; re-plan ↓</button></div>`}
+const kmhOf=sec=>sec?(Math.round(36000/sec)/10).toFixed(1):'';
 // ---- training: a logged session collapses to one line ----
 function loggedHTML(d){const l=L()[iso(d)];const st=l.status;
-  const bits=[l.dur?`${l.dur} min`:'',l.rpe?`effort ${l.rpe}/10`:'',l.tb?`${l.tb} kg`:'',l.pace?`${l.pace}/km`:'',l.fivek?`5 km ${l.fivek}`:''].filter(Boolean).join(' · ');
+  const bits=[l.dur?`${l.dur} min`:'',l.rpe?`effort ${l.rpe}/10`:'',l.tb?`${l.tb} kg`:'',l.pace?`${l.pace}/km (${kmhOf(toSec(l.pace))} km/h)`:'',l.fivek?`5 km ${l.fivek}`:''].filter(Boolean).join(' · ');
   return `<div class="form logged"><div class="lgrow"><span class="chipx ${st}">${st==='done'?'✓ Done':st==='partial'?'Partly done':'Missed'}</span><span class="ds">${esc(bits)}</span><button type="button" class="editbtn" id="sEdit">✎ Edit</button></div>${l.notes?`<div class="hint" style="font-size:12px;color:var(--muted)">${esc(l.notes)}</div>`:''}</div>`}
 document.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
   if(c('[data-todo]'))returnTo='dashboard';else if(c('.tabs a'))returnTo=null;
@@ -3746,7 +3747,7 @@ p3Rings=function(k,s){const d=D()[k]||{};const dt=dayTypeFor(k),ft=foodTotals(d)
   const R=(id,val,max,txt,lab,plus)=>`<button type="button" class="p3ring" data-p3ring="${id}">${ring(val,max,72,4,'fade',txt,'')}<span>${lab}${plus?' <i class="p3plus">+</i>':''}</span></button>`;
   return `<section class="p3rings" aria-label="Your day">${R('balance',s,100,s!=null?Math.round(s):'–','Balance')}${R('sleep',sh,need,sh!=null?sh+'h':'–','Sleep')}${R('food',Math.round(ft.kcal),kt,(ft.kcal?Math.round(ft.kcal/kt*100):0)+'%','Food',1)}${R('drinks',w,lo,w?(Math.round(w*10)/10)+'L':'0L','Drinks',1)}</section>`};
 p3Tiles=function(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);
-  const t=(id,icon,name,done,sub)=>`<button type="button" class="p1tile p3tile${done?' done':''}" data-p1tile="${id}"><span class="p1ti">${ico(done?'check':icon)}</span><span class="p3tt"><b>${name}</b>${sub?`<small>${sub}</small>`:''}</span></button>`;
+  const t=(id,icon,name,done,sub)=>`<button type="button" class="p1tile p3tile${done?' done':''}" data-p1tile="${id}"><span class="p1ti">${ico(done?'check':icon)}</span><span class="p3tlab"><b>${name}</b>${sub?`<small>${sub}</small>`:''}</span></button>`;
   return `<section class="p3tiles p3t3" aria-label="Add">${t('ci','sun','Check in',ci,ci?'Done':'')}${t('move','footprints','Session',false,'')}${t('rec','wind','Recover',false,'')}</section>`};
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3ring]');if(!b)return;const id=b.dataset.p3ring;
   if(id==='food'){e.stopImmediatePropagation();fView='today';sel=todayDate();location.hash='food';return}
@@ -7259,6 +7260,12 @@ p3LookNow=function(){const v=p3LookPref();if(v!=='auto')return v;return p3PhoneD
 p3ApplyLook=function(){const e=p3LookNow();if(document.documentElement.dataset.look!==e)document.documentElement.dataset.look=e;const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=e==='bone'?'#F4F1EB':e==='forest'?'#0E0E10':(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0B0C10')};
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{p3ApplyLook();try{render()}catch(e){}})}catch(e){}
 p3ApplyLook();
+
+// ---- runs: every pace per km also shows km/h, for treadmill runs ----
+const P3KMH_RE=/(\b\d{1,2}:\d\d)(?:\s?-\s?(\d{1,2}:\d\d))?(\s?\/km)(?! \(\d)(?! <span style="color:var\(--muted\)">\(from)/g;
+function p3AddKmh(h){if(typeof h!=='string')return h;return h.replace(P3KMH_RE,(m,a,b,u)=>{const x=kmhOf(toSec(a)),y=b?kmhOf(toSec(b)):'';if(!x)return m;const r=y?(+x<+y?x+'-'+y:y+'-'+x):x;return `${m} (${r} km/h)`})}
+viewPlan=(function(old){return function(){return p3AddKmh(old.apply(this,arguments))}})(viewPlan);
+viewTrainingTab=(function(old){return function(){return p3AddKmh(old.apply(this,arguments))}})(viewTrainingTab);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
