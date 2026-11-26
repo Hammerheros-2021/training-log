@@ -1596,6 +1596,13 @@ details.rcat.p3rf .rprogs{padding:0 12px 12px}
 .p3t3 .p1tile.p3tile .p1ti{width:32px;height:32px;flex:none}
 .p3tlab{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
 .p3tlab b{white-space:nowrap}
+.p3fpill small{margin-left:6px;font-size:11px;font-weight:500;opacity:.75}
+.p3prt{display:flex;flex-direction:column;gap:6px;margin:10px 0 4px}
+.p3prtc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.p3prtc button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:99px;padding:7px 12px;font-size:13px}
+.p3prtc button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.p3prti{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:3px 10px}
+.p3prti svg{width:15px;height:15px}.p3prti input{border:0;background:transparent;color:var(--fg);font:inherit;font-size:13px;padding:3px 0;width:auto}
 .p3tlab{display:flex;flex-direction:column;min-width:0}.p3tlab b{font:500 13px/16px var(--font-body)}.p3tlab small{font-size:11px;line-height:13px;color:var(--text-muted)}
 .p3hr{display:flex;align-items:center;gap:14px;padding:16px!important;margin-bottom:var(--space-3)}
 .p3hri{flex:none;display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:color-mix(in srgb,var(--fade-blue) 14%,transparent)}
@@ -2083,6 +2090,6 @@ html[data-look="forest"]{--bg:#0E0E10!important;--surface:#18181B!important;--li
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p6d"></script>
+<script src="/p3/app.js?v=p6e"></script>
 </body>
 </html>

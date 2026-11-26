@@ -363,7 +363,7 @@ function targets(){return {fastH:(meta.settings&&meta.settings.fastH)||14}}
 
 // ---------- totals ----------
 const kcalOf=i=>isNum(i.kcal)?+i.kcal:Math.round(4*(+i.carbs||0)+4*(+i.protein||0)+9*(+i.fat||0));
-const breaksFast=i=>kcalOf(i)>=20;
+const breaksFast=i=>kcalOf(i)>=5;
 function foodTotals(d){const t={n:0,microN:0};NK.forEach(k=>t[k]=0);(d&&d.food||[]).forEach(i=>{NK.forEach(k=>{t[k]+=k==='kcal'?kcalOf(i):(+i[k]||0)});t.n++;if(i.micros!==false)t.microN++});suppItems(d).forEach(i=>NK.forEach(k=>{if(k!=='kcal')t[k]+=(+i[k]||0);else t.kcal+=(+i.kcal||0)}));return t}
 function mealWindow(d){if(!d)return null;let ts=(d.food||[]).filter(breaksFast).map(i=>tmin(i.at)).filter(x=>x!=null);const f=tmin(d.firstMeal),l=tmin(d.lastMeal);if(f!=null)ts.push(f);if(l!=null)ts.push(l);if(!ts.length)return null;return {first:f!=null?f:Math.min(...ts),last:l!=null?l:Math.max(...ts)}}
 function fastHours(map,k){const d=map[k],p=map[iso(addD(parse(k),-1))];const w=mealWindow(d),pw=mealWindow(p);if(!w||!pw)return null;return Math.round(((w.first+1440)-pw.last)/6)/10}
@@ -407,7 +407,7 @@ function foodTodayHTML(dIso){
   const freq=frequentFoods();const ai=!!sample;const due=planDue();
   const kEmpty=!kitchen().length&&!sampleMode;
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Your meal plans are built from it, so this comes first.</span><em>Add my food ›</em></button>`:''}${!kEmpty&&due&&dIso===iso(todayDate())?`<button type="button" class="rpill" data-fview="plan" style="--vc:var(--warn);width:100%;text-align:left"><b>!</b><span><b>${due==='none'?'Plan your next 3 days':'Your meal plan ends today'}</b><br><small>Update your food, then let Keel plan the next 3 days.</small></span><span aria-hidden="true">›</span></button>`:''}
-  <article class="card kmac"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label} <span class="dtwhy">· ${esc(dayTypeWhy(dIso))}</span></h2>${(D()[dIso]||{}).trainIntent==='extra'&&!((D()[dIso]||{}).extras||[]).length&&!sampleMode?'<button type="button" class="linkbtn" data-intentclear style="min-height:32px;padding:0">Didn\'t train? Switch back to a rest day</button>':''}<div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div>
+  <article class="card kmac"><div class="chead"><div style="flex:1;min-width:0"><h2>${DAYT[dt].label} <span class="dtwhy">· ${esc(dayTypeWhy(dIso))}</span></h2>${(D()[dIso]||{}).trainIntent==='extra'&&!((D()[dIso]||{}).extras||[]).length&&!sampleMode?'<button type="button" class="linkbtn" data-intentclear style="min-height:32px;padding:0">Didn\'t train? Switch back to a rest day</button>':''}<div class="sub">${dt!=='rest'&&pl&&pl.type!=='R'?`${TNAME[pl.type]} at ${esc(trainTimeFor(dIso))}${FASTED()?', fasted':''}`:'No session'}${win?` · ate ${fmtT(win.first)}-${fmtT(win.last)}`:''}</div></div>${p3FastPill(dIso)}</div>
     
     ${macroRings(t,dt)}${waterHTML(dIso)}
     ${microsHTML(t,dt,dIso)}
@@ -477,7 +477,7 @@ function foodErr(e){const m={not_granted:'This needs your permission to use the 
 async function parseDiary(){
   const ta=$('#f-say');const text=(ta&&ta.value||'').trim();fState.text=text;if(!text){toast('Add what you ate first');return}
   fState.busy=true;fState.msg='Working out your day… this can take up to a minute.';render();
-  try{const out=await sample.json(`Here is a person's spoken or typed diary of what they ate and drank today, possibly dictated, rambling and out of order. Turn it into individual items with nutrition estimates. If a meal matches one of these known recipes, use its figures: ${LIB.map(x=>`${x[0]} (${x[7]}): ${x[2]} kcal, ${x[3]} g protein, ${x[4]} g fat, ${x[5]} g net carbs, ${x[6]} g fibre`).join('; ')}.\nDiary: """${text.slice(0,6000)}"""\n${foodRules()}`);
+  try{const out=await sample.json(`Here is a person's spoken or typed diary of what they ate and drank today, possibly dictated, rambling and out of order. Turn it into individual items with nutrition estimates. If a meal matches one of these known recipes, use its figures: ${LIB.map(x=>`${x[0]} (${x[7]}): ${x[2]} kcal, ${x[3]} g protein, ${x[4]} g fat, ${x[5]} g net carbs, ${x[6]} g fibre`).join('; ')}.\nDiary: """${text.slice(0,6000)}"""\n${foodRules()}\nFor this diary "at" is never null: give the stated time, or your best estimate from the order and wording (first thing, after training, mid-morning, before bed). Meals and snacks eaten at different times get different times; items eaten together share one.`);
     const items=cleanItems(out&&out.items,'Snack',true,'diary');
     if(!items.length){fState={...fState,busy:false,msg:'Could not pick out any foods. Name the foods with rough amounts and try again.'};render();return}
     const k=iso(sel);const keep=((days[k]&&days[k].food)||[]).filter(i=>i.src!=='diary');const extra={food:keep.concat(items),diary:text};
@@ -2171,10 +2171,10 @@ function foodTodayHTML(dIso){
   const DD=D(),d=DD[dIso]||{date:dIso,food:[]};const t=foodTotals(d),dt=dayTypeFor(dIso),win=mealWindow(d),fh=fastHours(DD,dIso);const pd=planDay(dIso);const due=planDue();const isToday=dIso===iso(todayDate());
   const kEmpty=!kitchen().length&&!sampleMode;const pw=plantsWeek(dIso),pt=plantsOn(d);
   const food=(d.food||[]).map((i,ix)=>({...i,ix}));
-  const meals=MEALS.map(m=>{const its=food.filter(i=>i.meal===m);return its.length?p1MealHTML(m,its):''}).join('');
+  const meals=p3Sittings(food).map(g=>p1MealHTML(g.m,g.its,g.gid)).join('');
   const pm=pd?(pd.meals||[]).filter(m=>!/fasted/i.test(m.slot||'')):[];const pmDone=pd?(pd.meals||[]).filter((m,ix)=>!/fasted/i.test(m.slot||'')&&planLogged(dIso,ix)).length:0;
   return `${kEmpty?`<button type="button" class="bigcta" data-fview="kitchen"><b>Start here: what food can you get?</b><span>Tap what you have at home, or say where you'll be eating. Meal plans are built from it.</span><em>Add my food ›</em></button>`:''}
-  <article class="card p1ftot"><div class="chead"><div style="flex:1;min-width:0"><h2>${isToday?'Today so far':'This day'}</h2></div><div class="p3totr"><button type="button" class="p3howl p3howtop" data-howcalc>How we work it out</button>${fh!=null?`<span class="kpill" style="--vc:${fh>=targets().fastH?'var(--ok)':'var(--warn)'}">Fasted ${fh} h</span>`:''}</div></div>
+  <article class="card p1ftot"><div class="chead"><div style="flex:1;min-width:0"><h2>${isToday?'Today so far':'This day'}</h2></div><div class="p3totr"><button type="button" class="p3howl p3howtop" data-howcalc>How we work it out</button>${p3FastPill(dIso)}</div></div>
     ${p1FoodBars(t,dt,'d')}${microsHTML(t,dt,dIso)}</article>
   ${foodActionsHTML(dIso)}
   ${meals?`<article class="card p1meals">${meals}</article>`:''}
@@ -3272,11 +3272,11 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
   if(x=c('[data-p2fmt]')){e.preventDefault();e.stopImmediatePropagation();const det=x.closest('details');if(det){det.open=true;P2OPEN.add(x.dataset.p2fmt)}P2FT=P2FT&&P2FT.meal===x.dataset.p2fmt?null:{meal:x.dataset.p2fmt};render();return}
   if(c('[data-p2ftx]')){e.preventDefault();e.stopImmediatePropagation();P2FT=null;render();return}
   if(x=c('[data-p2mmove]')){e.preventDefault();e.stopImmediatePropagation();const m=x.dataset.p2mmove;const t=p2T(($('#p2mt')||{}).value);if(!t){toast('Pick a time first');return}
-    const k=iso(sel);const before=clone((days[k]||{}).food||[]);const food=clone(before);const its=food.filter(i=>i.meal===m);if(!its.length){P2FT=null;render();return}
+    const k=iso(sel);const before=clone((days[k]||{}).food||[]);const food=clone(before);const its=(typeof P3GRP!=='undefined'&&P3GRP[m])?P3GRP[m].map(ix=>food[ix]).filter(Boolean):food.filter(i=>i.meal===m);if(!its.length){P2FT=null;render();return}
     const first=its.map(i=>p2T(i.at)).filter(Boolean).sort()[0];const d=first?p1Min(t)-p1Min(first):0;const nm=p1MealFor(t);
     its.forEach(i=>{const a=p2T(i.at);i.at=a?hm(p1Min(a)+d):t;i.meal=nm});P2FT=null;P2OPEN.add(nm);p2Undo={k,food:before};
     days[k]={...(days[k]||{date:k}),food};render();await persistDay(k,{food});
-    p2UndoBar(`${m} moved to ${t}${nm!==m?`, now under ${nm.toLowerCase()}`:''}.`);return}
+    p2UndoBar(`${m.split('~')[0]} moved to ${t}${nm!==m.split('~')[0]?`, now under ${nm.toLowerCase()}`:''}.`);return}
   if(c('[data-p2undo]')){e.preventDefault();e.stopImmediatePropagation();if(!p2Undo)return;const u=p2Undo;p2Undo=null;days[u.k]={...(days[u.k]||{date:u.k}),food:u.food};render();await persistDay(u.k,{food:u.food});const ub=document.getElementById('p2undo');if(ub)ub.remove();toast('Put back');return}},true);
 function p2UndoBar(msg){let el=document.getElementById('p2undo');if(el)el.remove();el=document.createElement('div');el.id='p2undo';el.className='p2undo';el.innerHTML=`<span>${esc(msg)}</span><button type="button" data-p2undo>Undo</button>`;document.body.appendChild(el);clearTimeout(p2UndoBar.t);p2UndoBar.t=setTimeout(()=>{el.remove()},8000)}
 // ================= P2 v2: personal balance that learns from how sessions feel =================
@@ -5903,7 +5903,7 @@ function kuzCopyCard(dIso){if(dIso>=kuzToday())return '';const ms=MEALS.filter(m
   return `<article class="card kuzcopy"><div class="chead"><div style="flex:1"><h2>Copy to today</h2><div class="sub">Adds the same foods to today, at the same times</div></div></div><div class="kuztags" style="padding:0 16px 14px">${ms.map(m=>`<button type="button" class="kuzcp" data-kuzcopy="${m}">${ico('repeat')}<span>${esc(m)}</span></button>`).join('')}${ms.length>1?`<button type="button" class="kuzcp" data-kuzcopy="*">${ico('repeat')}<span>Whole day</span></button>`:''}</div></article>`}
 foodTodayHTML=(function(old){return function(dIso){const h=old(dIso);return sampleMode?h:kuzDayBar(dIso)+kuzCopyCard(dIso)+h}})(foodTodayHTML);
 // buttons at the bottom of each meal
-p1MealHTML=(function(old){return function(m,its){const h=old(m,its);if(sampleMode)return h;const k=iso(sel);
+p1MealHTML=(function(old){return function(m,its,gid){const h=old(m,its,gid);if(sampleMode)return h;const k=iso(sel);
   const bar=`<div class="kuzbar"><button type="button" data-kuzsave="${m}">${ico('star')}<span>Save as favourite</span></button>${k<kuzToday()?`<button type="button" data-kuzcopy="${m}">${ico('repeat')}<span>Copy to today</span></button>`:''}</div>`;
   const j=h.lastIndexOf('</details>');return j<0?h:h.slice(0,j)+bar+h.slice(j)}})(p1MealHTML);
 // save-as-usual sheet: name it, untick anything that isn't part of it
@@ -7266,6 +7266,42 @@ const P3KMH_RE=/(\b\d{1,2}:\d\d)(?:\s?-\s?(\d{1,2}:\d\d))?(\s?\/km)(?! \(\d)(?! 
 function p3AddKmh(h){if(typeof h!=='string')return h;return h.replace(P3KMH_RE,(m,a,b,u)=>{const x=kmhOf(toSec(a)),y=b?kmhOf(toSec(b)):'';if(!x)return m;const r=y?(+x<+y?x+'-'+y:y+'-'+x):x;return `${m} (${r} km/h)`})}
 viewPlan=(function(old){return function(){return p3AddKmh(old.apply(this,arguments))}})(viewPlan);
 viewTrainingTab=(function(old){return function(){return p3AddKmh(old.apply(this,arguments))}})(viewTrainingTab);
+
+// ================= P3: overnight fast and meal times you can trust =================
+// The fast is last food yesterday to first food today. Anything with calories counts (a milky coffee breaks it; black coffee, tea and water don't).
+// Item times win over the old stored first/last fields, which could go stale.
+mealWindow=function(d){if(!d)return null;const ts=(d.food||[]).filter(breaksFast).map(i=>tmin(p2T(i.at))).filter(x=>x!=null);
+  if(ts.length)return {first:Math.min(...ts),last:Math.max(...ts)};const f=tmin(d.firstMeal),l=tmin(d.lastMeal);if(f==null&&l==null)return null;return {first:f!=null?f:l,last:l!=null?l:f}};
+fastHours=function(map,k){const d=map[k],p=map[iso(addD(parse(k),-1))];const w=mealWindow(d),pw=mealWindow(p);if(!w||!pw)return null;const h=Math.round(((w.first+1440)-pw.last)/6)/10;return h>0&&h<36?h:null};
+function p3FastPill(dIso){const DD=D();const w=mealWindow(DD[dIso]),pw=mealWindow(DD[iso(addD(parse(dIso),-1))]);const T=targets().fastH;
+  if(w&&pw){const h=fastHours(DD,dIso);if(h==null)return '';return `<span class="kpill p3fpill" style="--vc:${h>=T?'var(--ok)':'var(--warn)'}" title="Last food yesterday to first food today">Fasted ${h} h<small>${fmtT(pw.last)} to ${fmtT(w.first)}</small></span>`}
+  if(pw&&!w&&dIso===iso(todayDate())){const n=new Date();const h=Math.round(((n.getHours()*60+n.getMinutes()+1440)-pw.last)/6)/10;if(h>0&&h<36)return `<span class="kpill p3fpill" style="--vc:var(--muted)">Fasting ${h} h so far<small>since ${fmtT(pw.last)}</small></span>`}
+  return ''}
+// separate sittings of the same meal (two snacks, say) get their own card, all in time order
+let P3GRP={};
+function p3Sittings(food){const out=[];P3GRP={};
+  MEALS.forEach(m=>{const its=food.filter(i=>i.meal===m).slice().sort((a,b)=>(tmin(p2T(a.at))??9999)-(tmin(p2T(b.at))??9999));let cur=null,last=null,n=0;
+    its.forEach(i=>{const t=tmin(p2T(i.at));if(!cur||(t!=null&&last!=null&&t-last>60)){n++;cur={m,gid:n>1?m+'~'+n:m,its:[]};out.push(cur)}cur.its.push(i);if(t!=null)last=t})});
+  out.forEach(g=>{P3GRP[g.gid]=g.its.map(i=>i.ix);const ts=g.its.map(i=>tmin(p2T(i.at))).filter(x=>x!=null);g.t=ts.length?Math.min(...ts):9000+MEALS.indexOf(g.m)});
+  return out.sort((a,b)=>a.t-b.t)}
+// the meal card, keyed by sitting rather than by meal name
+const _p3MH=p1MealHTML;p1MealHTML=function(m,its,gid){gid=gid||m;const save=P2FT;
+  if(gid!==m)P2FT=save&&save.meal===gid?{...save,meal:m}:(save&&save.meal===m?null:save);
+  let h;try{h=_p3MH(m,its)}finally{P2FT=save}
+  if(gid===m)return h;
+  if(P2OPEN.has(gid)&&!/^<details class="p1meal"[^>]*\sopen/.test(h))h=h.replace('<details class="p1meal"','<details class="p1meal" open');
+  else if(!P2OPEN.has(gid)&&!(save&&save.meal===gid))h=h.replace(/^(<details class="p1meal" data-ms="meal[^"]*") open/,'$1');
+  return h.split(`data-ms="meal${m}"`).join(`data-ms="meal${gid}"`).split(`data-p2fmt="${m}"`).join(`data-p2fmt="${gid}"`).split(`data-p2mmove="${m}"`).join(`data-p2mmove="${gid}"`)};
+// photo check: say when you had it before logging (Now, or a few taps back)
+let P3PRT=null;
+const _p3PRH=photoReviewHTML;photoReviewHTML=function(){const h=_p3PRH();if(!PR||!h)return h;const today=iso(sel)===iso(todayDate());const now=p1Min(p1Now());
+  const opts=today?[['Now',null],['30 min ago',hm(now-30)],['1 h ago',hm(now-60)],['2 h ago',hm(now-120)]]:[];
+  const cur=P3PRT;const row=`<div class="p3prt"><span class="label">Had it</span><div class="p3prtc">${opts.map(([l,t])=>`<button type="button" data-p3prt="${t||''}" aria-pressed="${(cur||null)===(t||null)}">${l}</button>`).join('')}<label class="p3prti">${ico('clock')}<input type="time" id="p3prti" value="${esc(cur||(today?p1Now():MEAL_T[PR.meal]||'13:00'))}" aria-label="Time you had it"></label></div></div>`;
+  const j=h.lastIndexOf('<div class="actions">');return j<0?h:h.slice(0,j)+row+h.slice(j)};
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3prt]');if(!b||!PR)return;P3PRT=b.dataset.p3prt||null;showPR()},true);
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='p3prti'&&PR){P3PRT=p2T(e.target.value);showPR()}},true);
+const _p3prLog=prLog;prLog=async function(){if(PR){const today=iso(sel)===iso(todayDate());const t=P3PRT||(today?p1Now():null);if(t){PR.items.forEach(x=>x.at=t);PR.meal=p1MealFor(t)}}P3PRT=null;return _p3prLog()};
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#prNo'))P3PRT=null},true);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
