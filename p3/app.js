@@ -6996,7 +6996,7 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
 
 // ================= Rest of today (26 Nov): say what you'll likely eat, see where you'd finish against every target. Nothing is logged. =================
 let ROT={busy:false,err:'',items:null,text:''};
-function rotLoad(){const k=iso(todayDate());const m=meta.rot;if(m&&m.k===k&&!ROT.items&&!ROT.busy){ROT.items=m.items||null;ROT.text=m.text||'';ROT.tips=m.tips||null}if(m&&m.k!==k&&ROT.items){ROT.items=null;ROT.text=''}}
+function rotLoad(){return;const k=iso(todayDate());const m=meta.rot;if(m&&m.k===k&&!ROT.items&&!ROT.busy){ROT.items=m.items||null;ROT.text=m.text||'';ROT.tips=m.tips||null}if(m&&m.k!==k&&ROT.items){ROT.items=null;ROT.text=''}}
 const rotF=(v,u)=>u==='kcal'||u==='mg'||u==='µg'?Math.round(v).toLocaleString('en-IE'):(Math.round(v*10)/10).toString();
 function rotRows(){const k=iso(todayDate());const d=D()[k]||{};const dt=dayTypeFor(k);const now=foodTotals(d);const end=foodTotals(Object.assign({},d,{food:(d.food||[]).concat(ROT.items||[])}));
   return NUTS.map(n=>{const tg=nutTarget(n.k,dt);if(tg.lo==null&&tg.hi==null)return null;const v=end[n.k]||0;const st=status(v,tg);
@@ -7006,14 +7006,16 @@ function rotSheet(){rotLoad();const k=iso(todayDate());const has=ROT.items&&ROT.
   let res='';if(has){const rows=rotRows();const ok=rows.filter(r=>r.cls==='ok').length;const short=rows.filter(r=>r.cls==='short'||r.cls==='near');const over=rows.filter(r=>r.cls==='over');
     const sec=(title,rs)=>rs.length?`<div class="label" style="margin:14px 0 6px">${title}</div>${rs.map(rotBar).join('')}`:'';
     res=`<div class="rotsum"><b>${ok} of ${rows.length}</b> on target by tonight${short.length?`. Still short: ${short.slice(0,4).map(r=>esc(r.n.l.toLowerCase())).join(', ')}${short.length>4?'…':''}`:''}${over.length?`. Over: ${over.map(r=>esc(r.n.l.toLowerCase())).join(', ')}`:''}.</div>
-    ${ROT.tips&&ROT.tips.length?`<div class="rottips"><span class="label">Koach suggests</span>${ROT.tips.map(t=>`<p>${ico('sparkles')}<span>${esc(t)}</span></p>`).join('')}</div>`:ROT.tipsBusy?'<p class="ds" style="font-size:13px;margin-top:8px">Koach is looking for easy wins…</p>':''}
+    ${ROT.tips&&ROT.tips.length?`<details class="rottips"><summary><span>${ico('sparkles')}Koach suggests</span><small>${ROT.tips.length} tip${ROT.tips.length>1?'s':''}</small></summary>${ROT.tips.map(t=>`<p><span>${esc(t)}</span></p>`).join('')}</details>`:ROT.tipsBusy?'<p class="ds" style="font-size:13px;margin-top:8px">Koach is looking for easy wins…</p>':''}
     <div class="rotkey"><span><i class="a"></i>Eaten</span><span><i class="b"></i>Planned</span><span><i class="t"></i>Target</span></div>
-    <p class="ds" style="font-size:12px;margin:4px 0 0">Counting: ${ROT.items.map(i=>esc(i.name)).join(', ')}. Not logged. Log the food as usual when you eat it.</p>
+    
     ${sec('Macros',rows.filter(r=>r.n.macro))}${sec('Vitamins and minerals',rows.filter(r=>!r.n.macro))}`}
   p1Sheet(`<div class="kshead"><div><h2>Rest of today</h2><small class="ds">Say what you'll likely eat. Keel shows where you'd finish.</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
-  <textarea id="rotT" class="in" rows="3" placeholder="e.g. Steak, cauliflower, broccoli and liver for dinner, then yogurt, raspberries and walnuts" style="width:100%;box-sizing:border-box">${esc(ROT.text||'')}</textarea>
+  <textarea id="rotT" class="in rotT" rows="3" placeholder="e.g. Steak, cauliflower, broccoli and liver for dinner, then yogurt, raspberries and walnuts" style="width:100%;box-sizing:border-box">${esc(ROT.text||'')}</textarea>
   <div style="display:flex;gap:8px;margin-top:8px">${speakBtn('rotT')}<button type="button" class="rotgo" data-rotgo ${ROT.busy?'disabled':''}>${ROT.busy?'Working it out…':has?'Check again':'Check it'}</button></div>
-  ${ROT.err?`<p class="ds" style="color:var(--bad)">${esc(ROT.err)}</p>`:''}${res}`)}
+  ${ROT.err?`<p class="ds" style="color:var(--bad)">${esc(ROT.err)}</p>`:''}${res}`);rotFit()}
+function rotFit(){const t=document.getElementById('rotT');if(!t)return;t.style.height='auto';t.style.height=Math.max(84,t.scrollHeight+2)+'px'}
+document.addEventListener('input',e=>{if(e.target&&e.target.id==='rotT'){ROT.text=e.target.value;rotFit()}});
 async function rotGo(){const el=document.getElementById('rotT');const txt=(el&&el.value||'').trim();if(!txt){toast('Say or type what you plan to eat');return}
   ROT={busy:true,err:'',items:ROT.items,text:txt};rotSheet();
   try{const j=await sample.json(`The person is planning the REST OF TODAY. These foods are NOT eaten yet; they are what they will likely eat later today:\n"""${txt}"""\n${foodRules()}`);
@@ -7038,7 +7040,7 @@ microsHTML=(function(old){return function(t,dt,k){const h=old.apply(this,argumen
   const b=`<button type="button" class="p3nwb rot" data-rotopen aria-label="Rest of today: will I hit my targets?">${ico('sparkles')}<span>Rest of today</span></button>`;
   return h.includes('<div class="p3nwi">')?h.replace('<div class="p3nwi">','<div class="p3nwi">'+b):`<div class="p3nwi">${b}</div>`+h}})(microsHTML);
 window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closest(q);
-  if(c('[data-rotopen]')){e.preventDefault();e.stopImmediatePropagation();ROT.err='';rotSheet();return}
+  if(c('[data-rotopen]')){e.preventDefault();e.stopImmediatePropagation();if(!ROT.busy&&!ROT.tipsBusy)ROT={busy:false,err:'',items:null,text:'',tips:null};rotSheet();return}
   if(c('[data-rotgo]')){e.preventDefault();e.stopImmediatePropagation();if(!ROT.busy)rotGo();return}},true);
 (function(){const st=document.createElement('style');st.textContent=`.p3nwb.rot{color:var(--text)}
 .rotgo{flex:1;min-height:46px;border-radius:99px;border:0;background:var(--k-amber);color:#15171E;font:600 15px/1 var(--font-body)}.rotgo[disabled]{opacity:.6}
@@ -7049,6 +7051,8 @@ window.addEventListener('click',e=>{const c=q=>e.target.closest&&e.target.closes
 .rotbt i.a{left:0;background:var(--muted)}.rotbt i.b{background:var(--good,#3a9a5b)}.rotb.near .rotbt i.b{background:var(--k-amber)}.rotb.short .rotbt i.b,.rotb.over .rotbt i.b{background:var(--bad,#c4453c)}
 .rotbt i.zone{background:color-mix(in srgb,var(--good,#3a9a5b) 18%,transparent)}.rotbt i.t{width:2px;margin-left:-1px;background:var(--text)}
 .rotkey{display:flex;gap:14px;margin-top:12px;font-size:12px;color:var(--muted)}.rotkey i{display:inline-block;width:10px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}.rotkey i.a{background:var(--muted)}.rotkey i.b{background:var(--good,#3a9a5b)}.rotkey i.t{width:2px;background:var(--text)}
+.rotT{resize:none;overflow:hidden;font-size:15px;line-height:1.4}
+.rottips summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;list-style:none;font-weight:600;font-size:14px}.rottips summary::-webkit-details-marker{display:none}.rottips summary span{display:flex;gap:6px;align-items:center}.rottips summary small{color:var(--muted);font-weight:500}.rottips summary::after{content:'▾';margin-left:8px;color:var(--muted)}.rottips[open] summary::after{content:'▴'}
 .rottips{margin-top:10px;padding:12px 14px;border-radius:14px;border:1px solid var(--k-amber);background:color-mix(in srgb,var(--k-amber) 8%,transparent)}.rottips p{display:flex;gap:8px;margin:6px 0 0;font-size:14px;line-height:1.4}.rottips p .ki{flex:none;color:var(--k-amber)}
 .rotr{display:grid;grid-template-columns:1fr auto 92px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .rotr b{font-weight:500}.rotr span{color:var(--muted);font-size:13px}.rotr em{font-style:normal;font-size:12px;font-weight:600;text-align:right}
