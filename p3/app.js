@@ -307,6 +307,7 @@ const NUTS=[
  {k:'caffeine',l:'Caffeine',u:'mg',hi:400}];
 const NK=NUTS.map(n=>n.k), MICRO=NUTS.filter(n=>!n.macro).map(n=>n.k);
 const PLANTS_WEEK=30, WATER=[3,4];
+const p3WHit=(w,lo)=>+w>=(+lo||0)*0.925;// within 7.5% of the water target counts
 let RULES=`- Training is always in the morning and done FASTED: water, black coffee and a SIS electrolyte tablet beforehand, nothing else.
 - Break the fast with a post-training breakfast; most of the day's net carbs go in the first meals after training.
 - Starch (oats, potatoes, rice, sweet potato, lentils, banana, mango) only on training and match days. Rest days stay low carb.
@@ -372,7 +373,7 @@ function plantsWeek(k){const dt=parse(k);const s=new Set();for(let i=0;i<7;i++){
 function guessMeal(){const h=new Date().getHours();return h<11?'Breakfast':h<15?'Lunch':h<17?'Snack':'Dinner'}
 function frequentFoods(){return learnedFoods()}
 const fmtN=(v,u)=>u==='µg'||(u==='g'&&v<10)?(Math.round(v*10)/10):Math.round(v);
-function nutBar(n,val,tg){const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);const pct=Math.min(100,val/ref*100);const st=status(val,tg);
+function nutBar(n,val,tg){const ref=(tg.t||tg.lo||tg.hi||1);const pct=Math.min(100,val/ref*100);const st=status(val,tg);
   return `<div class="mac"><div class="mh"><span>${n.l}</span><span class="num"><b>${fmtN(val,n.u)}</b>${n.u==='kcal'?'':' '+n.u} · ${tg.txt}</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:${SC[st]}"></div></div></div>`}
 
 // ---------- plan helpers ----------
@@ -728,7 +729,7 @@ function viewDashboard(){
   else{const next=(()=>{for(let i=1;i<=20;i++){const dd=addD(now,i),p=planFor(dd);if(p&&p.type!=='R'&&!p.pre)return {dd,p}}return null})();
     const ix=(d&&d.extras)||[];tSess=`<a class="dt" href="#training" data-dtab><span class="dl">Today's session</span><b class="mid">${ix.length?'Extra session':d&&d.trainIntent==='extra'?'Training planned':pl&&!pl.pre?'Rest day':'No session'}</b>${ix.length?`<span class="chipx done">✓ Logged</span>`:d&&d.trainIntent==='extra'?'<span class="chipx todo">Not logged yet</span>':''}${next?`<span class="ds">Next: ${TNAME[next.p.type]}<br>${fmtD(next.dd)}</span>`:''}</a>`}
   const dt=dayTypeFor(k),ft=foodTotals(d),kt=nutTarget('kcal',dt),pt=nutTarget('protein',dt),ct=nutTarget('carbs',dt);
-  const tFuel=`<a class="dt" href="#food" data-dtab><span class="dl">Fuel · ${DAYT[dt].label}</span><div class="fnum"><b class="num">${Math.round(ft.kcal)}</b><small>of ${kt.t} kcal</small></div>${miniBar('Protein',ft.protein,pt.t,SC[status(ft.protein,pt)],`${Math.round(ft.protein)} / ${pt.t} g`)}${miniBar('Carbs',ft.carbs,ct.t,ft.carbs>ct.hi?'var(--bad)':'var(--e)',`${Math.round(ft.carbs)} / ${ct.hi} g`)}</a>`;
+  const tFuel=`<a class="dt" href="#food" data-dtab><span class="dl">Fuel · ${DAYT[dt].label}</span><div class="fnum"><b class="num">${Math.round(ft.kcal)}</b><small>of ${kt.t} kcal</small></div>${miniBar('Protein',ft.protein,pt.t,SC[status(ft.protein,pt)],`${Math.round(ft.protein)} / ${pt.t} g`)}${miniBar('Carbs',ft.carbs,ct.t,ft.carbs>ct.hi?'var(--bad)':'var(--e)',`${Math.round(ft.carbs)} / ${ct.t} g`)}</a>`;
   // fasting
   let fastTxt='–',fastSub='Log food times',fastCol='var(--fg)';const T=targets();
   const fh=fastHours(DD,k);
@@ -1156,7 +1157,7 @@ const supps=()=>(meta.supps&&meta.supps.list)||[];
 function suppItems(d){if(!d||!d.date)return [];return supps().filter(s=>d.date>=(s.since||'0')&&d.date<=iso(todayDate())&&!(d.suppMissed||[]).includes(s.id)).map(s=>Object.assign({name:s.name},s.nut||{}))}
 function ringSVG(v,tg,col,size){const r=size/2-6,c=2*Math.PI*r,p=Math.max(0,Math.min(1,tg?v/tg:0));return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true"><circle cx="${size/2}" cy="${size/2}" r="${r}" style="fill:none;stroke:var(--line);stroke-width:7"/><circle cx="${size/2}" cy="${size/2}" r="${r}" transform="rotate(-90 ${size/2} ${size/2})" style="fill:none;stroke:${col};stroke-width:7;stroke-linecap:round" stroke-dasharray="${(c*p).toFixed(1)} ${c.toFixed(1)}" ${p?'':'opacity="0"'}/></svg>`}
 function macroRings(t,dt){
-  const one=(k,lab,col)=>{const n=NUTS.find(x=>x.k===k),tg=nutTarget(k,dt);const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);const st=status(t[k],tg);
+  const one=(k,lab,col)=>{const n=NUTS.find(x=>x.k===k),tg=nutTarget(k,dt);const ref=(tg.t||tg.lo||tg.hi||1);const st=status(t[k],tg);
     return `<div class="mring">${ringSVG(t[k],ref,st==='bad'&&t[k]>ref?'var(--bad)':col,74)}<div class="mrv"><b class="num">${Math.round(t[k])}</b></div><span>${lab}</span><small class="mof">of ${Math.round(ref)}${n.u==='kcal'?'':' '+n.u}</small></div>`};
   return `<div class="mrings">${one('kcal','Calories','var(--o)')}${one('protein','Protein','var(--s)')}${one('carbs','Net carbs','var(--e)')}${one('fat','Fat','var(--x)')}</div>`;
 }
@@ -2144,7 +2145,7 @@ function p1Bar(id,pct,col){const from=P1W[id]!=null?P1W[id]:0;return `<div class
 function p1Anim(){const els=[...document.querySelectorAll('[data-bid]')];if(!els.length)return;
   requestAnimationFrame(()=>requestAnimationFrame(()=>els.forEach(el=>{el.style.width=el.dataset.w+'%';P1W[el.dataset.bid]=+el.dataset.w})))}
 const P1MAC=[['kcal','Calories','var(--o)'],['protein','Protein','var(--s)'],['carbs','Net carbs','var(--e)'],['fat','Fat','var(--x)']];
-function p1Ref(k,dt){const tg=nutTarget(k,dt);return tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1)}
+function p1Ref(k,dt){const tg=nutTarget(k,dt);return (tg.t||tg.lo||tg.hi||1)}
 function p1FoodBars(t,dt,prefix){
   return `<div class="p1mbs">${P1MAC.map(([k,lab,col])=>{const ref=p1Ref(k,dt),v=t[k]||0,n=NUTS.find(x=>x.k===k);const over=k!=='protein'&&v>ref*1.1;
     return `<div class="p1mb"><div class="p1mbh"><span>${lab}</span><span class="num"><b>${Math.round(v)}</b> of ${Math.round(ref)}${n.u==='kcal'?'':' '+n.u}</span></div>${p1Bar(prefix+k,v/ref*100,over?'var(--bad)':col)}</div>`}).join('')}</div>`}
@@ -2208,7 +2209,7 @@ function p1PRLive(){if(!PR)return;const k=iso(sel),dt=dayTypeFor(k),so=foodTotal
 document.addEventListener('input',e=>{const t=e.target;if(t&&t.dataset&&t.dataset.prsl!=null&&PR){PR.items[+t.dataset.prsl].pct=+t.value;p1PRLive()}});
 
 // ---------- hydration ----------
-function p1WaterTarget(){const k=iso(todayDate()),d=D()[k]||{};let lo=WATER[0];const why=[];
+function p1WaterTarget(k){k=k||iso(todayDate());const d=D()[k]||{};let lo=WATER[0];const why=[];
   if(d.weather&&d.weather.tmax>=20){lo+=.5;why.push('a warm day')}
   if((d.blocks||[]).some(b=>b.phys==='hard')){lo+=.5;why.push('hard physical work')}
   const p=planFor(parse(k));if((p&&p.type!=='R'&&!p.pre)||(d.extras||[]).length){lo+=.5;why.push('training')}
@@ -2229,7 +2230,7 @@ function p1Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d
   return `<section class="p1tiles"><h3 class="p1th">Add something</h3><div class="p1grid">
     ${t('ci','sun','Check in',ci?'Done today':'Sleep and how you feel',ci)}${t('food','utensils','Log food',fd?`${fd} item${fd>1?'s':''} so far`:'Snap, say or type',false)}
     ${t('day','clipboard-list','My day',dayDone?'Saved':'Work, driving, family',dayDone)}${t('move','footprints','Log a session','Walk, run, class, route',false)}
-    ${t('water','coffee','Drinks',w?`${Math.round(w*100)/100} of ${tg.lo} L water`:'Water, coffee, tea',w>=tg.lo)}${t('rec','wind','Recover','Breathe or stretch',false)}</div></section>`}
+    ${t('water','coffee','Drinks',w?`${Math.round(w*100)/100} of ${tg.lo} L water`:'Water, coffee, tea',p3WHit(w,tg.lo))}${t('rec','wind','Recover','Breathe or stretch',false)}</div></section>`}
 
 // ---------- routes ----------
 Object.assign(RT,{base:'map',q:'',sig:'',mapEl:null,grp:null,tiles:null,tprof:null});
@@ -2695,7 +2696,7 @@ planMealsHTML=function(k,compact){return _p1PM(k,compact).replace(/<span class="
 
 // vitamins: tap any one to see what it does and where it's found
 const NUT_WHAT={fibre:'Keeps your gut working well, keeps you full and steadies blood sugar.',sodium:'Keeps fluid balance and muscles working. You lose a lot in sweat.',potassium:'Works with sodium on fluid balance, heart rhythm and muscle contractions.',magnesium:'Helps muscles relax, energy production and sleep.',calcium:'Builds bones and teeth, and helps muscles contract.',iron:'Carries oxygen in your blood. Low iron means tiredness.',zinc:'Supports your immune system, healing and recovery.',selenium:'Protects cells from damage and supports the thyroid.',iodine:'Your thyroid needs it to set your energy use.',vitA:'Eyesight, skin and the immune system.',vitC:'Immune system, healing, and helps you absorb iron from plants.',vitD:'Bones, muscles and immunity. In Ireland it\'s hard to get enough from sun between October and March.',vitK:'Blood clotting and bone strength.',b12:'Energy, nerves and making red blood cells. Mostly found in animal foods.',folate:'Making new cells and red blood cells.',choline:'Brain, memory and muscle control.',omega3:'Heart, brain and joints, and may help calm inflammation.',caffeine:'Wakes you up and can help training, but stays in your system for hours and can upset sleep.',protein:'Builds and repairs muscle and keeps you full.',carbs:'Fuel for hard training and your brain.',fat:'Hormones, absorbing vitamins A, D, E and K, and steady energy.',kcal:'The total energy in your food.'};
-function nutBar(n,val,tg){const ref=tg.hi&&!tg.lo?tg.hi:(tg.t||tg.lo||tg.hi||1);const pct=Math.min(100,val/ref*100);const st=status(val,tg);
+function nutBar(n,val,tg){const ref=(tg.t||tg.lo||tg.hi||1);const pct=Math.min(100,val/ref*100);const st=status(val,tg);
   return `<button type="button" class="mac p1nut" data-nutinfo="${n.k}"><div class="mh"><span>${n.l} <i aria-hidden="true">›</i></span><span class="num"><b>${fmtN(val,n.u)}</b>${n.u==='kcal'?'':' '+n.u} · ${tg.txt}</span></div><div class="tr"><div class="fl" style="width:${pct}%;background:${SC[st]}"></div></div></button>`}
 function p1NutInfo(k){const n=NUTS.find(x=>x.k===k);if(!n)return;const dk=iso(sel);const t=foodTotals(D()[dk]||{});const tg=nutTarget(k,dayTypeFor(dk));
   p1Sheet(`<div class="kshead"><div><h2>${esc(n.l)}</h2><small class="ds">Today: ${fmtN(t[k]||0,n.u)}${n.u==='kcal'?'':' '+n.u} · target ${esc(tg.txt||'')}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
@@ -2992,7 +2993,7 @@ function p2SleepCard(k){if(sampleMode)return '';const S=p2Sleep(k);const cw=S.co
       <p class="p2tip"><b>Tonight:</b> start winding down at ${S.wind}, lights out by ${S.bed}${S.why.length?`, a bit earlier because ${S.why.join(' and ')}`:''}. ${tip}</p></div></details>`}
 
 // ---------- habits and streaks ----------
-const P2HABITS=[['checkin','Check in','circle-check',k=>!!readiness(D()[k])],['water','Water target','droplet',k=>p3Fluid(D()[k]).t>=p1WaterTarget().lo],['bed','Bed on time','moon',k=>{const d=D()[k]||{};const b=bedMin(d.bed);const t=bedMin(p2Sleep(iso(addD(parse(k),-1))).bed);return b!=null&&t!=null&&b<=t+15}],['phone','Phone away early','moon',k=>{const g=screenGap(D()[k]);return g!=null&&g>=45}],
+const P2HABITS=[['checkin','Check in','circle-check',k=>!!readiness(D()[k])],['water','Water target','droplet',k=>p3WHit(p3Fluid(D()[k]).t,p1WaterTarget(k).lo)],['bed','Bed on time','moon',k=>{const d=D()[k]||{};const b=bedMin(d.bed);const t=bedMin(p2Sleep(iso(addD(parse(k),-1))).bed);return b!=null&&t!=null&&b<=t+15}],['phone','Phone away early','moon',k=>{const g=screenGap(D()[k]);return g!=null&&g>=45}],
   ['veg','5 portions of veg and fruit','leaf',null],['walk','A walk outside','footprints',null],['stretch','Stretch or loosen-out','person-standing',null],['steps','10,000 steps','footprints',null],['read','Read before bed','book-open',null],['nodrink','Alcohol-free day','glass-water',k=>!(D()[k]||{}).food||!(D()[k].food||[]).some(x=>stdDrinks(x)>0)]];
 const myHabits=()=>((meta.habits&&meta.habits.list)||['checkin','water','bed','walk']).filter(id=>P2HABITS.some(h=>h[0]===id));
 function habDone(id,k){const h=P2HABITS.find(x=>x[0]===id);if(!h)return false;const d=D()[k]||{};if((d.hab||[]).includes(id))return true;return h[3]?!!h[3](k):false}
@@ -3552,7 +3553,7 @@ p3LookHTML=function(){const v=p3LookPref();return `<section class="card p3look">
 p3Today=function(k,s){return p1Top()+p3Koach(k)+injuryBanner()+p3Rings(k,s)+p3Tiles()+p2Habits(k)};
 function p3Tiles(){const k=iso(todayDate()),d=D()[k]||{};const ci=!!(d.sleepQ||d.energy||d.bed);const w=p3Fluid(d).t;let lo=2.5;try{lo=p1WaterTarget().lo}catch(e){}const fd=(d.food||[]).length;
   const t=(id,icon,name,done,sub)=>`<button type="button" class="p1tile p3tile${done?' done':''}" data-p1tile="${id}"><span class="p1ti">${ico(done?'check':icon)}</span><b>${name}</b><small>${sub||'&nbsp;'}</small></button>`;
-  return `<section class="p3tiles" aria-label="Add">${t('ci','sun','Check in',ci,ci?'Done':'')}${t('food','utensils','Food',false,fd?fd+' logged':'')}${t('water','coffee','Drinks',w>=lo,w?(Math.round(w*10)/10)+' L':'')}${t('move','footprints','Session',false,'')}${t('rec','wind','Recover',false,'')}</section>`}
+  return `<section class="p3tiles" aria-label="Add">${t('ci','sun','Check in',ci,ci?'Done':'')}${t('food','utensils','Food',false,fd?fd+' logged':'')}${t('water','coffee','Drinks',p3WHit(w,lo),w?(Math.round(w*10)/10)+' L':'')}${t('move','footprints','Session',false,'')}${t('rec','wind','Recover',false,'')}</section>`}
 const _p3CiDraw=p1CiDraw;p1CiDraw=function(){_p3CiDraw();const host=document.querySelector('#p1Host .ksheet');if(!host||host.querySelector('.p3myday'))return;const yd=D()[iso(addD(parse((P1.ci&&P1.ci.k)||iso(todayDate())),-1))]||{};const done=!!(yd.blocks||[]).length;
   const b=document.createElement('button');b.type='button';b.className='p1hurt p3myday';b.dataset.p1tile='day';b.innerHTML=`${ico(done?'check':'clipboard-list')} Yesterday: work, driving, family${done?' · saved':''} ›`;
   const hurt=host.querySelector('#p1Hurt');if(hurt)hurt.insertAdjacentElement('afterend',b);else host.appendChild(b)};
@@ -4349,10 +4350,10 @@ p1NutInfo=(function(old){return function(k){old(k);const host=document.querySele
   const html=`<section class="p1blk p3src14"><h3>What's behind it (last 2 weeks)</h3><p style="margin:0 0 8px">${verdict}</p>${top.map(z=>`<div class="p3srcR"><span>${esc(z.nm)}${z.sup?' <i>supplement</i>':''}</span><b>${z.days} of ${x.od} days · ${f(z.tot/z.days)} ${n.u}</b><em style="width:${Math.max(4,Math.round(z.tot/x.rows.reduce((a,q)=>a+q.tot,0)*100))}%"></em></div>`).join('')}<p class="ds" style="margin:6px 0 0;font-size:12px">Amounts are per day it was eaten or taken${u.supp?'. The limit for this one only counts supplements':''}.</p></section>`;
   const a=host.querySelector('.p3ul')||host.querySelector('.p3srcS')||host.querySelector('.kshead');a.insertAdjacentHTML('afterend',html)}})(p1NutInfo);
 // ================= P3: Today reorganised; 5 stars = 5 things you log =================
-function p3Log5(k){const d=D()[k]||{};const meals=new Set((d.food||[]).map(i=>i.meal).filter(m=>m&&m!=='Snack'));const w=p3Fluid(d).t;let wt=2;try{wt=p1WaterTarget().lo||2}catch(e){}
+function p3Log5(k){const d=D()[k]||{};const meals=new Set((d.food||[]).map(i=>i.meal).filter(m=>m&&m!=='Snack'));const w=p3Fluid(d).t;let wt=2;try{wt=p1WaterTarget(k).lo||2}catch(e){}
   return [{id:'ci',l:'Check in',ic:'sun',done:!!(d.sleepQ||d.energy||d.bed),a:'data-p1tile="ci"'},
    {id:'food',l:meals.size>=2?'Meals':'2+ meals',ic:'utensils',done:meals.size>=2,a:'data-p3ring="food"'},
-   {id:'water',l:'Water',ic:'droplet',done:w>=wt,a:'data-p3ring="drinks"'},
+   {id:'water',l:'Water',ic:'droplet',done:p3WHit(w,wt),a:'data-p3ring="drinks"'},
    {id:'move',l:'Session',ic:'footprints',done:!!(L()[k]||(d.recovery||[]).length||(d.extras||[]).length),a:'data-p1tile="move"'},
    {id:'phone',l:'Phone away',ic:'moon',done:habDone('phone',k),a:'data-p3phone'}]}
 p2Habits=function(k){if(sampleMode)return '';const it=p3Log5(k);const n=it.filter(x=>x.done).length;
@@ -4540,13 +4541,13 @@ function nutritionPanels(now){
   const hit=key=>logged.filter(v=>status(v[key],nutTarget(key,v.dt))==='ok').length;
   const prot=[],fasts=[];for(let i=41;i>=0;i--){const d=addD(now,-i),dd=DD[iso(d)];if(dd&&(dd.food||[]).length)prot.push({x:d/DAY,y:foodTotals(dd).protein,lab:short(d)});const fh=fastHours(DD,iso(d));if(fh!=null)fasts.push({x:d/DAY,y:fh,lab:short(d)})}
   const withMic=logged.filter(v=>v.microN>0);
-  const gaps=NUTS.filter(n=>!n.macro).map(n=>{const a=avg(withMic.map(v=>v[n.k]))||0;const tg=nutTarget(n.k,'rest');const ref=tg.lo||tg.hi;const pct=ref?a/ref*100:0;const st=status(a,tg);const sc=tg.lo?pct:(pct<=100?200:200-(pct-100));return {n,pct,st,sc}}).sort((x,y)=>x.sc-y.sc);
+  const gaps=NUTS.filter(n=>!n.macro).map(n=>{const a=avg(withMic.map(v=>v[n.k]))||0;const tg=nutTarget(n.k,'rest');const ref=tg.t||tg.lo||tg.hi;const pct=ref?a/ref*100:0;const st=status(a,tg);const sc=tg.lo?pct:(pct<=100?200:200-(pct-100));return {n,pct,st,sc}}).sort((x,y)=>x.sc-y.sc);
   const wk=[];for(let w=5;w>=0;w--){const sun=addD(now,-((now.getDay()+6)%7)+6-w*7);const k=iso(sun>now?now:sun);wk.push({lab:short(addD(sun,-6)),n:plantsWeek(k).size})}
   const f7=fasts.slice(-7).map(p=>p.y),win=[];for(let i=0;i<14;i++){const w=mealWindow(DD[iso(addD(now,-i))]);if(w)win.push(w.last-w.first)}
   const dtc={rest:0,training:0,match:0};logged.forEach(v=>dtc[v.dt]++);
   return `<div class="tests"><div><b class="num">${Math.round(hit('protein')/logged.length*100)}%</b><small>Days protein on target</small></div><div><b class="num">${Math.round(hit('carbs')/logged.length*100)}%</b><small>Days under the net-carb cap</small></div><div><b class="num" style="color:${f7.length&&avg(f7)>=T.fastH?'var(--ok)':'var(--warn)'}">${f7.length?avg(f7).toFixed(1)+'h':'-'}</b><small>Avg overnight fast, 7 days</small></div></div>
    <div class="label">Calories per day vs that day's target (white tick; paler = off target) · ${dtc.training} training, ${dtc.rest} rest${dtc.match?`, ${dtc.match} match`:''} days</div><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Calories per day">${g}${bars}</svg>
-   <div class="label">Days on target, last 28 days</div><div class="bars">${NUTS.filter(n=>n.macro).map(n=>{const p=Math.round(hit(n.k)/logged.length*100);return `<div class="bar" style="--c:${({kcal:'var(--o)',protein:'var(--s)',carbs:'var(--e)',fat:'var(--x)',fibre:'var(--farm)'})[n.k]||'var(--k-blue)'}"><span>${n.l}</span><div class="tr"><div class="fl" style="width:${p}%"></div></div><span class="pct num">${p}%</span></div>`}).join('')}</div>
+   <div class="label">Days on target, last 28 days</div><small class="ds" style="display:block;font-size:11px;margin:2px 0 6px">On target means within 10% of the day's figure. Protein counts from 90% up, carbs up to 10% over.</small><div class="bars">${NUTS.filter(n=>n.macro).map(n=>{const p=Math.round(hit(n.k)/logged.length*100);return `<div class="bar" style="--c:${({kcal:'var(--o)',protein:'var(--s)',carbs:'var(--e)',fat:'var(--x)',fibre:'var(--farm)'})[n.k]||'var(--k-blue)'}"><span>${n.l}</span><div class="tr"><div class="fl" style="width:${p}%"></div></div><span class="pct num">${p}%</span></div>`}).join('')}</div>
    <div class="label">Protein per day (g) · 175-180 target</div>${lineChart(prot,{pad:10,fmtY:v=>Math.round(v),color:'var(--s)',h:120})}
    <div class="label">Vitamins &amp; minerals, average vs target · biggest gaps first</div>${withMic.length?`<div class="bars">${gaps.map(x=>`<div class="bar" style="--c:${SC[x.st]}"><span>${x.n.l}</span><div class="tr"><div class="fl" style="width:${Math.min(100,x.pct)}%"></div></div><span class="pct num">${Math.round(x.pct)}%</span></div>`).join('')}</div>`:'<div class="hint">Use the diary or photos to get vitamin and mineral estimates.</div>'}
    <div class="label">Different plants per week · target ${PLANTS_WEEK}</div><div class="bars">${wk.map(w=>`<div class="bar" style="--c:${w.n>=PLANTS_WEEK?'var(--ok)':w.n>=20?'var(--warn)':'var(--bad)'}"><span>wk of ${w.lab}</span><div class="tr"><div class="fl" style="width:${Math.min(100,w.n/PLANTS_WEEK*100)}%"></div></div><span class="pct num">${w.n}</span></div>`).join('')}</div>
