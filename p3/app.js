@@ -350,9 +350,9 @@ let fView='today', pState={busy:false,msg:'',req:''}, kState={busy:false,msg:'',
 function dayTypeFor(k){return dayTypeAuto(k)}
 function trainTimeFor(k){const d=D()[k];return (d&&d.trainTime)||(meta.settings&&meta.settings.trainTime)||(PROFILE&&PROFILE.plan&&PROFILE.plan.trainTime)||'06:30'}
 function nutTarget(k,dt){const T=DAYT[dt];const n=NUTS.find(x=>x.k===k);
-  if(k==='kcal')return {lo:Math.round(T.kcal*.95),hi:Math.round(T.kcal*1.05),t:T.kcal,txt:`${T.kcal}`};
-  if(k==='protein')return {lo:Math.round(T.protein*.94),t:T.protein,txt:`${T.protein} g`};
-  if(k==='carbs')return {hi:T.carbs,t:T.carbs,txt:`up to ${T.carbs} g`};
+  if(k==='kcal')return {lo:Math.round(T.kcal*.9),hi:Math.round(T.kcal*1.1),t:T.kcal,txt:`${T.kcal}`};
+  if(k==='protein')return {lo:Math.round(T.protein*.9),t:T.protein,txt:`${T.protein} g`};
+  if(k==='carbs')return {hi:Math.round(T.carbs*1.1),t:T.carbs,txt:`up to ${T.carbs} g`};
   if(k==='fat')return {lo:Math.round(T.fat*.9),hi:Math.round(T.fat*1.1),t:T.fat,txt:`${T.fat} g`};
   return {lo:n.lo,hi:n.hi,t:n.lo||n.hi,txt:n.lo&&n.hi?`${n.lo}-${n.hi} ${n.u}`:n.lo?`${n.lo} ${n.u}`:`max ${n.hi} ${n.u}`};
 }
@@ -6466,14 +6466,14 @@ const _p3CiOpen=p1CiOpen;
 p1CiOpen=function(){_p3CiOpen.apply(this,arguments);const c=P1.ci;if(!c)return;const d=D()[c.k]||{};c.had=new Set(['sleepQ','energy','mood','stress','sore'].filter(x=>d[x]!=null));c.touched=new Set();
   let qm=true;try{qm=localStorage.getItem('p3cifull')!=='1'}catch(e){}c.quick=qm;c.off=new Set(d.ciOff||[]);c.feel=d.feel||null;
   const prev=Object.values(D()).filter(x=>x&&x.bed&&x.wake&&x.date!==c.k).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];c.prevBW=prev?{bed:prev.bed,wake:prev.wake}:null;c.sleepSet=!!(d.bed&&d.wake);
-  c.bed=p3SnapT(c.bed,5);c.wake=p3SnapT(c.wake,5);p1CiDraw()};
+  c.bed=p3SnapT(c.bed,10);c.wake=p3SnapT(c.wake,10);p1CiDraw()};
 function p3QuickCiHTML(c){const h=p1SleepCalc(c);const p=planFor(parse(c.k));const planned=!!(p&&p.type!=='R'&&!p.pre);const same=c.prevBW&&c.prevBW.bed===c.bed&&c.prevBW.wake===c.wake;const s=c.sick||{types:[]};
   const sickOn=c.off.has('unwell');
   return `<div class="kshead"><div><h2>Morning check-in</h2><small class="ds">${fmtD(parse(c.k),{weekday:'long',day:'numeric',month:'short'})}</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
   <section class="p1blk p3qci"><div class="p3qh"><h3>Last night</h3><b class="num p3qsl">${h!=null&&c.sleepSet?h+' h':'–'}</b></div>
     ${c.prevBW?`<button type="button" class="p3same${same&&c.sleepSet?' on':''}" data-p3same aria-pressed="${!!(same&&c.sleepSet)}">${ico('check')} Same as last night <small class="num">${esc(c.prevBW.bed)} to ${esc(c.prevBW.wake)}</small></button>`:''}
-    <div class="p3bw"><div><span class="label">Into bed</span>${p3WheelHTML('ci-bed',p3Times(19*60,27*60,5),c.sleepSet?c.bed:'',null,{def:c.bed,label:'Into bed',cb:v=>{c.bed=v;c.sleepSet=true;p3QciSleep()}})}</div>
-      <div><span class="label">Woke for good</span>${p3WheelHTML('ci-wake',p3Times(4*60,12*60,5),c.sleepSet?c.wake:'',null,{def:c.wake,label:'Woke for good',cb:v=>{c.wake=v;c.sleepSet=true;p3QciSleep()}})}</div></div></section>
+    <div class="p3bw"><div><span class="label">Into bed</span>${p3WheelHTML('ci-bed',p3Times(19*60,27*60,10),c.sleepSet?c.bed:'',null,{def:c.bed,label:'Into bed',cb:v=>{c.bed=v;c.sleepSet=true;p3QciSleep()}})}</div>
+      <div><span class="label">Woke for good</span>${p3WheelHTML('ci-wake',p3Times(4*60,12*60,10),c.sleepSet?c.wake:'',null,{def:c.wake,label:'Woke for good',cb:v=>{c.wake=v;c.sleepSet=true;p3QciSleep()}})}</div></div></section>
   <section class="p1blk p3qci"><h3>How do you feel?</h3><div class="p3feel">${P3FEEL.map(([v,l])=>`<button type="button" data-p3feel="${v}" aria-pressed="${+c.feel===v}"><i class="p3fd p3fd${v}"></i><span>${l}</span></button>`).join('')}</div></section>
   <section class="p1blk p3qci"><h3>Anything off? <small class="ds">Skip if not</small></h3><div class="p3off">${P3OFF.map(([v,l])=>`<button type="button" data-p3off="${v}" aria-pressed="${c.off.has(v)}">${l}</button>`).join('')}<a class="p3offn" href="#checkin" id="p1Hurt">${ico('heart-pulse')} Niggle or injury</a></div>
     ${sickOn?`<div class="p1cof p3sickq">${SICK.map(x=>`<button type="button" data-p1sick="${x}" aria-pressed="${(s.types||[]).includes(x)}">${x}</button>`).join('')}</div>`:''}</section>
@@ -6485,14 +6485,14 @@ function p3QciSleep(){const c=P1.ci;if(!c)return;const h=p1SleepCalc(c);const b=
 p1CiDraw=(function(old){return function(){const c=P1.ci;if(c&&c.quick){p1Sheet(p3QuickCiHTML(c));p3WheelInit(document.getElementById('p1Host'));return}old.apply(this,arguments);
   if(c&&!c.quick){const host=document.querySelector('#p1Host .ksheet');if(host&&!host.querySelector('[data-p3cifull]')){const sv=host.querySelector('#p1CiSave');if(sv)sv.insertAdjacentHTML('afterend','<button type="button" class="linkbtn p3full" data-p3cifull="0">Quick check-in ›</button>')}
     // bed and wake become wheels here too
-    ['bed','wake'].forEach(k=>{const inp=host&&host.querySelector('#p1'+k);if(!inp||inp.dataset.wh)return;inp.dataset.wh='1';inp.classList.add('p3hidin');const vals=k==='bed'?p3Times(19*60,27*60,5):p3Times(4*60,12*60,5);
-      inp.insertAdjacentHTML('afterend',p3WheelHTML('cif-'+k,vals,p3SnapT(c[k],5),null,{label:k==='bed'?'Into bed':'Woke for good',cb:v=>{c[k]=v;inp.value=v;const h=p1SleepCalc(c);const b=document.querySelector('.p1sleep b');if(b)b.textContent=(h!=null?h:'–')+' h';setTimeout(p1Queue,0)}}))});
+    ['bed','wake'].forEach(k=>{const inp=host&&host.querySelector('#p1'+k);if(!inp||inp.dataset.wh)return;inp.dataset.wh='1';inp.classList.add('p3hidin');const vals=k==='bed'?p3Times(19*60,27*60,10):p3Times(4*60,12*60,10);
+      inp.insertAdjacentHTML('afterend',p3WheelHTML('cif-'+k,vals,p3SnapT(c[k],10),null,{label:k==='bed'?'Into bed':'Woke for good',cb:v=>{c[k]=v;inp.value=v;const h=p1SleepCalc(c);const b=document.querySelector('.p1sleep b');if(b)b.textContent=(h!=null?h:'–')+' h';setTimeout(p1Queue,0)}}))});
     const scr=host&&host.querySelector('#p1scr');if(scr&&!scr.dataset.wh){scr.dataset.wh='1';scr.classList.add('p3hidin');scr.insertAdjacentHTML('afterend',p3WheelHTML('cif-scr',['']. concat(p3Times(19*60,27*60,15)),c.screenOff?p3SnapT(c.screenOff,15):'',v=>v||'Not set',{label:'Phone away at',cb:v=>{c.screenOff=v;setTimeout(p1Queue,0)}}))}
     p3WheelInit(host)}}})(p1CiDraw);
 document.addEventListener('click',e=>{const c=P1.ci;if(!c)return;const q=s=>e.target.closest&&e.target.closest(s);let x;
   if(x=q('[data-p3cifull]')){e.stopImmediatePropagation();c.quick=x.dataset.p3cifull!=='1';try{localStorage.setItem('p3cifull',c.quick?'0':'1')}catch(z){}p1CiDraw();return}
   if(!c.quick)return;
-  if(q('[data-p3same]')){e.stopImmediatePropagation();if(c.prevBW){c.bed=p3SnapT(c.prevBW.bed,5);c.wake=p3SnapT(c.prevBW.wake,5);c.sleepSet=true}p1CiDraw();setTimeout(p1Queue,0);return}
+  if(q('[data-p3same]')){e.stopImmediatePropagation();if(c.prevBW){c.bed=p3SnapT(c.prevBW.bed,10);c.wake=p3SnapT(c.prevBW.wake,10);c.sleepSet=true}p1CiDraw();setTimeout(p1Queue,0);return}
   if(x=q('[data-p3feel]')){e.stopImmediatePropagation();c.feel=+x.dataset.p3feel;p1CiDraw();setTimeout(p1Queue,0);return}
   if(x=q('[data-p3off]')){e.stopImmediatePropagation();const v=x.dataset.p3off;if(c.off.has(v))c.off.delete(v);else c.off.add(v);if(v==='unwell'&&!c.off.has(v))c.sick={types:[],sev:null,meds:[]};p1CiDraw();setTimeout(p1Queue,0);return}},true);
 // slider touched in the full check-in; untouched sliders save nothing
@@ -6827,6 +6827,44 @@ p3L5Sheet=function(){const cur=p3L5Ids();const extra=cur.filter(x=>!P3L5FIX.incl
 window.addEventListener('click',async e=>{const x=e.target.closest&&e.target.closest('[data-p3l5p]');if(!x)return;e.stopImmediatePropagation();const id=x.dataset.p3l5p;let ex=p3L5Ids().filter(z=>!P3L5FIX.includes(z));
   if(ex.includes(id))ex=ex.filter(z=>z!==id);else{if(ex.length>=3){const out=ex.shift();const P=z=>(P3L5POOL.find(p=>p[0]===z)||[z,z])[1];toast(`Swapped ${P(out)} for ${P(id)}`)}ex.push(id)}
   await persistMeta('log5',{ids:ex,updatedAt:new Date().toISOString()});p3L5Sheet();render()},true);
+
+// ================= P3 (26 Nov): nothing in the small icon row under the rings; session feedback is 3 quick swipes; bed and wake in 10 min steps =================
+// the icon row is gone for good (meal plan, heart rate, anything new). Alerts still show as the badge on the Food ring
+render=(function(old){return function(){old.apply(this,arguments);try{const app=document.getElementById('app');if(!app)return;
+  app.querySelectorAll('.p3acts').forEach(a=>a.remove())}catch(e){}}})(render);
+// session feedback: 3 cards, swipe left and right, tap an answer and it moves on, saves itself after the third
+const P3FBQ=[['feel','Overall',FB_FEEL.map(([v,l])=>[v,l])],['energy','Energy',[['low','Lacking'],['steady','Steady'],['full','Full of it']]],['effort','Compared with the plan',[['easier','Easier'],['right','About right'],['harder','Harder']]]];
+p2FbDraw=function(){const f=P2FB.f;if(!f)return;
+  p1Sheet(`<div class="kshead"><h2>How did it go?</h2><button type="button" class="x" id="p2FbX" aria-label="Close">${ico('x')}</button></div>
+  <div class="p3fbs" id="p3fbs">${P3FBQ.map(([q,l,o],i)=>`<section class="p3fbc" data-p3fbi="${i}"><span class="label">${i+1} of 3 · ${esc(l)}</span><div class="p3fbo">${o.map(([v,t])=>`<button type="button" data-p3fq="${q}" data-p3fv="${v}" aria-pressed="${String(f[q])===String(v)}">${esc(t)}</button>`).join('')}</div></section>`).join('')}</div>
+  <div class="p3fbd" aria-hidden="true">${P3FBQ.map((_,i)=>`<i data-p3fbd="${i}"${i===0?' class="on"':''}></i>`).join('')}</div>`);
+  const s=document.getElementById('p3fbs');if(s)s.addEventListener('scroll',()=>{const i=Math.round(s.scrollLeft/Math.max(1,s.clientWidth));document.querySelectorAll('[data-p3fbd]').forEach(d=>d.classList.toggle('on',+d.dataset.p3fbd===i))},{passive:true})};
+window.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3fq]');if(!x)return;e.preventDefault();e.stopImmediatePropagation();const f=P2FB.f;if(!f)return;
+  const q=x.dataset.p3fq,v=x.dataset.p3fv;f[q]=q==='feel'?+v:v;x.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===x)));
+  const s=document.getElementById('p3fbs');const i=P3FBQ.findIndex(z=>z[0]===q);
+  const next=P3FBQ.findIndex((z,j)=>j>i&&f[z[0]]==null);
+  setTimeout(()=>{if(next>=0&&s){s.scrollTo({left:next*s.clientWidth,behavior:'smooth'});return}
+    if(!f.feel){if(s)s.scrollTo({left:0,behavior:'smooth'});return}p2FbSave()},220)},true);
+(function(){const st=document.createElement('style');st.textContent=`.p3fbs{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:4px -4px 0}.p3fbs::-webkit-scrollbar{display:none}
+.p3fbc{flex:0 0 100%;scroll-snap-align:start;box-sizing:border-box;padding:4px 4px 0;display:flex;flex-direction:column;gap:10px}
+.p3fbo{display:flex;flex-wrap:wrap;gap:8px}.p3fbo button{flex:1 1 auto;min-height:48px;padding:0 14px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:500 15px/1 var(--font-body)}
+.p3fbo button[aria-pressed="true"]{background:var(--k-amber);border-color:var(--k-amber);color:#15171E}
+.p3fbd{display:flex;justify-content:center;gap:6px;margin:14px 0 4px}.p3fbd i{width:7px;height:7px;border-radius:99px;background:var(--line)}.p3fbd i.on{background:var(--text)}`;document.head.appendChild(st)})();
+
+// daily five: pick favourites (up to 12). Check in and water every day, plus 3 of your favourites that change each day
+let P3L5K=null;const P3FAVMAX=12;
+const p3Favs=()=>{const l=meta.log5||{};const src=Array.isArray(l.fav)?l.fav:Array.isArray(l.ids)?l.ids:['food','move','phone'];return [...new Set(src)].filter(id=>!P3L5FIX.includes(id)&&P3L5POOL.some(p=>p[0]===id)).slice(0,P3FAVMAX)};
+function p3DayPicks(k){const f=p3Favs();if(f.length<=3)return f;const n=Math.floor(parse(k).getTime()/864e5);const o=[];for(let j=0;o.length<3&&j<f.length;j++){const id=f[(n*3+j)%f.length];if(!o.includes(id))o.push(id)}return o}
+p3L5Ids=(k)=>P3L5FIX.concat(p3DayPicks(k||P3L5K||iso(todayDate())));
+p3Log5=(function(old){return function(k){const was=P3L5K;P3L5K=k;try{return old.apply(this,arguments)}finally{P3L5K=was}}})(p3Log5);
+p3L5Sheet=function(){const fav=p3Favs();const today=p3DayPicks(iso(todayDate()));const P=id=>(P3L5POOL.find(p=>p[0]===id)||[id,id])[1];
+  p1Sheet(`<div class="kshead"><div><h2>Your daily habits</h2><small class="ds">Check in and water every day. Pick your favourites and you get 3 of them each day, a different mix every day.</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>
+  <p class="ds" style="margin:0 0 10px">Today: <b>${today.map(id=>esc(P(id))).join(', ')||'none yet'}</b></p>
+  <div class="p3l5pick">${P3L5POOL.map(([id,l,ic])=>{const fx=P3L5FIX.includes(id);const on=fx||fav.includes(id);return `<button type="button" ${fx?'disabled':`data-p3fav="${id}"`} aria-pressed="${on}"><span class="p3l5i">${ico(ic)}</span><b>${esc(l)}</b>${fx?'<small class="ds">Every day</small>':''}<span class="p3l5c">${on?ico('check'):''}</span></button>`}).join('')}</div>
+  <p class="ds" style="font-size:12px">${fav.length} of ${P3FAVMAX} favourites picked. Pick at least 3. Most tick themselves from what you log; tap the others on Today.</p>`)};
+window.addEventListener('click',async e=>{const x=e.target.closest&&e.target.closest('[data-p3fav]');if(!x)return;e.preventDefault();e.stopImmediatePropagation();const id=x.dataset.p3fav;let f=p3Favs();
+  if(f.includes(id)){if(f.length<=3){toast('Keep at least 3 favourites');return}f=f.filter(z=>z!==id)}else{if(f.length>=P3FAVMAX){toast(`${P3FAVMAX} is the most. Untick one first.`);return}f.push(id)}
+  await persistMeta('log5',Object.assign({},meta.log5||{},{fav:f,updatedAt:new Date().toISOString()}));p3L5Sheet();render()},true);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
