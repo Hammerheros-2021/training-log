@@ -23,7 +23,7 @@ async function azure(text, male) {
   return Buffer.from(await r.arrayBuffer());
 }
 
-const STYLE = 'Speak with a soft, natural Irish accent, like a calm friend from the west of Ireland. Warm, low and relaxed. Conversational, never theatrical or sing-song. Unhurried, with natural pauses between sentences. Do not sound like an announcer or a robot.';
+const STYLE = 'Voice: a calm man or woman from the west of Ireland (Mayo, Sligo or Leitrim), speaking with a clear, natural Irish accent all the way through. Never drift into an American or English accent. Accent: soft rolled or tapped r after vowels (as in "breathe", "for", "your"); "th" leaning towards a soft t or d ("tree" for three, "dis" for this), but gently; open, rounded vowels; the gentle lilt of Irish speech, rising a little mid-sentence and settling at the end. Tone: warm, low, relaxed and reassuring, like a friend talking you through it in a quiet room. Pace: slow and unhurried, with real pauses after each sentence and before breathing cues. Do not sound like an announcer, an actor doing an accent, or a robot. No sing-song, no stage Irish.';
 async function openai(text, male) {
   const tries = male ? [process.env.TTS_VOICE_MALE || 'cedar', 'ash'] : [process.env.TTS_VOICE_FEMALE || 'marin', 'coral'];
   let last = '';

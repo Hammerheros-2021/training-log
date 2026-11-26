@@ -1725,7 +1725,7 @@ function vstatText(){if(!AUD.voice)return 'Voice off';if(TTS_ON)return VST.state
 function vstatSet(s,m){VST.state=s;VST.msg=m||'';const e=$('#vStat');if(e)e.innerHTML=vstatText()}
 const ttsUrl=new Map(),ttsP=new Map();
 function ttsGet(text){const tk=AUD.who+'|'+text;if(ttsUrl.has(tk))return Promise.resolve(ttsUrl.get(tk));if(ttsP.has(tk))return ttsP.get(tk);
-  const p=(async()=>{try{let blob=null,cache=null,key=null;try{cache=window.caches?await caches.open('tts-v3'):null;key=new Request(location.origin+'/tts-cache/'+AUD.who+'/'+encodeURIComponent(text));const hit=cache&&await cache.match(key);if(hit)blob=await hit.blob()}catch(e){}
+  const p=(async()=>{try{let blob=null,cache=null,key=null;try{cache=window.caches?await caches.open('tts-v4'):null;try{caches.delete('tts-v3')}catch(e){};key=new Request(location.origin+'/tts-cache/'+AUD.who+'/'+encodeURIComponent(text));const hit=cache&&await cache.match(key);if(hit)blob=await hit.blob()}catch(e){}
       if(!blob){const {data:{session}}=await sb.auth.getSession();if(!session){vstatSet('err','signed out');return null}
         const r=await fetch('/api/tts',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+session.access_token},body:JSON.stringify({text,voice:AUD.who})});
         if(!r.ok){let m='error '+r.status;try{const j=await r.json();m=j.error||m}catch(e){}vstatSet('err',String(m).slice(0,140));ttsP.delete(tk);return null}
