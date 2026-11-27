@@ -594,7 +594,7 @@ function sessionForm(d,pl){
   let spec='';
   if(k==='S')spec=`<div class="row2"><div class="field"><label class="label" for="f-tb">${esc(KEYLIFTS[0]||'Main lift')} top set (kg)</label><input id="f-tb" type="number" inputmode="decimal" step="2.5" value="${f.tb??''}" data-bind="s.tb"></div>
     <div class="field"><label class="label" for="f-ss">${esc(KEYLIFTS[1]||'Second lift')} (kg)</label><input id="f-ss" type="number" inputmode="decimal" step="1" value="${f.ss??''}" data-bind="s.ss"></div></div>`;
-  if(k==='T'&&!test)spec=`<label class="toggle"><input id="f-swap" type="checkbox" ${f.swap?'checked':''} data-bind="s.swap"> Did a ${esc(TNAME.H)} instead</label>`+(f.swap?'':`<div class="field"><label class="label" for="f-pace">Average rep pace (min:sec per km)</label><input id="f-pace" type="text" inputmode="numeric" placeholder="4:35" value="${esc(f.pace||'')}" data-bind="s.pace"></div>`);
+  if(k==='T'&&!test)spec=`<label class="toggle"><input id="f-swap" type="checkbox" ${f.swap?'checked':''} data-bind="s.swap"> Did a ${esc(TNAME.H)} instead</label>`+(f.swap?'':`<div class="field"><label class="label" for="f-pace">Average rep pace</label><input id="f-pace" type="text" inputmode="numeric" placeholder="4:35" value="${esc(f.pace||'')}" data-bind="s.pace"></div>`);
   if(test)spec=`<div class="field"><label class="label" for="f-5k">5 km time (min:sec)</label><input id="f-5k" type="text" inputmode="numeric" placeholder="21:30" value="${esc(f.fivek||'')}" data-bind="s.fivek"></div>`;
   if(isH||f.isClass)spec+=hyroxScanHTML();
   return `<form class="form" id="logForm" autocomplete="off" style="border-top:1px solid var(--line)">
@@ -7414,6 +7414,24 @@ const _p3PatT=p1Patterns;p1Patterns=function(){const r=_p3PatT();const rows=r.ro
   add(p3Link(rows,x=>x.sessM==null?null:x.sessM>=19*60,x=>x.nextSleep,{exp:-1,thr:.25,ctl:hard}),c=>({ic:'moon',col:'var(--k-violet)',t:`After training at 7 pm or later you sleep ${Math.round(Math.abs(c.a-c.b)*60)} minutes less.`,s:`${c.na} late sessions compared with ${c.nb} earlier ones.`}));
   add(p3Link(rows,x=>x.fz,x=>x.feel,{exp:-1,thr:.5,ctl:hard}),c=>({ic:'flame',col:'var(--k-amber)',t:`Fasted sessions feel harder for you than sessions after food.`,s:`Feel ${c.a.toFixed(1)} vs ${c.b.toFixed(1)} out of 5, ${c.na} fasted and ${c.nb} fed, hard days matched.`}));
   r.list.sort((a,b)=>b.w-a.w);return r};
+
+// ================= P3: pace as min/km (outside, on a watch) or km/h (treadmill) =================
+// Either way it's saved as min/km; the other unit is shown underneath so both always line up.
+let P3PM=(()=>{try{return localStorage.getItem('p3paceMode')||'out'}catch(e){return 'out'}})();
+const p3KmhVals=(()=>{const a=[];for(let v=60;v<=220;v++)a.push((v/10).toFixed(1));return a})();
+function p3PaceExtra(){const inp=document.getElementById('f-pace');if(!inp||!inp.dataset.wh)return;const fld=inp.closest('.field');if(!fld)return;
+  const pw=fld.querySelector('[data-wh="in-f-pace"]');let box=fld.querySelector('.p3pm');
+  if(!box){box=document.createElement('div');box.className='p3pm';box.innerHTML=`<div class="p3pmseg" role="group" aria-label="Pace units"><button type="button" data-p3pm="out">Outside · min/km</button><button type="button" data-p3pm="tm">Treadmill · km/h</button></div><div class="p3pmk"></div><small class="ds p3pmx"></small>`;(pw||inp).insertAdjacentElement('beforebegin',box)}
+  box.querySelectorAll('[data-p3pm]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.p3pm===P3PM)));
+  const sec=toSec(inp.value);const k=box.querySelector('.p3pmk');
+  if(P3PM==='tm'){if(pw)pw.style.display='none';if(!k.firstChild){const cur=sec?(Math.round(36000/sec)/10).toFixed(1):'';k.innerHTML=p3WheelHTML('in-f-kmh',p3KmhVals,cur,null,{def:'12.0',label:'Treadmill speed, km/h',unit:'km/h',cb:v=>{const sp=Math.round(3600/(+v));inp.value=fromSec(sp);inp.dispatchEvent(new Event('input',{bubbles:true}));inp.dispatchEvent(new Event('change',{bubbles:true}));p3PaceNote()}});p3WheelInit(k)}}
+  else{if(pw)pw.style.display='';k.innerHTML=''}
+  p3PaceNote()}
+function p3PaceNote(){const inp=document.getElementById('f-pace'),x=document.querySelector('.p3pmx');if(!inp||!x)return;const sec=toSec(inp.value);x.textContent=sec?(P3PM==='tm'?`= ${fromSec(sec)} per km`:`= ${kmhOf(sec)} km/h on a treadmill`):''}
+const _p3Wf=p3Wheelify;p3Wheelify=function(root){_p3Wf(root);try{p3PaceExtra()}catch(e){}};
+window.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3pm]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();P3PM=b.dataset.p3pm;try{localStorage.setItem('p3paceMode',P3PM)}catch(_){}
+  const k=document.querySelector('.p3pmk');if(k)k.innerHTML='';p3PaceExtra()},true);
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='f-pace')p3PaceNote()});
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
