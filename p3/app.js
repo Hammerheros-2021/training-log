@@ -7380,6 +7380,41 @@ const _p3PRH2=photoReviewHTML;photoReviewHTML=function(){const h=_p3PRH2();if(!P
   const row=`<div class="p3fq"><p>Nothing logged since <b>${p3AbsTxt(pe,k)}</b>. Were you fasting?</p><div class="p3fq2"><button type="button" data-p3fconf="fast" data-p3fk="${k}">Yes, fasting</button><button type="button" data-p3fconf="gap" data-p3fk="${k}">No, didn't log</button></div></div>`;
   const j=h.lastIndexOf('<div class="actions">');return j<0?h:h.slice(0,j)+row+h.slice(j)};
 
+// ================= P3: when you trained =================
+// Every session gets a time: the one you set, else the time from "How did it go?", else an estimate from when it was logged.
+// From that: fasted or fed (only when food either side of it is logged), and patterns like late training and sleep.
+function p3SessAt(k){const d=D()[k]||{};let t=p2T(d.sessAt);if(t)return {t,src:'set'};if(d.sfb&&(t=p2T(d.sfb.time)))return {t,src:'set'};
+  const l=L()[k];if(l&&l.status&&l.status!=='missed'&&l.savedAt){const dt=new Date(l.savedAt);if(iso(dt)===k){const m=dt.getHours()*60+dt.getMinutes()-(+l.dur||60);if(m>240)return {t:hm(m),src:'est'}}}return null}
+function p3SessFasted(k){const s=p3SessAt(k);if(!s)return null;const at=p3Abs(k,tmin(s.t));const before=p3PrevEat(at);if(before==null)return null;return at-before>=8*60}
+function p3TimeChips(cur,attr,k){const now=p1Min(p1Now());const today=k===iso(todayDate());const plan=p2T((D()[k]||{}).trainTime)||p2T(trainTimeFor(k));
+  const opts=[];if(plan)opts.push([plan,'Planned '+plan]);if(today){opts.push([hm(now-60),'1 h ago']);opts.push([hm(now-120),'2 h ago'])}
+  return `<div class="p3prtc">${opts.map(([t,l])=>`<button type="button" ${attr}="${t}" aria-pressed="${cur===t}">${l}</button>`).join('')}<label class="p3prti"><input type="time" ${attr}-in value="${esc(cur||plan||'18:00')}" aria-label="Time you started"></label></div>`}
+// "How did it go?" gets one line at the top: when you started
+const _p3FbDraw=p2FbDraw;p2FbDraw=function(){const f=P2FB.f;if(f&&!f.time){const k=P2FB.k;const s=p3SessAt(k);const plan=p2T((D()[k]||{}).trainTime)||p2T(trainTimeFor(k));const now=p1Min(p1Now());
+    f.time=s?s.t:(k===iso(todayDate())?(plan&&p1Min(plan)<now?plan:hm(now-60)):plan||null)}
+  _p3FbDraw.apply(this,arguments);const host=document.querySelector('#p1Host .kshead');if(!host||!f)return;
+  host.insertAdjacentHTML('afterend',`<div class="p3prt p3sat"><span class="label">Started at</span>${p3TimeChips(f.time,'data-p3fbt',P2FB.k)}</div>`)};
+window.addEventListener('click',e=>{const x=e.target.closest&&e.target.closest('[data-p3fbt]');if(!x||!P2FB.f)return;e.preventDefault();e.stopImmediatePropagation();P2FB.f.time=x.dataset.p3fbt;document.querySelectorAll('[data-p3fbt]').forEach(b=>b.setAttribute('aria-pressed',String(b===x)));const i=document.querySelector('[data-p3fbt-in]');if(i)i.value=P2FB.f.time},true);
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.hasAttribute&&t.hasAttribute('data-p3fbt-in')&&P2FB.f){P2FB.f.time=p2T(t.value);document.querySelectorAll('[data-p3fbt]').forEach(b=>b.setAttribute('aria-pressed','false'))}},true);
+const _p3FbSave=p2FbSave;p2FbSave=async function(){const f=P2FB.f,k=P2FB.k;if(f&&f.time&&k&&!sampleMode){const d=D()[k]||{};if(!p2T(d.sessAt))days[k]={...(days[k]||{date:k}),sessAt:f.time}}const r=await _p3FbSave.apply(this,arguments);if(f&&f.time&&k&&!sampleMode)persistDay(k,{sessAt:f.time});return r};
+// the logged session line shows the time, and fasted when we can tell
+const _p3Logged=loggedHTML;loggedHTML=function(d){const h=_p3Logged(d);const k=iso(d);if(sampleMode)return h;const s=p3SessAt(k);const fz=p3SessFasted(k);
+  const chip=`<button type="button" class="p2tc p3satc" data-p3sat="${k}" aria-label="Change when you trained">${ico('clock')}<span>${s?(s.src==='est'?'~':'')+s.t:'Set time'}${fz===true?' · fasted':''}</span></button>`;
+  const j=h.indexOf('</div>',h.indexOf('class="lgrow"'));return j<0?h:h.slice(0,j+6)+`<div class="p3satrow">${chip}</div>`+h.slice(j+6)};
+window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(x=c('[data-p3sat]')){e.preventDefault();e.stopImmediatePropagation();const k=x.dataset.p3sat;const s=p3SessAt(k);
+    p1Sheet(`<div class="kshead"><div><h2>When did you start?</h2><small class="ds">Used to tell fasted from fed training, and how late sessions affect your sleep.</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div><div class="p3prt">${p3TimeChips(s&&s.src==='set'?s.t:null,'data-p3satt',k).replace('<div class="p3prtc">',`<div class="p3prtc" data-p3satk="${k}">`)}</div>`);return}
+  if(x=c('[data-p3satt]')){e.preventDefault();e.stopImmediatePropagation();const k=x.closest('[data-p3satk]').dataset.p3satk;await p3SetSess(k,x.dataset.p3satt);return}},true);
+document.addEventListener('change',async e=>{const t=e.target;if(t&&t.hasAttribute&&t.hasAttribute('data-p3satt-in')){const k=t.closest('[data-p3satk]').dataset.p3satk;const v=p2T(t.value);if(v)await p3SetSess(k,v)}},true);
+async function p3SetSess(k,t){days[k]={...(days[k]||{date:k}),sessAt:t};p1Sheet(null);render();await persistDay(k,{sessAt:t});const fz=p3SessFasted(k);toast(`Session at ${t}${fz===true?', fasted':fz===false?', after food':''}`)}
+// patterns that use the time, under the same rules as the rest
+const _p3PatT=p1Patterns;p1Patterns=function(){const r=_p3PatT();const rows=r.rows;
+  rows.forEach(x=>{const s=p3SessAt(x.k);x.sessM=s?tmin(s.t):null;x.fz=x.sessM!=null?p3SessFasted(x.k):null;x.feel=x.d&&x.d.sfb&&isNum(x.d.sfb.feel)?+x.d.sfb.feel:null});
+  const add=(c,fmt)=>{if(c)r.list.push({...fmt(c),w:c.w})};const hard=x=>!!x.hard;
+  add(p3Link(rows,x=>x.sessM==null?null:x.sessM>=19*60,x=>x.nextSleep,{exp:-1,thr:.25,ctl:hard}),c=>({ic:'moon',col:'var(--k-violet)',t:`After training at 7 pm or later you sleep ${Math.round(Math.abs(c.a-c.b)*60)} minutes less.`,s:`${c.na} late sessions compared with ${c.nb} earlier ones.`}));
+  add(p3Link(rows,x=>x.fz,x=>x.feel,{exp:-1,thr:.5,ctl:hard}),c=>({ic:'flame',col:'var(--k-amber)',t:`Fasted sessions feel harder for you than sessions after food.`,s:`Feel ${c.a.toFixed(1)} vs ${c.b.toFixed(1)} out of 5, ${c.na} fasted and ${c.nb} fed, hard days matched.`}));
+  r.list.sort((a,b)=>b.w-a.w);return r};
+
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
   catch(e){showGate('<div class="gcard"><h1>Not set up yet</h1><p class="gsub">The app is missing its database settings. Add SUPABASE_URL and SUPABASE_ANON_KEY in the hosting settings, then redeploy.</p></div>');return}
