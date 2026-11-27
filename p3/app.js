@@ -570,7 +570,7 @@ async function finishPlan(out,req){
 }
 async function ateThis(ref){
   const [k,ix]=[ref.slice(0,10),+ref.slice(11)];const pd=planDay(k);const m=pd&&pd.meals[ix];if(!m)return;
-  const it={name:m.name,qty:(m.items||[]).map(x=>x.qty?`${x.qty} ${x.name}`:x.name).join(', ').slice(0,120),meal:slotMeal(m.slot),at:m.time||MEAL_T[slotMeal(m.slot)],est:true,src:'plan',planRef:ref,plants:m.plants||[]};NK.forEach(x=>it[x]=+m[x]||0);
+  const it={name:m.name,qty:(m.items||[]).map(x=>x.qty?`${x.qty} ${x.name}`:x.name).join(', ').slice(0,120),meal:slotMeal(m.slot),at:k===iso(todayDate())?p1Now():(m.time||MEAL_T[slotMeal(m.slot)]),est:true,src:'plan',planRef:ref,plants:m.plants||[]};NK.forEach(x=>it[x]=+m[x]||0);
   await addFood([it],k);toast(`Logged ${m.name}`);render();
 }
 // ================= session form =================
@@ -998,7 +998,7 @@ function mealExtras(m){return {where:WHERE.includes(m.where)?m.where:'',when:Str
 function optsHTML(k,ix,m){const o=m.options||[];if(!o.length)return '';const can=k<=iso(todayDate());const logged=planLogged(k,ix);
   return `<div class="popts"><span>Or, if that's not doable</span>${o.map((x,j)=>`<div class="popt"><div><b>${esc(x.name)}</b>${x.where?` <em>${esc(x.where)}</em>`:''}${x.get?`<br><small>${esc(x.get)}</small>`:''}<br><small class="num">about ${Math.round(x.kcal)} kcal · ${Math.round(x.protein)}p</small></div>${can&&!logged?`<button type="button" class="ghost ate" data-ateopt="${k}:${ix}:${j}">Had this</button>`:''}</div>`).join('')}</div>`}
 async function ateOpt(ref){const [k,ix,j]=[ref.slice(0,10),+ref.split(':')[1],+ref.split(':')[2]];const pd=planDay(k);const m=pd&&pd.meals[ix];const x=m&&m.options&&m.options[j];if(!x)return;
-  const it={name:x.name,qty:x.get||'',meal:slotMeal(m.slot),at:m.time||MEAL_T[slotMeal(m.slot)],est:true,src:'plan',planRef:k+':'+ix,plants:[],micros:false};NK.forEach(q=>it[q]=0);['kcal','protein','carbs','fat'].forEach(q=>it[q]=+x[q]||0);
+  const it={name:x.name,qty:x.get||'',meal:slotMeal(m.slot),at:k===iso(todayDate())?p1Now():(m.time||MEAL_T[slotMeal(m.slot)]),est:true,src:'plan',planRef:k+':'+ix,plants:[],micros:false};NK.forEach(q=>it[q]=0);['kcal','protein','carbs','fat'].forEach(q=>it[q]=+x[q]||0);
   await addFood([it],k);toast(`Logged ${x.name}`);render()}
 function eatSetHTML(){const s=meta.settings||{};const st=s.eatStyle||'home',n=String(s.meals||'auto');
   const sg=(key,vals,labels,cur)=>`<div class="seg small">${vals.map((v,i)=>`<button type="button" data-eset="${key}" data-v="${v}" aria-pressed="${cur===v}">${labels[i]}</button>`).join('')}</div>`;
@@ -4179,7 +4179,7 @@ foodActionsHTML=function(dIso){let h=_p1foodActions(dIso);if(!h)return h;const m
 let P3MP=false,P3VM=null;
 window.addEventListener('click',e=>{const s=e.target.closest&&e.target.closest('[data-form="f"][data-v]');if(s&&MEALS.includes(s.dataset.v)){P3MP=true;fState.at=null}},true);
 function p3ShownMeal(){return fState.meal||(iso(sel)===iso(todayDate())?guessMeal():'Dinner')}
-function p3AtFor(meal){const today=iso(sel)===iso(todayDate());if(!today)return MEAL_T[meal];const n=new Date(),nm=n.getHours()*60+n.getMinutes();if(meal===guessMeal())return fmtT(nm);const t=tmin(MEAL_T[meal]);return t!=null&&t<nm?MEAL_T[meal]:fmtT(nm)}
+function p3AtFor(meal){const today=iso(sel)===iso(todayDate());if(!today)return MEAL_T[meal];const n=new Date();return fmtT(n.getHours()*60+n.getMinutes())}// logging today: the time you log it, change it after if needed
 cleanItems=(function(old){return function(arr,meal,est,src){const out=old(arr,meal,est,src);if(!P3VM||(src!=='voice'&&src!=='photo'))return out;
   return out.map(i=>P3VM.force||!P3VM.words?{...i,meal:P3VM.meal,at:P3VM.at}:i)}})(cleanItems);
 runVoice=(function(old){return async function(){const t=$('#v-text');const text=(t&&t.value||'');const meal=p3ShownMeal();
@@ -5918,7 +5918,7 @@ window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.
   if(x=c('[data-kuzadd]')){e.preventDefault();const u=KUZL[+x.dataset.kuzadd];if(!u)return;const m=p3ShownMeal();
     await addFood(kuzPaste(u.items,m,p3AtFor(m)));toast(`Added ${u.name}: ${u.items.length} item${u.items.length>1?'s':''}`);render();return}
   if(x=c('[data-kuzsame]')){e.preventDefault();const [k,m]=x.dataset.kuzsame.split('|');const src=kuzMealItems(k,m);if(!src.length)return;
-    await addFood(kuzPaste(src,m,null));toast(`Copied ${m.toLowerCase()} from ${kuzDayName(k)}`);render();return}
+    await addFood(kuzPaste(src,m,iso(sel)===kuzToday()?p3AtFor(m):null));toast(`Copied ${m.toLowerCase()} from ${kuzDayName(k)}`);render();return}
   if(x=c('[data-kuzcopy]')){e.preventDefault();e.stopPropagation();const k=iso(sel),w=x.dataset.kuzcopy;const ms=w==='*'?MEALS:[w];const src=[].concat(...ms.map(m=>kuzMealItems(k,m)));if(!src.length)return;
     await addFood(kuzPaste(src,null,null),kuzToday());toast(`Copied ${w==='*'?'the whole day':w.toLowerCase()} to today`);render();return}
   if(x=c('[data-kuzsave]')){e.preventDefault();e.stopPropagation();const m=x.dataset.kuzsave;const its=kuzMealItems(iso(sel),m);if(!its.length)return;
