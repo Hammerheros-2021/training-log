@@ -1597,6 +1597,19 @@ details.rcat.p3rf .rprogs{padding:0 12px 12px}
 .p3tlab{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
 .p3tlab b{white-space:nowrap}
 .p3fpill small{margin-left:6px;font-size:11px;font-weight:500;opacity:.75}
+button.p3fpill{font:inherit;cursor:pointer}
+.p3fpill.p3fstart{opacity:.8}
+.p3fq{border:1px solid var(--warn);border-radius:14px;padding:12px;margin:8px 0 12px;display:flex;flex-direction:column;gap:10px}
+.p3fq p{margin:0;font-size:14px}
+.p3fq2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.p3fq2 button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:10px;font:inherit;font-size:14px}
+.p3fq2 button:first-child{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.p3fact{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 12px}.p3fact p{margin:0;font-size:14px}
+.p3fr{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin-top:14px;width:100%}
+.p3fseg{display:grid!important;grid-template-columns:1fr 1fr;width:100%;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.p3fseg button{width:auto!important;margin:0!important;border:0;background:transparent;color:var(--fg);padding:10px 8px;display:flex;flex-direction:column;gap:2px;font:inherit;text-align:center}
+.p3fseg button small{font-size:11px;opacity:.75}
+.p3fseg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
 .p3prt{display:flex;flex-direction:column;gap:6px;margin:10px 0 4px}
 .p3prtc{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .p3prtc button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:99px;padding:7px 12px;font-size:13px}
@@ -2090,6 +2103,6 @@ html[data-look="forest"]{--bg:#0E0E10!important;--surface:#18181B!important;--li
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p6e"></script>
+<script src="/p3/app.js?v=p6f"></script>
 </body>
 </html>

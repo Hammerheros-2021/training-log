@@ -363,7 +363,7 @@ function targets(){return {fastH:(meta.settings&&meta.settings.fastH)||14}}
 
 // ---------- totals ----------
 const kcalOf=i=>isNum(i.kcal)?+i.kcal:Math.round(4*(+i.carbs||0)+4*(+i.protein||0)+9*(+i.fat||0));
-const breaksFast=i=>kcalOf(i)>=5;
+const breaksFast=i=>p3Breaks(i);
 function foodTotals(d){const t={n:0,microN:0};NK.forEach(k=>t[k]=0);(d&&d.food||[]).forEach(i=>{NK.forEach(k=>{t[k]+=k==='kcal'?kcalOf(i):(+i[k]||0)});t.n++;if(i.micros!==false)t.microN++});suppItems(d).forEach(i=>NK.forEach(k=>{if(k!=='kcal')t[k]+=(+i[k]||0);else t.kcal+=(+i.kcal||0)}));return t}
 function mealWindow(d){if(!d)return null;let ts=(d.food||[]).filter(breaksFast).map(i=>tmin(i.at)).filter(x=>x!=null);const f=tmin(d.firstMeal),l=tmin(d.lastMeal);if(f!=null)ts.push(f);if(l!=null)ts.push(l);if(!ts.length)return null;return {first:f!=null?f:Math.min(...ts),last:l!=null?l:Math.max(...ts)}}
 function fastHours(map,k){const d=map[k],p=map[iso(addD(parse(k),-1))];const w=mealWindow(d),pw=mealWindow(p);if(!w||!pw)return null;return Math.round(((w.first+1440)-pw.last)/6)/10}
@@ -2591,7 +2591,7 @@ function p1PatternsView(){const {have,list,rows}=p1Patterns();const k=iso(sample
   const toggle=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">${sampleMode?`<span class="sample">Example data, not yours</span>`:'<span class="label">From your last 8 weeks</span>'}<button type="button" class="ghost" id="sampleBtn" style="padding:8px 12px">${sampleMode?'Show my data':'See an example'}</button></div>`;
   return toggle+`<article class="card p1streak"><div class="p1stk">${ico('shield')}<div><b class="num">${st}</b><span>days with no niggles</span></div></div><p>${st>=21?'That\'s a strong run. Steady sleep, sensible load and fuelling well all play a part. Keep doing what you\'re doing.':st>=7?'Building nicely. Keep the hard days hard and the easy days easy.':'Every day without a niggle counts. Look after the basics: sleep, protein, and easy days after hard ones.'}${injDays?` You had ${injDays} sore or niggly day${injDays>1?'s':''} in the last 8 weeks.`:''}</p></article>
   ${have<14?`<article class="card"><div class="form"><b>Patterns need about two weeks of check-ins.</b><span class="ds">You have ${have} so far. Keep checking in, logging food and your day, and Keel will start linking sleep, work, training, coffee and drink to how you feel.</span></div></article>`:''}
-  ${list.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>What links up for you</h2><div class="sub">Strongest first. These are patterns, not proof.</div></div></div><ul class="p1pats">${list.map(p=>`<li style="--pc:${p.col}">${ico(p.ic)}<span><b>${esc(p.t)}</b><small>${esc(p.s)}</small></span></li>`).join('')}</ul></article>`:have>=14?'<article class="card"><div class="form"><span class="ds">Nothing strong stands out yet. That usually means things are fairly steady.</span></div></article>':''}
+  ${list.length?`<article class="card"><div class="chead"><div style="flex:1"><h2>What links up for you</h2><div class="sub">Strongest first. Only links that hold up once training is taken into account.</div></div></div><ul class="p1pats">${list.map(p=>`<li style="--pc:${p.col}">${ico(p.ic)}<span><b>${esc(p.t)}</b><small>${esc(p.s)}</small></span></li>`).join('')}</ul></article>`:have>=14?'<article class="card"><div class="form"><span class="ds">Nothing strong stands out yet. That usually means things are fairly steady.</span></div></article>':''}
   ${patternHTML()}`}
 // export
 var P1X={from:null,to:null,groups:{sleep:1,train:1,food:1,work:1,weather:1,body:1},busy:false};
@@ -7302,6 +7302,83 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='p3prti'&&PR){P3PRT=p2T(e.target.value);showPR()}},true);
 const _p3prLog=prLog;prLog=async function(){if(PR){const today=iso(sel)===iso(todayDate());const t=P3PRT||(today?p1Now():null);if(t){PR.items.forEach(x=>x.at=t);PR.meal=p1MealFor(t)}}P3PRT=null;return _p3prLog()};
 document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('#prNo'))P3PRT=null},true);
+
+// ================= P3: rules for "What links up for you" =================
+// A link is only shown when it (1) goes the way the science says it should, (2) has at least 7 days on each side,
+// (3) is big enough to matter, and (4) still holds when training is taken into account (hard days compared with hard days).
+// Anything that fails is hidden, so a coincidence never reads as advice.
+const P3RULE_MIN=7;
+function p3Link(rows,test,val,o){const g=rows.map(r=>({t:test(r),v:val(r),c:o.ctl?o.ctl(r):null})).filter(x=>(x.t===true||x.t===false)&&x.v!=null&&!isNaN(x.v));
+  const A=g.filter(x=>x.t).map(x=>x.v),B=g.filter(x=>!x.t).map(x=>x.v);if(A.length<P3RULE_MIN||B.length<P3RULE_MIN)return null;
+  const a=avg(A),b=avg(B),d=a-b;if(Math.abs(d)<o.thr)return null;if(o.exp&&Math.sign(d)!==o.exp)return null;
+  if(o.ctl){let wsum=0,dsum=0;[true,false].forEach(cv=>{const ga=g.filter(x=>x.t&&x.c===cv).map(x=>x.v),gb=g.filter(x=>!x.t&&x.c===cv).map(x=>x.v);if(ga.length>=3&&gb.length>=3){const w=Math.min(ga.length,gb.length);wsum+=w;dsum+=w*(avg(ga)-avg(gb))}});
+    if(!wsum)return null;const dw=dsum/wsum;if(o.exp&&Math.sign(dw)!==o.exp)return null;if(Math.abs(dw)<o.thr*.6)return null}
+  return {a,b,na:A.length,nb:B.length,w:Math.abs(d)/o.thr}}
+p1Patterns=function(){const rows=p1Series(56);rows.forEach((r,i)=>{r.prevHard=i>0?rows[i-1].hard:null});const have=rows.filter(r=>r.bal!=null).length;const list=[];
+  const add=(c,fmt)=>{if(c)list.push({...fmt(c),w:c.w})};const hard=r=>!!r.hard,prevHard=r=>!!r.prevHard;const mins=c=>Math.round(Math.abs(c.a-c.b)*60),pts=c=>Math.round(Math.abs(c.a-c.b));
+  add(p3Link(rows,r=>r.hard,r=>r.next,{exp:-1,thr:5}),c=>({ic:'flame',col:'var(--k-pink)',t:`After a hard day, your balance next morning is ${pts(c)} points lower.`,s:`${c.na} hard days compared with ${c.nb} others.`}));
+  add(p3Link(rows,r=>r.lateCaf,r=>r.nextSleep,{exp:-1,thr:.25,ctl:hard}),c=>({ic:'coffee',col:'var(--k-amber)',t:`When you have coffee after 2 pm you sleep ${mins(c)} minutes less.`,s:`${c.na} late-coffee days compared with ${c.nb} others, training days matched.`}));
+  add(p3Link(rows,r=>r.drinks>=2,r=>r.next,{exp:-1,thr:5,ctl:hard}),c=>({ic:'wine',col:'var(--k-violet)',t:`After a night with a few drinks, your balance is ${pts(c)} points lower next day.`,s:`${c.na} nights compared with ${c.nb}.`}));
+  add(p3Link(rows,r=>r.mind>=4,r=>r.nextSleep,{exp:-1,thr:.25,ctl:hard}),c=>({ic:'brain',col:'var(--k-sky)',t:`On mentally heavy work days you sleep ${mins(c)} minutes less that night.`,s:`${c.na} heavy days compared with ${c.nb}, training days matched.`}));
+  add(p3Link(rows,r=>r.sleep==null?null:r.sleep>=7,r=>r.bal,{exp:1,thr:5,ctl:prevHard}),c=>({ic:'moon',col:'var(--k-blue)',t:`With 7 hours or more of sleep, your balance is ${pts(c)} points higher.`,s:`${c.na} good nights compared with ${c.nb} short ones.`}));
+  add(p3Link(rows,r=>r.protOk,r=>r.nextSore,{exp:-1,thr:.4,ctl:hard}),c=>({ic:'beef',col:'var(--k-green)',t:`On days you hit your protein, you're less sore the next morning.`,s:`Soreness ${c.a.toFixed(1)} vs ${c.b.toFixed(1)} out of 5, training days matched.`}));
+  add(p3Link(rows,r=>r.screen==null?null:r.screen>=60,r=>r.sleep,{exp:1,thr:.25,ctl:hard}),c=>({ic:'moon',col:'var(--k-violet)',t:`When your phone is away an hour before bed you sleep ${mins(c)} minutes more.`,s:`${c.na} nights compared with ${c.nb}.`}));
+  add(p3Link(rows,r=>((r.d.hc||[]).length>0),r=>r.nextSleep,{exp:1,thr:.25,ctl:hard}),c=>({ic:'flame',col:'var(--k-amber)',t:`On days with a sauna or cold water you sleep ${mins(c)} minutes more.`,s:`${c.na} days compared with ${c.nb}.`}));
+  add(p3Link(rows,r=>((r.d.hc||[]).length>0),r=>r.nextSore,{exp:-1,thr:.4,ctl:hard}),c=>({ic:'snowflake',col:'var(--k-sky)',t:`After heat or cold, you're less sore next morning.`,s:`Soreness ${c.a.toFixed(1)} vs ${c.b.toFixed(1)} out of 5.`}));
+  list.sort((a,b)=>b.w-a.w);return {have,list,rows}};
+// Best days: a row only shows when it points the right way (more sleep, earlier bed, more water on your best days)
+p3PatCards=(function(old){return function(){const h=old();return h.replace(/<article class="card p3best">[\s\S]*?<\/article>/,()=>{const DD=D(),now=todayDate();const all=[];for(let i=1;i<=84;i++){const d=DD[iso(addD(now,-i))];if(d&&readiness(d)!=null)all.push(d)}
+  if(all.length<21)return '';const s=[...all].sort((a,b)=>readiness(b)-readiness(a));const q=Math.floor(s.length/3);const top=s.slice(0,q),bot=s.slice(-q);
+  const mean=(arr,f)=>{const v=arr.map(x=>{try{return f(x)}catch(e){return null}}).filter(v=>v!=null&&!isNaN(v));return v.length>=P3RULE_MIN?v.reduce((a,b)=>a+b,0)/v.length:null};
+  const rows=[['Sleep',d=>sleepHours(d),v=>v.toFixed(1)+' h',.4,1],['In bed by',d=>bedMin(d.bed),v=>fmtT(Math.round(v)%1440),25,-1],['Water',d=>p3Fluid(d).t||null,v=>v.toFixed(1)+' L',.4,1]].map(([n,f,fm,min,dir])=>{const a=mean(top,f),b=mean(bot,f);return a==null||b==null||Math.abs(a-b)<min||Math.sign(a-b)!==dir?'':`<div class="p3bd"><small>${n}</small><b>${fm(a)}</b><span>${fm(b)}</span></div>`}).join('');
+  return rows?`<article class="card p3best"><div class="chead"><div style="flex:1"><h2>Your best days</h2></div></div><div class="p3bdh"><small></small><small>Best days</small><small>Low days</small></div>${rows}</article>`:''})}})(p3PatCards);
+
+// ================= P3: fasting you control =================
+// Rule: Relaxed (default) lets black tea, black coffee and electrolyte tabs through (under 10 kcal and under 2 g carbs); Strict counts any calories.
+// Overnight gaps up to 18 h count on their own. Longer gaps only count if you started a fast or said "yes, fasting" afterwards,
+// so a day you simply didn't log never shows up as a fast, for you or for staff.
+const P3F_AUTO=18;
+function p3FM(){return Object.assign({rule:'relaxed',conf:{},active:null},meta.fast||{})}
+function p3Breaks(i){const k=kcalOf(i)||0;if(p3FM().rule==='strict')return k>0;return k>=10||(+i.carbs||0)>=2}
+const p3DN=k=>Math.round(parse(k).getTime()/864e5);
+const p3Abs=(k,m)=>p3DN(k)*1440+m;
+const p3AbsK=a=>iso(new Date(Math.floor(a/1440)*864e5+12*36e5));
+function p3NowAbs(){return p3Abs(iso(todayDate()),p1Min(p1Now()))}
+function p3Eats(k){const d=D()[k];return ((d&&d.food)||[]).filter(p3Breaks).map(i=>tmin(p2T(i.at))).filter(x=>x!=null).map(m=>p3Abs(k,m)).sort((a,b)=>a-b)}
+function p3PrevEat(abs){const k0=p3AbsK(abs);for(let i=0;i<=3;i++){const k=iso(addD(parse(k0),-i));const e=p3Eats(k).filter(a=>a<abs);if(e.length)return e[e.length-1]}return null}
+function p3AbsTxt(a,refK){const k=p3AbsK(a),t=fmtT(((a%1440)+1440)%1440);const back=p3DN(refK)-p3DN(k);return back<=1?t:`${fmtD(parse(k),{weekday:'short'})} ${t}`}
+function p3Fast(k){const e=p3Eats(k);if(!e.length)return null;const to=e[0];const from=p3PrevEat(to);if(from==null)return null;const h=Math.round((to-from)/6)/10;const c=p3FM().conf[k];
+  if(c==='gap')return {gap:true,from,to,h};if(h<=P3F_AUTO||c==='fast')return {ok:true,from,to,h};return {ask:true,from,to,h}}
+fastHours=function(map,k){try{const r=p3Fast(k);return r&&r.ok&&r.h>0?r.h:null}catch(e){return null}};
+async function p3FSave(ch){const f={...p3FM(),...ch};await persistMeta('fast',f)}
+// an active fast ends itself when you log something that breaks it
+function p3FTick(){const f=p3FM();if(!f.active||sampleMode)return;const t=p3DN(iso(todayDate()));for(let dn=Math.floor(f.active.since/1440);dn<=t;dn++){const k=p3AbsK(dn*1440);if(p3Eats(k).some(x=>x>f.active.since)){p3FSave({active:null,conf:{...f.conf,[k]:'fast'}});return}}}
+function p3FastPill(dIso){if(sampleMode)return '';try{p3FTick()}catch(e){}const f=p3FM();const today=iso(todayDate());const T=targets().fastH;const r=p3Fast(dIso);
+  const pill=(cls,col,main,sub)=>`<button type="button" class="kpill p3fpill ${cls}" data-p3fast style="--vc:${col}">${main}${sub?`<small>${sub}</small>`:''}</button>`;
+  if(r&&r.ok)return pill('','var(--'+(r.h>=T?'ok':'warn')+')',`Fasted ${r.h} h`,`${p3AbsTxt(r.from,dIso)} to ${p3AbsTxt(r.to,dIso)}`);
+  if(r&&r.ask)return pill('p3fask','var(--warn)','Fasting?',`nothing logged since ${p3AbsTxt(r.from,dIso)}`);
+  if(dIso!==today)return '';
+  const now=p3NowAbs();
+  if(f.active){const h=Math.round((now-f.active.since)/6)/10;return pill('p3flive','var(--accent,var(--k-blue))',`Fasting ${h} h`,`since ${p3AbsTxt(f.active.since,dIso)}`)}
+  if(!p3Eats(dIso).length){const pe=p3PrevEat(now);if(pe!=null){const h=Math.round((now-pe)/6)/10;if(h<=P3F_AUTO)return pill('','var(--muted)',`Fasting ${h} h`,`since ${p3AbsTxt(pe,dIso)}`)}}
+  return pill('p3fstart','var(--muted)','Fasting','')}
+// the one sheet: question if needed, start or end a fast, Strict or Relaxed
+function p3FastSheet(){const f=p3FM();const k=iso(sel);const today=iso(todayDate());const r=p3Fast(k);const now=p3NowAbs();
+  const q=r&&r.ask?`<div class="p3fq"><p>Nothing logged since <b>${p3AbsTxt(r.from,k)}</b>. Were you fasting?</p><div class="p3fq2"><button type="button" data-p3fconf="fast">Yes, fasting</button><button type="button" data-p3fconf="gap">No, didn't log</button></div></div>`:'';
+  const act=k!==today||(r&&r.ask)?'':f.active?`<div class="p3fact"><p>Fasting since <b>${p3AbsTxt(f.active.since,k)}</b>, ${Math.round((now-f.active.since)/6)/10} h so far.</p><button type="button" class="ghost" data-p3fend>End fast</button></div>`:`<button type="button" class="p3wisave" data-p3fstart>${ico('play')} Start a fast now</button>`;
+  const seg=`<div class="p3fr"><span class="label">What breaks a fast</span><div class="p3fseg" role="group"><button type="button" data-p3frule="strict" aria-pressed="${f.rule==='strict'}"><b>Strict</b><small>any calories</small></button><button type="button" data-p3frule="relaxed" aria-pressed="${f.rule!=='strict'}"><b>Relaxed</b><small>black tea, coffee, electrolytes ok</small></button></div></div>`;
+  p1Sheet(`<div class="kshead"><div><h2>Fasting</h2><small class="ds">From your last food to your first. Overnight counts on its own; longer fasts count when you start one or say yes.</small></div><button type="button" class="x" id="p1X" aria-label="Close">${ico('x')}</button></div>${q}${act}${seg}`)}
+window.addEventListener('click',async e=>{const c=q=>e.target.closest&&e.target.closest(q);let x;
+  if(c('[data-p3fast]')){e.preventDefault();e.stopImmediatePropagation();p3FastSheet();return}
+  if(x=c('[data-p3fconf]')){e.preventDefault();e.stopImmediatePropagation();const f=p3FM();const k=x.dataset.p3fk||iso(sel);await p3FSave({conf:{...f.conf,[k]:x.dataset.p3fconf}});if(x.closest('#prWrap')){showPR()}else{p1Sheet(null)}render();toast(x.dataset.p3fconf==='fast'?'Counted as a fast':'Marked as not logged');return}
+  if(c('[data-p3fstart]')){e.preventDefault();e.stopImmediatePropagation();const now=p3NowAbs();const pe=p3PrevEat(now);const since=pe!=null&&now-pe<=P3F_AUTO*60?pe:now;await p3FSave({active:{since}});p1Sheet(null);render();toast(`Fast started, counting from ${p3AbsTxt(since,iso(todayDate()))}`);return}
+  if(c('[data-p3fend]')){e.preventDefault();e.stopImmediatePropagation();await p3FSave({active:null});p1Sheet(null);render();toast('Fast ended');return}
+  if(x=c('[data-p3frule]')){e.preventDefault();e.stopImmediatePropagation();await p3FSave({rule:x.dataset.p3frule});p3FastSheet();render();return}},true);
+// the food check asks once, only after a long gap with no fast started
+const _p3PRH2=photoReviewHTML;photoReviewHTML=function(){const h=_p3PRH2();if(!PR||!h||sampleMode)return h;const k=iso(sel),today=iso(todayDate());if(k!==today)return h;const f=p3FM();if(f.active||f.conf[k]||p3Eats(k).length)return h;
+  const now=p3NowAbs();const pe=p3PrevEat(now);if(pe==null||now-pe<=P3F_AUTO*60)return h;
+  const row=`<div class="p3fq"><p>Nothing logged since <b>${p3AbsTxt(pe,k)}</b>. Were you fasting?</p><div class="p3fq2"><button type="button" data-p3fconf="fast" data-p3fk="${k}">Yes, fasting</button><button type="button" data-p3fconf="gap" data-p3fk="${k}">No, didn't log</button></div></div>`;
+  const j=h.lastIndexOf('<div class="actions">');return j<0?h:h.slice(0,j)+row+h.slice(j)};
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
