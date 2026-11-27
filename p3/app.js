@@ -7254,7 +7254,7 @@ trCard=(function(old){return function(){const h=old.apply(this,arguments);if(!h)
 .evbar{height:6px;border-radius:99px;background:var(--line);margin:0 16px 16px;overflow:hidden}.evbar i{display:block;height:100%;background:var(--k-green,#3a9a5b)}`;document.head.appendChild(st)})();
 
 // ================= Looks: Bone, Forest and Keel only, plus Match phone (Bone or Forest, following the phone's light or dark mode) =================
-P3LOOKS.length=0;P3LOOKS.push(['bone','Bone','Light paper, forest green'],['forest','Forest','Dark and calm'],['keel','Keel','Black, the logo colours'],['auto','Match phone','Bone or Forest, with your phone\'s light or dark mode']);
+P3LOOKS.length=0;P3LOOKS.push(['bone','Bone','Light paper, forest green'],['forest','Forest','Dark and calm'],['keel','Keel','Black, the logo colours'],['keellight','Keel light','White, the logo colours'],['auto','Match phone','Bone or Forest, with your phone\'s light or dark mode']);
 const p3PhoneDark=()=>!!(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
 p3LookNow=function(){const v=p3LookPref();if(v!=='auto')return v;return p3PhoneDark()?'forest':'bone'};
 p3ApplyLook=function(){const e=p3LookNow();if(document.documentElement.dataset.look!==e)document.documentElement.dataset.look=e;const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=e==='bone'?'#F4F1EB':e==='forest'?'#0E0E10':(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0B0C10')};

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0A100D">
-<script>try{var L=["bone","forest","keel","auto"],q=new URLSearchParams(location.search).get("look");if(q&&L.indexOf(q)>=0)localStorage.setItem("keelLook",q);var v=localStorage.getItem("keelLook")||"auto";if(L.indexOf(v)<0)v="auto";if(v==="auto")v=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"forest":"bone";document.documentElement.dataset.look=v}catch(e){}</script>
+<script>try{var L=["bone","forest","keel","keellight","auto"],q=new URLSearchParams(location.search).get("look");if(q&&L.indexOf(q)>=0)localStorage.setItem("keelLook",q);var v=localStorage.getItem("keelLook")||"auto";if(L.indexOf(v)<0)v="auto";if(v==="auto")v=window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches?"forest":"bone";document.documentElement.dataset.look=v}catch(e){}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Keel">
@@ -1471,6 +1471,14 @@ html[data-look="keel"]{
   --font-display:"Inter Tight",Inter,system-ui,sans-serif;
   --logo-a:#E23D9E; --logo-b:#5B6CFF; --logo-c:#34E3A0; --scrim:rgba(0,0,0,.72); color-scheme:dark;
 }
+html[data-look="keellight"]{
+  --bg:#F7F7FA; --surface:#FFFFFF; --line:#E3E3EA; --text:#0B0B10; --text-body:#3A3A44; --text-muted:#6C6C76; --on-text:#FFFFFF; --on-tint:#FFFFFF;
+  --fade-magenta:#C2287F; --fade-blue:#4152D6; --fade-green:#0F8A5F;
+  --status-good:#13895E; --status-caution:#A86F12; --status-alert:#C93C4A;
+  --k-blue:#4152D6; --k-pink:#C2287F; --k-green:#13895E; --k-amber:#A86F12; --k-violet:#6E4FD0; --k-sky:#1C7FB8; --k-clay:#9A6A33;
+  --font-display:"Inter Tight",Inter,system-ui,sans-serif;
+  --logo-a:#E23D9E; --logo-b:#5B6CFF; --logo-c:#2FBF8A; --scrim:rgba(11,11,16,.38); color-scheme:light;
+}
 html[data-look="platinum"]{
   --bg:#0E0F11; --surface:#16181B; --line:#25282D; --text:#EEF0F2; --text-body:#CDD1D6; --text-muted:#8C929A; --on-text:#0E0F11; --on-tint:#0E0F11;
   --fade-magenta:#3A3F46; --fade-blue:#8A939D; --fade-green:#F1F4F7;
@@ -1479,10 +1487,10 @@ html[data-look="platinum"]{
   --font-display:"Inter Tight",Inter,system-ui,sans-serif;
   --logo-a:#4A5058; --logo-b:#8A939D; --logo-c:#F1F4F7; --scrim:rgba(6,7,8,.72); color-scheme:dark;
 }
-html[data-look="dusk"] h1,html[data-look="dusk"] h2,html[data-look="keel"] h1,html[data-look="keel"] h2,html[data-look="platinum"] h1,html[data-look="platinum"] h2{font-weight:300!important;letter-spacing:-0.02em!important}
+html[data-look="dusk"] h1,html[data-look="dusk"] h2,html[data-look="keel"] h1,html[data-look="keel"] h2,html[data-look="keellight"] h1,html[data-look="keellight"] h2,html[data-look="platinum"] h1,html[data-look="platinum"] h2{font-weight:300!important;letter-spacing:-0.02em!important}
 .p3lk{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 .p3sw-midnight{background:linear-gradient(135deg,#0A0D12 50%,#BFDDF5 50%)}.p3sw-dusk{background:linear-gradient(135deg,#0F0E10 50%,#F5B48E 50%)}
-.p3sw-keel{background:linear-gradient(135deg,#000 50%,#5B6CFF 50%)}.p3sw-platinum{background:linear-gradient(135deg,#0E0F11 50%,#F1F4F7 50%)}
+.p3sw-keel{background:linear-gradient(135deg,#000 50%,#5B6CFF 50%)}.p3sw-keellight{background:linear-gradient(135deg,#F7F7FA 50%,#E23D9E 50%)}.p3sw-platinum{background:linear-gradient(135deg,#0E0F11 50%,#F1F4F7 50%)}
 .p3sw-auto{background:linear-gradient(90deg,#F4F1EB 50%,#0A100D 50%)}
 /* Today: tighter */
 .p3koach .p1read summary,.p3koach .p1readc{padding-top:12px!important;padding-bottom:12px!important}
@@ -2105,6 +2113,6 @@ html[data-look="forest"]{--bg:#0E0E10!important;--surface:#18181B!important;--li
 <div id="player" class="player" hidden></div>
 <div id="toast" class="toast" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="/p3/app.js?v=p6h"></script>
+<script src="/p3/app.js?v=p6i"></script>
 </body>
 </html>
