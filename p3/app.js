@@ -4818,7 +4818,8 @@ function bmCalc(){
       else if(/^Extra /.test(x.kind||''))credit(sess,BM_G.hyrox.t,.35,'Extra Hyrox classes');
       else credit(sess,{quads:1,glutes:1,hams:1,upback:1,abs:1,chest:1},.3,x.kind==='Gym'?'Extra gym':'Other training');
       flush(sess)});
-    if(isNum(dd.farm)&&dd.farm>=3){const sess={};credit(sess,BM_FARM,dd.farm>=4?1:.7,'Heavy farm days');flush(sess);pat.carry+=.5}
+    if(dd.wk&&Array.isArray(dd.wk.tasks)){if(dd.wk.tasks.length){const sess={};p3JbkBM(dd.wk,(m,f,src)=>credit(sess,m,f,src),pat);flush(sess)}}
+    else if(isNum(dd.farm)&&dd.farm>=3){const sess={};credit(sess,BM_FARM,dd.farm>=4?1:.7,'Heavy farm days');flush(sess);pat.carry+=.5}
     const h=dd.habits||[],rec=(dd.recovery||[]).map(r=>r.kind);
     if(h.includes('Mobility / stretch')||rec.includes('Loosen-out'))MOBILITY.forEach(([nm])=>BM_MOB.forEach(([re,ms])=>{if(re.test(nm))ms.forEach(m=>mob[m]+=1/ms.length*1.5)}));
     if(h.includes('Yoga / pilates')||rec.includes('Stretch / yoga'))BM_MOBALL.forEach(m=>mob[m]+=.5)}
@@ -7432,6 +7433,123 @@ const _p3Wf=p3Wheelify;p3Wheelify=function(root){_p3Wf(root);try{p3PaceExtra()}c
 window.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-p3pm]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();P3PM=b.dataset.p3pm;try{localStorage.setItem('p3paceMode',P3PM)}catch(_){}
   const k=document.querySelector('.p3pmk');if(k)k.innerHTML='';p3PaceExtra()},true);
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='f-pace')p3PaceNote()});
+
+// ---- Work days: your physical job counts. Set up a day once by voice, tick it in the morning check-in ----
+const P3JBMV={carry:'Carry',lift:'Lift',push:'Push',pull:'Pull',twist:'Twist',squat:'Squat / kneel',walk:'Walk',climb:'Climb',stand:'On feet'};
+const P3JBMS={carry:['grip','upback','abs','obliques','quads'],lift:['lowback','glutes','hams','quads','grip'],push:['chest','delts','arms','quads'],pull:['lats','upback','arms','grip'],twist:['obliques','delts','lowback'],squat:['quads','glutes','adductors'],walk:['calves','quads','glutes'],climb:['quads','glutes','calves'],stand:['calves']};
+const P3JBPAT={carry:'carry',lift:'hinge',push:'push',pull:'pull',twist:'rotate',squat:'squat',climb:'single'};
+const P3JBLV=['','Light','Medium','Heavy'];
+const P3JBT=(n,d,mv,lv,min)=>({n,d,mv,lv,min,ms:P3JBMS[mv].slice()});
+const P3JBSTART=[
+ ['Sheep farmer','Farm day',[P3JBT('Meal buckets','2 × 15 kg, a few hundred metres','carry',2,20),P3JBT('Pitchfork, bedding, silage','','twist',2,30),P3JBT('Lifting bags and bales','','lift',2,15),P3JBT('Handling sheep','Catching, turning, dosing','pull',2,30),P3JBT('Walking the land','','walk',1,120)]],
+ ['Dairy farmer','Farm day',[P3JBT('Milking','On your feet, reaching','stand',1,150),P3JBT('Scraping yards','','push',2,30),P3JBT('Carrying feed and buckets','','carry',2,15),P3JBT('Walking','','walk',1,90)]],
+ ['Block layer','Site day',[P3JBT('Lifting and laying blocks','','lift',2,240),P3JBT('Mixing and shovelling','','twist',2,45),P3JBT('Carrying','','carry',2,30),P3JBT('Bending and kneeling','','squat',1,60)]],
+ ['Carpenter','Site day',[P3JBT('Carrying timber','','carry',2,30),P3JBT('Lifting sheets','','lift',2,20),P3JBT('Overhead work','','push',1,60),P3JBT('Ladders and scaffold','','climb',1,30),P3JBT('On your feet','','walk',1,180)]],
+ ['Tour guide','Guiding day',[P3JBT('Walking with groups','','walk',1,240),P3JBT('Hills and steps','','climb',1,40)]],
+ ['Coach','Coaching day',[P3JBT('On your feet coaching','','walk',1,120),P3JBT('Setting up gear','Cones, goals, bags','carry',1,15)]]];
+const P3JB={on:false,ed:null,text:'',busy:false,msg:''};
+const p3JbList=()=>((meta.work&&meta.work.list)||[]);
+const p3JbId=()=>'w'+Date.now().toString(36);
+const p3JbTpl=id=>p3JbList().find(x=>x.id===id);
+// load, kept on the low side: minutes × effort, then halved, capped
+function p3JbLoad(tasks){const raw=(tasks||[]).reduce((a,t)=>a+(+t.min||0)*[0,1,4,6][+t.lv||1],0);return Math.min(300,Math.round(raw*.5))}
+function p3JbLevel(tasks){const l=p3JbLoad(tasks);return l<=0?0:l<80?1:l<200?2:l<280?3:4}
+function p3JbHrs(tasks){return Math.round((tasks||[]).filter(t=>t.mv!=='walk'||+t.lv>1).reduce((a,t)=>a+(+t.min||0),0)/30)/2}
+const _p3dla=dayLoadAll;
+dayLoadAll=function(k){const d=D()[k];if(d&&d.wk&&Array.isArray(d.wk.tasks))return sRPE(L()[k])+extrasLoad(d)+p3JbLoad(d.wk.tasks);return _p3dla(k)};
+// body map: each task credits its muscles and its movement
+function p3JbkBM(wk,cr,pat){const seen={};(wk.tasks||[]).forEach(t=>{const lv=+t.lv||1;const f=[0,.35,.6,.9][lv]*Math.min(1,(+t.min||30)/45);const m={};(t.ms&&t.ms.length?t.ms:P3JBMS[t.mv]||[]).forEach((x,i)=>m[x]=i<2?1:.6);
+  cr(m,f,'Work: '+(wk.name||'work day'));const p=P3JBPAT[t.mv];if(p&&!seen[p]){seen[p]=1;pat[p]+=lv>=2?1:.5}})}
+// food: a heavy work day on a rest day eats like a light or training day
+const _p3dtf=dayTypeFor;
+const p3JbDayLoad=k=>{const d=D()[k]||{};if(d.wk&&Array.isArray(d.wk.tasks))return p3JbLoad(d.wk.tasks);if(d.wkPlan&&d.wkPlan.id){const t=p3JbTpl(d.wkPlan.id);return t?p3JbLoad(t.tasks):0}return 0};
+dayTypeFor=function(k){const b=_p3dtf(k);if(b!=='rest')return b;const w=p3JbDayLoad(k);return w>=150?'training':w>=60?'light':b};
+const _p3dtw=dayTypeWhy;dayTypeWhy=function(k){const b=_p3dtf(k);if(b==='rest'&&p3JbDayLoad(k)>=60)return 'a heavy work day';return _p3dtw(k)};
+// what was usual on this weekday
+function p3JbUsual(k){const dow=parse(k).getDay();const t=p3JbList().find(x=>(x.dows||[]).includes(dow));if(t)return t.id;
+  const cnt={};for(let i=7;i<=28;i+=7){const d=D()[iso(addD(parse(k),-i))];if(d&&d.wk&&d.wk.id)cnt[d.wk.id]=(cnt[d.wk.id]||0)+1}const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];return top&&top[1]>=2?top[0]:null}
+async function p3JbParse(text){
+  const j=await sample.json(`Someone describes the physical work in their day job. Turn it into a short list of tasks.
+What they said: """${text.slice(0,1500)}"""
+Rules: one task per distinct job. Estimate minutes per day and keep every estimate on the low side. Effort lv: 1 light, 2 medium, 3 heavy (only for genuinely hard lifting or carrying). Desk, driving and sitting are not tasks.
+Reply {"name":"short name for the day, 1 to 3 words, e.g. Farm day","tasks":[{"n":"task, 2 to 4 words","d":"weights, distances or reps they said, short, else empty","mv":one of ${JSON.stringify(Object.keys(P3JBMV))},"ms":up to 5 muscles worked, most worked first, from ${JSON.stringify(BM_M.map(m=>m[0]))},"lv":1-3,"min":minutes}]}`,{maxTokens:1500});
+  const tasks=(j&&j.tasks||[]).filter(t=>t&&t.n&&P3JBMV[t.mv]).slice(0,10).map(t=>({n:String(t.n).slice(0,40),d:String(t.d||'').slice(0,60),mv:t.mv,lv:Math.max(1,Math.min(3,+t.lv||1)),min:Math.max(5,Math.min(480,Math.round((+t.min||20)/5)*5)),ms:(Array.isArray(t.ms)?t.ms:[]).filter(x=>BM_M.some(m=>m[0]===x)).slice(0,5)}));
+  tasks.forEach(t=>{if(!t.ms.length)t.ms=P3JBMS[t.mv].slice()});return {name:String(j&&j.name||'Work day').slice(0,24),tasks}}
+const P3JBDOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const p3JbMus=t=>(t.ms||[]).slice(0,4).map(x=>(BM_M.find(m=>m[0]===x)||[0,x])[1].replace(/ \(.*\)/,'')).join(', ');
+function p3JbTaskRow(t,i,ed){return `<div class="p3wt"><div><b>${esc(t.n)}</b>${t.d?`<small>${esc(t.d)}</small>`:''}<small>${esc(p3JbMus(t))}</small></div>
+  <span class="p3wtg p3wl${t.lv}">${P3JBMV[t.mv]} · ${P3JBLV[t.lv]}</span>${ed?`<div class="p3wte"><button type="button" data-p3w="lv" data-i="${i}">Effort ›</button><button type="button" data-p3w="min-" data-i="${i}">−</button><span class="num">${t.min} min</span><button type="button" data-p3w="min+" data-i="${i}">+</button><button type="button" data-p3w="del" data-i="${i}" aria-label="Remove">${ico('x')}</button></div>`:''}</div>`}
+function p3JbEdHTML(){const e=P3JB.ed;const head=`<div class="kshead"><div><h2>${e?esc(e.name||'Work day'):'Your work days'}</h2><small class="ds">${e?'Tap effort or minutes to change. Keep it on the low side.':'Set up a typical day once. Then it\'s one tap in the morning.'}</small></div><button type="button" class="x" data-p3w="back" aria-label="Back">${ico('x')}</button></div>`;
+  const say=`<div class="p3wsay"><textarea id="p3wtx" rows="3" placeholder="e.g. Two buckets of meal, 15 kilos each hand, 300 metres, twice a day. Half an hour pitchforking silage. Lifting a few bales.">${esc(P3JB.text)}</textarea><div class="p3wsb">${speakBtn('p3wtx')}<button type="button" class="primary" data-p3w="parse" ${P3JB.busy?'disabled':''}>${P3JB.busy?'Working it out…':e?'Add these':'Make my day'}</button></div>${P3JB.msg?`<small class="ds">${esc(P3JB.msg)}</small>`:''}</div>`;
+  if(!e){const L=p3JbList();
+    return head+(L.length?L.map(t=>`<section class="p1blk p3wcard"><div class="p3wch"><b>${esc(t.name)}</b><span class="ds">${t.tasks.length} tasks</span><button type="button" class="linkbtn" data-p3w="edit" data-id="${t.id}">Edit ›</button></div>
+      <div class="p3wdow"><span class="ds">Usual on</span>${[1,2,3,4,5,6,0].map(d=>`<button type="button" data-p3w="dow" data-id="${t.id}" data-d="${d}" aria-pressed="${(t.dows||[]).includes(d)}">${P3JBDOW[d]}</button>`).join('')}</div></section>`).join(''):'')+
+      `<section class="p1blk"><h3>${L.length?'Add another day':'Say what a typical day looks like'}</h3>${say}</section>
+      <section class="p1blk"><h3>Or start from one of these</h3><div class="p3off">${P3JBSTART.map((s,i)=>`<button type="button" data-p3w="start" data-i="${i}">${esc(s[0])}</button>`).join('')}</div></section>
+      <button type="button" class="primary p1save" data-p3w="back">Done</button>`}
+  return head+`<section class="p1blk"><div class="field"><span class="label">Name</span><input id="p3wnm" value="${esc(e.name)}" maxlength="24"></div></section>
+    <section class="p1blk">${e.tasks.length?e.tasks.map((t,i)=>p3JbTaskRow(t,i,true)).join(''):'<small class="ds">No tasks yet. Say what you do below.</small>'}<div class="p3wsum ds">Counts as about <b class="num">${p3JbLoad(e.tasks)}</b> load, on the low side. A hard hour in the gym is about 400.</div></section>
+    <section class="p1blk"><h3>Add more by voice</h3>${say}</section>
+    <button type="button" class="primary p1save" data-p3w="save">Save ${esc(e.name||'day')}</button>${e.id&&p3JbTpl(e.id)?`<button type="button" class="linkbtn p3full" data-p3w="rm">Delete this day</button>`:''}`}
+function p3JbDraw(){if(P1.ci){p1CiDraw();return}p1Sheet(P3JB.on?p3JbEdHTML():null)}
+async function p3JbSaveList(list){await persistMeta('work',{list})}
+// check-in: Yesterday's work and Today looks like
+function p3JbCiHTML(c){const L=p3JbList();const yk=iso(addD(parse(c.k),-1));const ydow=P3JBDOW[parse(yk).getDay()];
+  const chip=(id,l,cur,attr)=>`<button type="button" data-p3w="${attr}" data-id="${id}" aria-pressed="${cur===id}">${cur===id?ico('check')+' ':''}${esc(l)}</button>`;
+  const yes=`<section class="p1blk p3qci p3wci"><div class="p3qh"><h3>Yesterday's work</h3>${c.wkAuto&&c.wk?`<small class="p3wus">Usual for ${ydow}</small>`:''}</div>
+    ${L.length?`<div class="p3off">${L.map(t=>chip(t.id,t.name,c.wk,'ci')).join('')}${chip('off','Desk / off',c.wk,'ci')}<button type="button" data-p3w="ciadd" aria-pressed="${!!c.wkSay}">${ico('mic')} Say it</button></div>`
+      :`<div class="p3off">${chip('off','Desk / off',c.wk,'ci')}<button type="button" data-p3w="open">${ico('plus')} Set up your work day</button></div>`}
+    ${(c.wkAdd||[]).length?`<div class="p3wadd">${c.wkAdd.map((t,i)=>`<span>+ ${esc(t.n)} <small>${t.min} min</small><button type="button" data-p3w="ciaddx" data-i="${i}" aria-label="Remove">${ico('x')}</button></span>`).join('')}</div>`:''}
+    ${c.wkSay?`<div class="p3wsay"><textarea id="p3wci" rows="2" placeholder="e.g. Normal day plus two hours fencing">${esc(c.wkText||'')}</textarea><div class="p3wsb">${speakBtn('p3wci')}<button type="button" class="primary" data-p3w="ciparse" ${c.wkBusy?'disabled':''}>${c.wkBusy?'Working it out…':'Add'}</button></div></div>`:''}
+    ${L.length?`<button type="button" class="linkbtn p3wedl" data-p3w="open">Edit work days ›</button>`:''}</section>`;
+  const tod=L.length?`<section class="p1blk p3qci"><h3>Today looks like <small class="ds">Optional</small></h3><div class="p3off">${L.map(t=>chip(t.id,t.name,c.wkPlan,'plan')).join('')}${chip('off','Desk / off',c.wkPlan,'plan')}</div></section>`:'';
+  return yes+tod}
+const _p3qci=p3QuickCiHTML;
+p3QuickCiHTML=function(c){const h=_p3qci(c);const i=h.indexOf('<button type="button" class="primary p1save"');return i<0?h:h.slice(0,i)+p3JbCiHTML(c)+h.slice(i)};
+const _p3ciOpenW=p1CiOpen;
+p1CiOpen=function(){const r=_p3ciOpenW.apply(this,arguments);const c=P1.ci;if(c){const yk=iso(addD(parse(c.k),-1));const y=D()[yk]||{},t=D()[c.k]||{};
+  if(y.wk&&y.wk.id){c.wk=y.wk.id;c.wkAuto=false;c.wkAdd=(y.wk.extra||[]).slice()}else{c.wk=p3JbUsual(yk);c.wkAuto=!!c.wk;c.wkAdd=[]}
+  c.wkPlan=t.wkPlan&&t.wkPlan.id||null;c.wkSay=false;c.wkText='';c.wkTouched=false;p1CiDraw()}return r};
+const _p3ciDrawW=p1CiDraw;
+p1CiDraw=function(){if(P1.ci&&P3JB.on){p1Sheet(p3JbEdHTML());return}return _p3ciDrawW.apply(this,arguments)};
+const _p3ciFieldsW=p1CiFields;
+p1CiFields=function(c){const f=_p3ciFieldsW(c);if(c&&c.quick&&c.wkPlan!==undefined){if(c.wkPlan){const t=p3JbTpl(c.wkPlan);f.wkPlan={id:c.wkPlan,name:c.wkPlan==='off'?'Desk / off':t?t.name:''}}else f.wkPlan=null}return f};
+const _p3ciSaveW=p1CiSave;
+p1CiSave=async function(){const c=P1.ci;if(c&&c.quick&&c.feel&&c.sleepSet&&(c.wk||(c.wkAdd||[]).length)){const yk=iso(addD(parse(c.k),-1));const t=c.wk&&c.wk!=='off'?p3JbTpl(c.wk):null;const extra=(c.wkAdd||[]).slice();
+    const tasks=[...(t?t.tasks:[]),...extra];const wk={id:c.wk||'custom',name:c.wk==='off'?'Desk / off':t?t.name:'Work',tasks,extra,at:new Date().toISOString()};
+    try{await persistDay(yk,{wk,farm:p3JbLevel(tasks),farmHrs:p3JbHrs(tasks)})}catch(e){}}
+  return _p3ciSaveW.apply(this,arguments)};
+// profile entry
+const _p3vpW=viewProfile;
+viewProfile=function(){const h=_p3vpW.apply(this,arguments);const L=p3JbList();const s=`<section class="panel"><h3>Your work days</h3><div class="ds">${L.length?L.map(t=>esc(t.name)).join(', ')+'. Ticked in the morning check-in; counts towards load, body map and food.':'If your job is physical, set up a typical day once and it counts towards load, body map and food.'}</div><button type="button" class="ghost" data-p3w="open" style="color:var(--fg)">${L.length?'Edit work days':'Set up your work day'}</button></section>`;
+  const i=h.indexOf('<section class="panel"><h3>Send feedback');return i<0?h+s:h.slice(0,i)+s+h.slice(i)};
+document.addEventListener('input',e=>{const el=e.target;if(el.id==='p3wtx')P3JB.text=el.value;else if(el.id==='p3wci'&&P1.ci)P1.ci.wkText=el.value;else if(el.id==='p3wnm'&&P3JB.ed)P3JB.ed.name=el.value},true);
+document.addEventListener('click',async e=>{const b=e.target.closest&&e.target.closest('[data-p3w]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const a=b.dataset.p3w,c=P1.ci,ed=P3JB.ed,i=+b.dataset.i;
+  const L=p3JbList().map(x=>({...x}));
+  if(a==='open'){P3JB.on=true;P3JB.ed=null;P3JB.text='';P3JB.msg='';if(c)p1CiDraw();else p1Sheet(p3JbEdHTML());return}
+  if(a==='back'){if(ed){P3JB.ed=null;P3JB.msg='';p3JbDraw();return}P3JB.on=false;if(c){if(!c.wk){c.wk=p3JbUsual(iso(addD(parse(c.k),-1)));c.wkAuto=!!c.wk}}p3JbDraw();if(!c)render();return}
+  if(a==='start'){const s=P3JBSTART[i];P3JB.ed={id:null,name:s[1],tasks:JSON.parse(JSON.stringify(s[2])),dows:[1,2,3,4,5]};p3JbDraw();return}
+  if(a==='edit'){const t=L.find(x=>x.id===b.dataset.id);if(t)P3JB.ed=JSON.parse(JSON.stringify(t));p3JbDraw();return}
+  if(a==='dow'){const t=L.find(x=>x.id===b.dataset.id);const d=+b.dataset.d;if(!t)return;L.forEach(x=>{if(x!==t)x.dows=(x.dows||[]).filter(z=>z!==d)});t.dows=(t.dows||[]).includes(d)?t.dows.filter(z=>z!==d):[...(t.dows||[]),d];await p3JbSaveList(L);p3JbDraw();return}
+  if(ed&&a==='lv'){const t=ed.tasks[i];t.lv=t.lv%3+1;p3JbDraw();return}
+  if(ed&&(a==='min-'||a==='min+')){const t=ed.tasks[i];const st=t.min>=60?15:5;t.min=Math.max(5,Math.min(480,t.min+(a==='min+'?st:-st)));p3JbDraw();return}
+  if(ed&&a==='del'){ed.tasks.splice(i,1);p3JbDraw();return}
+  if(a==='parse'){const tx=(P3JB.text||'').trim();if(!tx){toast('Say or type what the day looks like first');return}P3JB.busy=true;P3JB.msg='';p3JbDraw();
+    try{const r=await p3JbParse(tx);if(!r.tasks.length)P3JB.msg="Couldn't pick out any physical work there. Try naming the jobs.";else{if(ed)ed.tasks.push(...r.tasks);else P3JB.ed={id:null,name:r.name,tasks:r.tasks,dows:[]};P3JB.text=''}}
+    catch(z){P3JB.msg='Could not work that out. Try again.'}P3JB.busy=false;p3JbDraw();return}
+  if(ed&&a==='save'){if(!ed.tasks.length){toast('Add at least one task');return}const nm=(ed.name||'').trim()||'Work day';const id=ed.id||p3JbId();const doc={id,name:nm,tasks:ed.tasks,dows:ed.dows||[]};
+    if(doc.dows.length)L.forEach(x=>{if(x.id!==id)x.dows=(x.dows||[]).filter(z=>!doc.dows.includes(z))});const j=L.findIndex(x=>x.id===id);if(j>=0)L[j]=doc;else L.push(doc);await p3JbSaveList(L);P3JB.ed=null;toast(nm+' saved');
+    if(c&&!c.wkTouched){const u=p3JbUsual(iso(addD(parse(c.k),-1)));c.wk=u||id;c.wkAuto=!!u}p3JbDraw();return}
+  if(ed&&a==='rm'){await p3JbSaveList(L.filter(x=>x.id!==ed.id));P3JB.ed=null;p3JbDraw();return}
+  if(!c)return;
+  if(a==='ci'){const id=b.dataset.id;c.wk=c.wk===id?null:id;c.wkAuto=false;c.wkTouched=true;p1CiDraw();return}
+  if(a==='plan'){const id=b.dataset.id;c.wkPlan=c.wkPlan===id?null:id;p1CiDraw();setTimeout(p1Queue,0);return}
+  if(a==='ciadd'){c.wkSay=!c.wkSay;p1CiDraw();return}
+  if(a==='ciaddx'){c.wkAdd.splice(i,1);p1CiDraw();return}
+  if(a==='ciparse'){const tx=(c.wkText||'').trim();if(!tx){toast('Say or type what was different');return}c.wkBusy=true;p1CiDraw();
+    try{const r=await p3JbParse(tx+'\n(Only list the extra jobs, not ones covered by '+(c.wk&&p3JbTpl(c.wk)?'their usual '+p3JbTpl(c.wk).name:'a normal day')+'.)');const lst=p3JbList();
+      const m=lst.find(t=>t.name.toLowerCase()===r.name.toLowerCase());if(!c.wk||c.wk==='off')c.wk=m?m.id:'custom';c.wkAdd=(c.wkAdd||[]).concat(r.tasks.filter(t=>!(m&&m.tasks.some(x=>x.n===t.n))));c.wkText='';c.wkSay=false;c.wkTouched=true}
+    catch(z){toast('Could not work that out. Try again.')}c.wkBusy=false;p1CiDraw();return}},true);
 
 (async()=>{
   try{const cfg=await fetch('/api/config').then(r=>r.json());if(!cfg.url||!cfg.anonKey)throw 0;window.P3CFG=cfg;VOICE_SERVER=!!cfg.voice;TTS_ON=!!(cfg.tts??cfg.voice);SERVER_PLAN=!!cfg.plan;window.__p1route=!!cfg.route;sb=window.supabase.createClient(cfg.url,cfg.anonKey)}
